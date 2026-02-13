@@ -1,0 +1,40 @@
+{
+  "date": "2026-02-11",
+  "evening": {
+    "recovery_score": 58,
+    "hrv": 115.77,
+    "rhr": 50,
+    "skin_temp": 34.80,
+    "spo2": 97.3,
+    "sleep": {
+      "duration_hours": 6.7,
+      "efficiency": 87.2,
+      "performance": 76,
+      "consistency": 81,
+      "rem_hours": 1.0,
+      "deep_hours": 1.4,
+      "light_hours": 3.4
+    },
+    "workouts": [
+      {
+        "type": "weightlifting",
+        "duration_mins": 34,
+        "strain": 9.7,
+        "avg_hr": 110,
+        "max_hr": 141,
+        "kilojoules": 734
+      },
+      {
+        "type": "running", 
+        "duration_mins": 35,
+        "strain": 11.4,
+        "avg_hr": 136,
+        "max_hr": 170,
+        "kilojoules": 1474
+      }
+    ],
+    "total_strain": 21.1,
+    "total_kilojoules": 2208,
+    "tonal_status": "unavailable - auth issue"
+  }
+}

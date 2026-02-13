@@ -1,0 +1,41 @@
+{
+  "date": "2026-02-04",
+  "evening": {
+    "strain": {
+      "total_day_strain": 10.0,
+      "kilojoules_burned": 3388,
+      "max_heart_rate": 149,
+      "interpretation": "High strain day - significant physical stress"
+    },
+    "workout": {
+      "type": "weightlifting",
+      "duration_minutes": 56,
+      "start_time": "10:42 AM",
+      "end_time": "11:38 AM",
+      "avg_heart_rate": 99,
+      "max_heart_rate": 149,
+      "kilojoules": 822,
+      "strain_contribution": 6.39,
+      "zones": "Mostly Zone 1 with Zone 2/3 spikes"
+    },
+    "sleep_last_night": {
+      "duration_hours": 7.47,
+      "efficiency_percent": 89.7,
+      "performance_percent": 83,
+      "recovery_score": 66
+    },
+    "weekly_pattern": {
+      "days_trained": 4,
+      "avg_workout_duration": 62,
+      "avg_sleep_efficiency": 88,
+      "training_consistency": "Daily weightlifting routine"
+    },
+    "tomorrow_outlook": {
+      "predicted_recovery": "60-70 range",
+      "intensity_recommendation": "Moderate - avoid high strain",
+      "target_bedtime": "10:30-11:00 PM",
+      "sleep_need_hours": 7.6
+    },
+    "notes": "Tonal service down - unable to fetch workout programming data"
+  }
+}

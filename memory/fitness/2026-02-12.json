@@ -1,0 +1,49 @@
+{
+  "evening": {
+    "date": "2026-02-12",
+    "strain": 25.5,
+    "workouts": [
+      {
+        "type": "running",
+        "duration_min": 32,
+        "strain": 11.96,
+        "kilojoules": 1555,
+        "avg_hr": 144,
+        "max_hr": 166
+      },
+      {
+        "type": "activity", 
+        "duration_min": 18,
+        "strain": 8.4,
+        "kilojoules": 746,
+        "avg_hr": 134,
+        "max_hr": 180
+      },
+      {
+        "type": "activity",
+        "duration_min": 8, 
+        "strain": 5.1,
+        "kilojoules": 277,
+        "avg_hr": 123,
+        "max_hr": 154
+      }
+    ],
+    "recovery": {
+      "score": 79,
+      "hrv": 121,
+      "resting_hr": 48
+    },
+    "sleep_last_night": {
+      "efficiency": 88,
+      "time_in_bed": "9h 18m",
+      "cycles": 7,
+      "disturbances": 17
+    },
+    "tonal_status": "auth_issue",
+    "recommendations": {
+      "bedtime": "21:15",
+      "sleep_need": "8h 50m",
+      "tomorrow_intensity": "medium"
+    }
+  }
+}

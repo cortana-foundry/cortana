@@ -1,0 +1,81 @@
+{
+  "morning": {
+    "timestamp": "2026-01-31T07:00:00-05:00",
+    "sleep": {
+      "start": "2026-01-31T02:27:25-05:00",
+      "end": "2026-01-31T09:44:19-05:00",
+      "total_in_bed_hours": 7.28,
+      "total_sleep_hours": 6.15,
+      "deep_hours": 1.64,
+      "rem_hours": 0.97,
+      "light_hours": 3.54,
+      "awake_hours": 1.13,
+      "efficiency_pct": 84.42,
+      "performance_pct": 71,
+      "consistency_pct": 91,
+      "disturbances": 18,
+      "respiratory_rate": 17.5,
+      "sleep_debt_hours": 2.13
+    },
+    "recovery": {
+      "note": "Data may still be processing for today"
+    },
+    "workout": {
+      "logged_today": false,
+      "last_workout": {
+        "date": "2026-01-30",
+        "type": "weightlifting",
+        "strain": 8.11,
+        "duration_min": 71,
+        "avg_hr": 105,
+        "max_hr": 150
+      }
+    },
+    "tonal": {
+      "status": "error",
+      "error": "failed to get user info - may need re-auth"
+    }
+  },
+  "evening": {
+    "timestamp": "2026-01-31T20:30:00-05:00",
+    "recovery": {
+      "score": 69,
+      "zone": "yellow",
+      "hrv_rmssd": 124.88,
+      "resting_hr": 47,
+      "spo2_pct": 97.61,
+      "skin_temp_c": 35.0
+    },
+    "todays_strain": {
+      "workout_strain": 6.53,
+      "total_kilojoules": 793,
+      "max_hr": 145,
+      "avg_hr": 107,
+      "workout_type": "weightlifting",
+      "duration_min": 38
+    },
+    "weekly_summary": {
+      "days_trained": 7,
+      "avg_recovery": 69.3,
+      "avg_sleep_performance": 75.6,
+      "workouts": [
+        {"date": "2026-01-25", "strain": 17.59, "types": ["weightlifting", "field-hockey"]},
+        {"date": "2026-01-26", "strain": 5.76, "types": ["weightlifting"]},
+        {"date": "2026-01-27", "strain": 6.73, "types": ["weightlifting"]},
+        {"date": "2026-01-28", "strain": 7.76, "types": ["weightlifting"]},
+        {"date": "2026-01-29", "strain": 5.68, "types": ["weightlifting"]},
+        {"date": "2026-01-30", "strain": 8.11, "types": ["weightlifting"]},
+        {"date": "2026-01-31", "strain": 6.53, "types": ["weightlifting"]}
+      ]
+    },
+    "sleep_recommendation": {
+      "sleep_need_hours": 10.0,
+      "target_bedtime": "10:00 PM ET",
+      "notes": "Sleep debt is elevated (~2.1h). Today's moderate strain (6.5) shouldn't add much additional need. Aim for an early bedtime to chip away at the debt."
+    },
+    "tonal": {
+      "status": "error",
+      "error": "failed to get user info - needs re-auth"
+    }
+  }
+}

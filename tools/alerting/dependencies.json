@@ -1,0 +1,35 @@
+{
+  "services": {
+    "tonal": {
+      "endpoint": "http://localhost:8080/tonal/health",
+      "healthCheck": "curl -s http://localhost:8080/tonal/health",
+      "dependents": ["fitness-morning-brief", "fitness-evening-recap", "weekly-fitness-insights"]
+    },
+    "whoop": {
+      "endpoint": "http://localhost:8080/whoop/data",
+      "healthCheck": "curl -s http://localhost:8080/whoop/data | head -c 100",
+      "dependents": ["fitness-morning-brief", "fitness-evening-recap", "weekly-fitness-insights"]
+    },
+    "postgres": {
+      "endpoint": "localhost:5432",
+      "healthCheck": "pg_isready -h localhost -p 5432",
+      "dependents": ["daily-upgrade-protocol", "daily-health-summary", "memory-consolidation", "pattern-logging"]
+    },
+    "openclaw-browser": {
+      "endpoint": "http://127.0.0.1:18800",
+      "healthCheck": "nc -z 127.0.0.1 18800",
+      "dependents": ["amazon-keepalive", "fedex-tracking", "flight-watch"]
+    },
+    "gog": {
+      "endpoint": "gog auth list",
+      "healthCheck": "gog auth list | grep -q hameldesai3",
+      "dependents": ["morning-brief", "calendar-reminders", "newsletter-digest", "newsletter-alerts"]
+    },
+    "bird": {
+      "endpoint": "bird whoami",
+      "healthCheck": "/Users/hd/bin/birdx whoami",
+      "dependents": ["twitter-mentions", "twitter-auth-check"]
+    }
+  },
+  "notes": "If a service is unhealthy, dependent crons may fail or degrade gracefully."
+}

@@ -1,0 +1,10 @@
+# local secrets
+secrets/**
+.env
+.env.*
+
+# dependencies
+node_modules/
+
+# OS files
+.DS_Store

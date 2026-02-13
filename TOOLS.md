@@ -1,0 +1,84 @@
+# TOOLS.md - Local Notes
+
+Environment-specific config that doesn't belong in skills.
+
+---
+
+## Browser Access (OpenClaw Browser)
+
+OpenClaw manages its own Chrome instance with CDP access.
+
+**Config:**
+- Port: 18800
+- Profile: `~/.openclaw/browser/openclaw/user-data`
+
+**Usage:**
+- Use `browser` tool with `profile="openclaw"`
+- Direct CDP: `curl http://127.0.0.1:18800/json`
+- Open new tab: `curl -X PUT "http://127.0.0.1:18800/json/new?<URL>"`
+
+**Note:** Legacy chrome-debug (port 9222) retired — all browser automation now uses OpenClaw's browser.
+
+---
+
+## iCloud Drive
+
+**Path:** `~/Library/Mobile Documents/com~apple~CloudDocs/`
+
+**Rules:**
+- ✅ READ files
+- ✅ COPY/MOVE files INTO iCloud
+- ❌ NEVER move files OUT of iCloud
+- ❌ NEVER delete files from iCloud
+
+---
+
+## Cortana Database (PostgreSQL)
+
+**Database:** cortana (PostgreSQL 17 local)
+**Path:** `/opt/homebrew/opt/postgresql@17/bin`
+**Service:** `brew services start/stop postgresql@17`
+
+### Tables
+
+**cortana_events** — Error/system event logging
+- Schema: id, timestamp, event_type, source, severity, message, metadata (JSONB)
+- Use for: auth failures, cron errors, system events
+
+**cortana_patterns** — Routine/behavior pattern tracking  
+- Schema: id, timestamp, pattern_type, value, day_of_week, metadata (JSONB)
+- Use for: wake times, sleep checks, workouts, work hours
+
+**cortana_upgrades** — Self-improvement tracking
+- Schema: id, proposed_at, gap_identified, proposed_fix, effort, status, outcome, approved_at, implemented_at
+- Status: proposed → approved/rejected → implemented/failed
+
+**cortana_feedback** — Learning from corrections
+- Schema: id, timestamp, feedback_type, context, lesson, applied
+- Use for: corrections, preferences, approval/rejection reasons
+
+### Quick Commands
+```bash
+export PATH="/opt/homebrew/opt/postgresql@17/bin:$PATH"
+
+# View recent events
+psql cortana -c "SELECT * FROM cortana_events ORDER BY timestamp DESC LIMIT 10;"
+
+# View upgrade history
+psql cortana -c "SELECT proposed_at::date, gap_identified, status FROM cortana_upgrades ORDER BY proposed_at DESC;"
+
+# View patterns by day of week
+psql cortana -c "SELECT pattern_type, day_of_week, COUNT(*) FROM cortana_patterns GROUP BY pattern_type, day_of_week;"
+
+# View unprocessed feedback
+psql cortana -c "SELECT * FROM cortana_feedback WHERE applied = FALSE;"
+```
+
+---
+
+## Skill-Specific Config
+
+Most tool configs now live in their skills:
+- **Fitness (Whoop/Tonal)** → `fitness-coach` skill
+- **Calendar (khal/vdirsyncer)** → `caldav-calendar` skill  
+- **Gmail/GCal (gog)** → `gog` skill

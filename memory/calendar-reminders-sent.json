@@ -1,0 +1,46 @@
+{
+  "reminders_sent": [
+    {
+      "event_id": "_6osj6dhn61gm4d9kc5gjge1j6ko38d1n6dhm8og",
+      "event_title": "🏎 FORMULA 1 ARAMCO PRE-SEASON TESTING 1 2026 - Practice 2",
+      "reminder_type": "all_day_9am",
+      "sent_at": "2026-02-12T15:20:00Z"
+    },
+    {
+      "event_id": "_ad4jcgqb9tckkga79h44mii5896kui2qb5a5kdq26lblgdpn60p46jac70", 
+      "event_title": "📊 COIN Earnings (Q4 2025) - After Close",
+      "reminder_type": "all_day_9am",
+      "sent_at": "2026-02-12T15:20:00Z"
+    },
+    {
+      "event_id": "_d1gmisj3elq2qrbfchgiqsr1dhnmsb9i60p3cc1i64pk0rrgcln66r31es",
+      "event_title": "Haircut - Moda Salon",
+      "reminder_type": "t60m",
+      "sent_at": "2026-02-12T18:00:00Z"
+    },
+    {
+      "event_id": "_d1gmisj3elq2qrbfchgiqsr1dhnmsb9i60p3cc1i64pk0rrgcln66r31es",
+      "event_title": "Haircut - Moda Salon",
+      "reminder_type": "t10m",
+      "sent_at": "2026-02-12T19:00:00Z"
+    },
+    {
+      "event_id": "0bpvbvk0n9mdrvpge7p196kos2_20260212T233000Z",
+      "event_title": "2026S SSW 567-A/A-U/WS - Online Lecture",
+      "reminder_type": "t60m",
+      "sent_at": "2026-02-12T22:30:00Z"
+    },
+    {
+      "event_id": "0bpvbvk0n9mdrvpge7p196kos2_20260212T233000Z",
+      "event_title": "2026S SSW 567-A/A-U/WS - Online Lecture",
+      "reminder_type": "t10m",
+      "sent_at": "2026-02-12T22:40:32Z"
+    },
+    {
+      "event_id": "_6osj6dhn61gm4d9kc5gjge1j6ko38d1n6dhm8oo",
+      "event_title": "🏎 FORMULA 1 ARAMCO PRE-SEASON TESTING 1 2026 - Practice 3",
+      "reminder_type": "all_day_9am",
+      "sent_at": "2026-02-13T14:00:00Z"
+    }
+  ]
+}

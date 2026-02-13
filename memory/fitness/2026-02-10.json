@@ -1,0 +1,46 @@
+{
+  "date": "2026-02-10",
+  "evening": {
+    "total_strain": 21.75,
+    "total_kilojoules": 2683,
+    "workouts": {
+      "weightlifting": {
+        "duration_min": 33,
+        "kilojoules": 760,
+        "strain": 6.43,
+        "avg_hr": 112,
+        "max_hr": 142
+      },
+      "running": {
+        "duration_min": 42,
+        "kilojoules": 1599,
+        "strain": 10.34,
+        "avg_hr": 131,
+        "max_hr": 169
+      },
+      "evening_activity": {
+        "duration_min": 16,
+        "kilojoules": 323,
+        "strain": 4.98,
+        "avg_hr": 107
+      }
+    },
+    "recovery": {
+      "current": 83,
+      "predicted_tomorrow": "65-75%",
+      "sleep_recommendation": {
+        "bedtime": "9:00-9:15 PM",
+        "target_duration": "8h 15m",
+        "reason": "High strain day requires extra recovery"
+      }
+    },
+    "weekly_summary": {
+      "days_trained": 7,
+      "consistency": "100%",
+      "avg_strain": 8.5,
+      "total_kilojoules_week": 8500
+    },
+    "tonal_service_status": "authentication_error",
+    "notes": "Excellent training day - 7 consecutive days of training. Strong combination of strength and cardio work."
+  }
+}

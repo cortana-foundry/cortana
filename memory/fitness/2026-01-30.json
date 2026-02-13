@@ -1,0 +1,49 @@
+{
+  "date": "2026-01-30",
+  "evening": {
+    "timestamp": "2026-01-30T20:30:00-05:00",
+    "recovery": {
+      "score": 60,
+      "hrv": 102.7,
+      "rhr": 49,
+      "spo2": 96.5
+    },
+    "sleep": {
+      "performance": 79,
+      "efficiency": 88.78,
+      "total_hours": 6.34,
+      "stages": {
+        "light_hours": 3.3,
+        "rem_hours": 1.08,
+        "deep_hours": 1.96
+      },
+      "disturbances": 15,
+      "consistency": 85
+    },
+    "workout": {
+      "type": "weightlifting",
+      "strain": 8.11,
+      "kilojoules": 1369,
+      "max_hr": 150,
+      "avg_hr": 105,
+      "duration_min": 71,
+      "muscle_groups": ["back", "biceps", "chest", "shoulders", "triceps"]
+    },
+    "tonal": {
+      "strength_scores": {
+        "overall": 685,
+        "upper": 877,
+        "core": 557,
+        "lower": 620
+      },
+      "changes": {
+        "upper": "+25 from yesterday"
+      }
+    },
+    "weekly_stats": {
+      "days_trained": 7,
+      "avg_strain": 6.6,
+      "avg_sleep_performance": 76
+    }
+  }
+}
