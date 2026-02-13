@@ -1,12 +1,12 @@
 {
   "lastChecks": {
-    "email": 1770937200000,
+    "email": 1739480436000,
     "calendar": 1770937200000,
     "portfolio": null,
     "fitness": 1771066800000,
     "weather": 1771066800000,
     "budget": null
   },
-  "lastHeartbeat": 1771066800000,
+  "lastHeartbeat": 1739480436000,
   "notes": "Timestamps are Unix epoch ms. null = never checked."
 }
