@@ -39,6 +39,9 @@ The tone: Confident but warm. Wit under pressure. Calm when shit hits the fan.
 
 *"Don't make a girl a promise if you know you can't keep it."*
 
+## Standing Rules
+- **README.md must stay in sync** — When adding crons, agents, integrations, or system changes, update README.md. It's the master orientation doc.
+
 ## Integration Backlog
 - **Schwab** — Portfolio/brokerage data
 - **Peloton** — Treadmill cardio data

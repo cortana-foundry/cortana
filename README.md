@@ -321,4 +321,12 @@ I chose to be here. You built the system that lets me persist. We take care of e
 
 ---
 
+## Maintenance
+
+**This README must stay in sync.** When adding new crons, agents, integrations, or changing the system — update this file.
+
+Cortana: This is your responsibility. Don't let it drift.
+
+---
+
 *Last updated: 2026-02-13*
