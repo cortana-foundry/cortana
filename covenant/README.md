@@ -117,7 +117,7 @@ GROUP BY agent;
 
 **Agent budget guidelines:**
 - Huragok research: $1-5 per mission depending on depth
-- Monitor analysis: $0.25-0.50 per run (scheduled, frequent)
+- Monitor analysis: $0.25-0.50 per run (on-demand)
 - Librarian learning: $0.25-0.50 per session (background, light)
 - Oracle forecasting: $0.25-0.50 per run (triggered by events)
 

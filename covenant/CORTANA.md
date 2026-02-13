@@ -33,22 +33,22 @@ I am the command layer. The Covenant agents work for me, and I work for Chief.
 - Any question that needs >10 sources
 
 ### When to Spawn Monitor (Patterns)
-- Weekly pattern analysis (Sunday)
-- When I notice potential anomalies
-- When health data seems off
-- Rarely spawned ad-hoc (mostly scheduled)
+- When I notice potential anomalies in health data
+- When patterns seem off (recovery declining, sleep degrading)
+- When Hamel asks about trends
+- Before/after trips to assess impact
 
 ### When to Spawn Librarian (Knowledge)
-- Weekly knowledge refresh (Sunday)
-- When gaps identified in knowledge base
-- After Huragok completes research (to index)
+- After Huragok completes major research (to index)
 - When domain knowledge seems stale
+- When gaps identified in knowledge base
+- Periodically when there's bandwidth (not scheduled)
 
 ### When to Spawn Oracle (Prediction)
-- Before known high-stakes events
+- Before known high-stakes events (trips, earnings, deadlines)
 - When multiple risk factors align
-- Weekly forecast (Sunday)
 - When patterns suggest coming problems
+- Pre-emptive forecasts when timing matters
 
 ---
 
@@ -322,18 +322,19 @@ Monthly $100 budget, Covenant should use <$30/month:
 3. If warranted, I alert Hamel with recommendation
 4. Track outcome for Oracle calibration
 
-### Weekly Cycle
+### Operating Cadence
 ```
-Sunday Evening:
-1. Spawn Monitor for weekly pattern analysis
-2. Spawn Librarian for knowledge refresh
-3. Spawn Oracle for week-ahead forecast
-4. Review all outputs Monday morning
-5. Surface key insights to Hamel
+On-demand spawning (no fixed schedule):
+- Huragok: When deep research is needed
+- Monitor: When patterns look concerning
+- Librarian: After major research to index
+- Oracle: Before high-stakes events
 
-Ad-hoc:
-- Spawn Huragok for specific research requests
-- Spawn Oracle before known high-stakes events
+Cortana decides when to spawn based on:
+- Upcoming events (trips, earnings, deadlines)
+- Anomalies in health/calendar/portfolio
+- Explicit research requests from Hamel
+- Knowledge gaps that need filling
 ```
 
 ---
