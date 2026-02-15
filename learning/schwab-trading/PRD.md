@@ -2,267 +2,478 @@
 
 **Author:** Cortana  
 **Date:** February 15, 2026  
-**Status:** Draft  
+**Status:** Draft (v2 — Strategy Engineering Approach)  
 **Owner:** Hamel Desai
 
 ---
 
 ## 1. Overview
 
-Build an autonomous trading agent integrated with Charles Schwab's brokerage API. The agent will monitor positions, analyze market conditions, and execute trades according to predefined strategies with appropriate risk controls.
+Build an AI-powered trading system integrated with Charles Schwab's brokerage API. The AI acts as a **strategy engineer** — it designs, backtests, and optimizes rules-based trading systems. It does NOT make discretionary trade decisions based on "vibes."
 
-### 1.1 Vision
+### 1.1 Core Philosophy
+
+> "Don't treat the LLM as a discretionary trader. Use it as a strategy engineer. The model doesn't execute trades; it builds rules that can be evaluated, scrutinized, refined, and optimized."
+
+**The Wrong Way:**
+- AI says "buy AAPL because it looks good" → vibes-based, untestable
+
+**The Right Way:**
+- AI says "here's a strategy: buy S&P 500 stocks ranked by 30-day momentum when RSI < 40, backtest shows 12% annual return with 0.8 sortino ratio" → rules-based, validated
+
+### 1.2 Vision
 
 A personal AI trading assistant that:
-- Monitors portfolio health 24/7
-- Surfaces actionable insights proactively
-- Executes trades with human approval (initially)
-- Graduates to autonomous execution with guardrails
-- Learns from outcomes and adapts
+- Engineers rules-based trading strategies
+- Backtests strategies against historical data
+- Optimizes parameters via genetic algorithms
+- Validates in paper trading before live deployment
+- Executes only proven strategies with strict risk controls
+- Learns from outcomes and refines systems
 
-### 1.2 Success Metrics
+### 1.3 Success Metrics
 
 | Metric | Target |
 |--------|--------|
-| Portfolio visibility | Real-time positions, P&L, alerts |
-| Trade execution latency | < 5 seconds from approval |
-| Max drawdown (autonomous mode) | Hard cap at 5% daily |
-| System uptime | 99%+ during market hours |
-| False positive alerts | < 10% |
+| Strategy win rate (backtest) | > 55% |
+| Sortino ratio (live) | > 1.0 |
+| Max drawdown | < 15% |
+| Paper trading validation period | 30+ days |
+| Live vs backtest deviation | < 20% |
 
 ---
 
 ## 2. Phased Rollout
 
-### Phase 1: Read-Only Portfolio Tracking (MVP)
+### Phase 1: Portfolio Intelligence (MVP)
 
 **Timeline:** 1-2 days  
-**Risk Level:** None (no trading)
+**Risk Level:** None (read-only)
 
 **Features:**
 - [ ] Schwab OAuth integration (token storage, refresh flow)
-- [ ] Account summary endpoint (balances, buying power)
-- [ ] Positions endpoint (holdings, cost basis, P&L)
-- [ ] Daily portfolio summary to Telegram (morning brief integration)
-- [ ] Price alerts for watchlist stocks (% move thresholds)
-- [ ] Earnings calendar integration for held positions
+- [ ] Account summary (balances, buying power, margin)
+- [ ] Positions with P&L, cost basis, allocation %
+- [ ] Daily portfolio summary in morning brief
+- [ ] Price alerts for significant moves (> 3%)
+- [ ] Earnings calendar for held positions
+- [ ] Sector/concentration analysis
 
 **Deliverables:**
 - `schwab_tokens.json` in `~/Desktop/services/`
-- New endpoints in existing Go service or standalone
-- Telegram notifications via existing message tool
+- Portfolio endpoints in Go service
+- Integration with existing morning brief cron
 
 ---
 
-### Phase 2: Trade Suggestions + Human Approval
+### Phase 2: Strategy Engineering + Backtesting
 
-**Timeline:** 1 week  
-**Risk Level:** Low (human in the loop)
+**Timeline:** 2-3 weeks  
+**Risk Level:** None (no real money)
+
+This is the core differentiator. The AI doesn't suggest trades — it engineers trading systems.
+
+#### 2.1 Strategy Builder
 
 **Features:**
-- [ ] Technical analysis signals (RSI, MACD, moving averages)
-- [ ] News sentiment integration (earnings, upgrades/downgrades)
-- [ ] Trade proposal format:
-  ```
-  📈 Trade Suggestion: BUY AAPL
+- [ ] Natural language → strategy rules conversion
+- [ ] Strategy template library (see Section 3)
+- [ ] Parameter extraction and validation
+- [ ] Strategy versioning and comparison
+
+**Example interaction:**
+```
+Hamel: "Build me a momentum strategy for large caps"
+
+Cortana: "Here's a momentum strategy:
+
+📊 Strategy: Large Cap Momentum v1
+
+Universe: S&P 500 stocks
+Entry Rules:
+  - 30-day price ROC > 5%
+  - RSI(14) between 40-70 (not overbought)
+  - Above 50-day SMA
   
-  Signal: RSI oversold (28) + positive earnings surprise
-  Entry: $185.50 (current: $184.20)
-  Position size: 10 shares ($1,855)
-  Stop loss: $178 (-4%)
-  Target: $195 (+5.7%)
-  
-  [✅ Approve] [❌ Reject] [✏️ Modify]
-  ```
-- [ ] Inline button approval via Telegram
-- [ ] Order execution on approval
-- [ ] Confirmation message with fill details
-- [ ] Full audit trail in `cortana_events`
+Exit Rules:
+  - 15% trailing stop
+  - RSI > 80 (take profit)
+  - Falls below 50-day SMA
 
-**Deliverables:**
-- Trade suggestion engine (Oracle agent integration?)
-- Order execution module
-- Telegram inline button handlers
+Position Sizing: Equal weight, max 10 positions
 
----
+Want me to backtest this against 2023-2025 data?"
+```
 
-### Phase 3: Autonomous Trading with Guardrails
-
-**Timeline:** 2-4 weeks  
-**Risk Level:** Medium-High (requires extensive testing)
+#### 2.2 Backtesting Engine
 
 **Features:**
+- [ ] Historical data integration (Schwab or third-party)
+- [ ] Walk-forward backtesting (not just in-sample)
+- [ ] Key metrics calculation:
+  - Total return vs benchmark (SPY)
+  - Sortino ratio (downside risk-adjusted)
+  - Max drawdown
+  - Win rate
+  - Average win/loss ratio
+  - Sharpe ratio
+- [ ] Trade-by-trade breakdown
+- [ ] Drawdown visualization
+- [ ] Multiple timeframe testing (1Y, 3Y, 5Y)
 
-#### 3.1 Strategy Framework
-- [ ] Strategy plugin architecture (swap strategies without code changes)
-- [ ] Initial strategies:
-  - Momentum (trend following)
-  - Mean reversion (oversold bounces)
-  - Earnings plays (pre/post earnings positioning)
-- [ ] Strategy backtesting against historical data
-- [ ] Paper trading mode (simulated execution, real prices)
+**Output format:**
+```
+📈 Backtest Results: Large Cap Momentum v1
+Period: Jan 2023 - Jan 2026 (3 years)
 
-#### 3.2 Risk Management (NON-NEGOTIABLE)
-- [ ] **Position limits:**
-  - Max 10% of portfolio in single position
-  - Max 5 open positions at once
-- [ ] **Loss limits:**
-  - Daily loss limit: 2% of portfolio
-  - Weekly loss limit: 5% of portfolio
-  - Auto-halt trading on breach
-- [ ] **Instrument restrictions:**
-  - Stocks only (no options, futures, margin initially)
-  - Whitelist of allowed tickers
-  - Blacklist of excluded tickers (meme stocks, penny stocks)
-- [ ] **Time restrictions:**
-  - No trading first/last 15 min of session (volatility)
-  - No overnight holds (initially)
+Performance:
+  Total Return: 47.2% (vs SPY 38.1%)
+  Annual Return: 13.8%
+  Sortino Ratio: 1.42
+  Max Drawdown: -12.3%
+  Win Rate: 58%
+  
+Risk Analysis:
+  Worst Month: -6.2% (Aug 2024)
+  Best Month: +8.1% (Nov 2024)
+  Correlation to SPY: 0.72
 
-#### 3.3 Kill Switches
-- [ ] `/trading stop` — immediate halt, no new orders
-- [ ] `/trading pause` — pause new orders, manage existing
-- [ ] `/trading status` — current state, open orders, P&L
-- [ ] Auto-halt on API errors or unexpected behavior
-- [ ] Circuit breaker on rapid successive losses
+Trade Stats:
+  Total Trades: 127
+  Avg Hold Time: 23 days
+  Avg Win: +7.2%
+  Avg Loss: -4.1%
 
-#### 3.4 Observability
-- [ ] Real-time P&L dashboard (canvas or web)
-- [ ] Trade history with outcomes
-- [ ] Strategy performance attribution
-- [ ] Daily/weekly performance reports
-- [ ] Anomaly detection (unusual fills, slippage)
+✅ Strategy meets minimum criteria (Sortino > 1.0)
+Ready for paper trading validation?
+```
 
-**Deliverables:**
-- Strategy engine with plugin support
-- Risk management module
-- Paper trading environment
-- Kill switch commands
-- Performance dashboard
+#### 2.3 Genetic Optimization
+
+**Features:**
+- [ ] Parameter range definition
+- [ ] Fitness function (sortino ratio, not just returns)
+- [ ] Population-based optimization
+- [ ] Cross-validation to prevent overfitting
+- [ ] Optimization report with best parameters
+
+**Example:**
+```
+Cortana: "Running genetic optimization on Large Cap Momentum...
+
+Testing 500 parameter combinations:
+  - RSI range: 30-50 to 50-80
+  - Trailing stop: 10-25%
+  - Lookback period: 20-60 days
+
+Best parameters found:
+  - RSI entry: 35-65
+  - Trailing stop: 18%
+  - Lookback: 25 days
+  
+Improved Sortino: 1.42 → 1.67
+Improved Max DD: -12.3% → -9.8%
+```
 
 ---
 
-## 3. Technical Architecture
+### Phase 3: Paper Trading Validation
 
-### 3.1 Schwab API Integration
+**Timeline:** 1 week to build, 30+ days to validate  
+**Risk Level:** None (simulated)
 
-**API Details:**
-- Portal: developer.schwab.com
-- Auth: OAuth 2.0 (similar to Whoop/Tonal)
-- Rate limits: ~120 requests/minute
-- Endpoints needed:
-  - `/accounts` — account info, balances
-  - `/accounts/{id}/positions` — holdings
-  - `/accounts/{id}/orders` — order management
-  - `/marketdata/quotes` — real-time quotes
-  - `/marketdata/chains` — options chains (future)
+Before ANY strategy goes live, it must prove itself in paper trading.
 
-**Token Management:**
-- Store: `~/Desktop/services/schwab_tokens.json`
-- Auto-refresh on expiry
-- Self-healing: delete tokens on auth failure (same pattern as Tonal)
+**Features:**
+- [ ] Simulated execution at real prices
+- [ ] Slippage modeling (realistic fills)
+- [ ] Daily P&L tracking
+- [ ] Strategy vs backtest comparison
+- [ ] Anomaly detection (behaving differently than expected?)
+- [ ] Minimum 30-day validation period
+- [ ] Graduation criteria (see below)
 
-### 3.2 Service Architecture
+**Graduation Criteria (strategy can go live if):**
+- [ ] 30+ days of paper trading
+- [ ] Live performance within 20% of backtest
+- [ ] No unexpected drawdowns
+- [ ] Sortino ratio > 1.0 in paper period
+- [ ] Human approval
+
+---
+
+### Phase 4: Live Deployment with Guardrails
+
+**Timeline:** Ongoing  
+**Risk Level:** Real money (controlled)
+
+Only strategies that graduate from paper trading can be deployed.
+
+#### 4.1 Position Management
+
+**Features:**
+- [ ] Automated order execution via Schwab API
+- [ ] Position sizing based on strategy rules
+- [ ] Rebalancing on schedule or trigger
+- [ ] Multi-strategy portfolio support
+
+#### 4.2 Risk Management (NON-NEGOTIABLE)
+
+```yaml
+position_limits:
+  max_single_position: 10%      # No position > 10% of portfolio
+  max_positions: 10             # Max 10 concurrent positions
+  max_sector_exposure: 30%      # No sector > 30%
+
+loss_limits:
+  daily_loss_limit: 2%          # Halt if down 2% in a day
+  weekly_loss_limit: 5%         # Halt if down 5% in a week
+  strategy_loss_limit: 10%      # Kill strategy if down 10% total
+
+instrument_restrictions:
+  allowed: [stocks]             # No options, futures, margin (initially)
+  blacklist: [penny_stocks, meme_stocks, SPACs]
+  
+time_restrictions:
+  no_trade_open: 15             # No trades first 15 min
+  no_trade_close: 15            # No trades last 15 min
+```
+
+#### 4.3 Protected Holdings
+
+Per MEMORY.md, these are NEVER sold by automated strategies:
+- **TSLA** — forever hold
+- **NVDA** — forever hold
+
+These can be added to but never reduced without explicit human approval.
+
+#### 4.4 Kill Switches
+
+| Command | Action |
+|---------|--------|
+| `/trading stop` | Halt all trading, flatten positions |
+| `/trading pause` | No new orders, manage existing |
+| `/trading status` | Current state, open orders, P&L |
+| `/strategy disable <name>` | Disable specific strategy |
+| Auto-halt | Triggers on loss limits or API errors |
+
+---
+
+## 3. Strategy Templates
+
+Pre-built strategy templates the AI can customize:
+
+### 3.1 Momentum
+```
+Universe: S&P 500
+Signal: Top N stocks by X-day price ROC
+Filter: RSI not overbought, above SMA
+Exit: Trailing stop or RSI overbought
+```
+
+### 3.2 Mean Reversion
+```
+Universe: Large caps with high liquidity
+Signal: RSI oversold (< 30) + price > 200 SMA (uptrend)
+Entry: Buy on oversold bounce
+Exit: RSI neutral (50) or stop loss
+```
+
+### 3.3 Quality + Momentum
+```
+Universe: All US stocks
+Filter 1: Profitable (positive earnings)
+Filter 2: Low debt (debt/equity < 0.5)
+Filter 3: Top quartile ROE
+Rank: By 6-month momentum
+Select: Top 15
+Rebalance: Monthly
+```
+
+### 3.4 Earnings Momentum
+```
+Universe: Stocks reporting earnings this week
+Signal: Positive earnings surprise > 5%
+Entry: Buy on earnings beat
+Exit: 10-day hold or trailing stop
+```
+
+### 3.5 Sector Rotation
+```
+Universe: Sector ETFs (XLK, XLF, XLE, etc.)
+Signal: Relative strength vs SPY
+Entry: Top 3 sectors by 30-day RS
+Exit: Rotate when RS ranking changes
+Rebalance: Weekly
+```
+
+---
+
+## 4. Technical Architecture
+
+### 4.1 System Overview
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│                     Cortana (Main)                      │
-│  - Morning briefs with portfolio summary                │
-│  - Trade approval via Telegram                          │
-│  - /trading commands                                    │
-└─────────────────┬───────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────┐
+│                     Cortana (Main)                          │
+│  - Strategy engineering conversations                       │
+│  - Backtest result interpretation                          │
+│  - Paper trading monitoring                                │
+│  - Live trading commands                                   │
+└─────────────────┬───────────────────────────────────────────┘
                   │
                   ▼
-┌─────────────────────────────────────────────────────────┐
-│              Trading Service (Go/Python)                │
-│  - Schwab API client                                    │
-│  - Strategy engine                                      │
-│  - Risk management                                      │
-│  - Order execution                                      │
-└─────────────────┬───────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────┐
+│              Strategy Engine (Python)                       │
+│  - Strategy builder (NL → rules)                           │
+│  - Backtesting framework                                   │
+│  - Genetic optimizer                                       │
+│  - Paper trading simulator                                 │
+└─────────────────┬───────────────────────────────────────────┘
                   │
                   ▼
-┌─────────────────────────────────────────────────────────┐
-│                   Schwab API                            │
-└─────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────┐
+│              Trading Service (Go)                           │
+│  - Schwab API client                                       │
+│  - Order execution                                         │
+│  - Position management                                     │
+│  - Risk enforcement                                        │
+└─────────────────┬───────────────────────────────────────────┘
+                  │
+                  ▼
+┌─────────────────────────────────────────────────────────────┐
+│                   Schwab API                                │
+└─────────────────────────────────────────────────────────────┘
 ```
 
-### 3.3 Data Storage
+### 4.2 Data Requirements
+
+| Data | Source | Use |
+|------|--------|-----|
+| Historical prices | Schwab API or Yahoo Finance | Backtesting |
+| Fundamentals | Schwab API or financial APIs | Quality filters |
+| Real-time quotes | Schwab API | Live execution |
+| Earnings calendar | Third-party API | Earnings strategies |
+| Sector classifications | Static mapping | Sector rotation |
+
+### 4.3 Storage
 
 | Data | Location |
 |------|----------|
 | Auth tokens | `~/Desktop/services/schwab_tokens.json` |
-| Trade history | `cortana_events` (PostgreSQL) |
-| Strategy config | `~/clawd/config/trading/strategies.yaml` |
-| Watchlist | `cortana_watchlist` (PostgreSQL) |
+| Strategies | `~/clawd/config/trading/strategies/` |
 | Backtest results | `~/clawd/memory/trading/backtests/` |
+| Paper trades | `cortana_events` (PostgreSQL) |
+| Live trades | `cortana_events` (PostgreSQL) |
+| Performance logs | `~/clawd/memory/trading/performance/` |
 
 ---
 
-## 4. Safety & Compliance
+## 5. Backtesting Framework
 
-### 4.1 Never Automated (Human Only)
-- Enabling/disabling autonomous mode
+### 5.1 Requirements
+
+- **Walk-forward testing:** Train on 2020-2023, test on 2024-2025
+- **Transaction costs:** Include $0 commissions but model slippage
+- **Survivorship bias:** Use point-in-time constituents where possible
+- **Realistic fills:** Assume some slippage on entries/exits
+
+### 5.2 Libraries (Python)
+
+Options:
+- **Backtrader** — mature, feature-rich
+- **Zipline** — Quantopian's engine (now open source)
+- **VectorBT** — fast, pandas-based
+- **Custom** — build minimal engine for our needs
+
+Recommendation: Start with **VectorBT** for speed, migrate to custom if needed.
+
+### 5.3 Metrics Calculated
+
+| Metric | Description | Target |
+|--------|-------------|--------|
+| Total Return | Cumulative P&L | > SPY |
+| CAGR | Annualized return | > 10% |
+| Sortino Ratio | Return / downside deviation | > 1.0 |
+| Sharpe Ratio | Return / total volatility | > 0.8 |
+| Max Drawdown | Worst peak-to-trough | < 20% |
+| Win Rate | % of profitable trades | > 50% |
+| Profit Factor | Gross profit / gross loss | > 1.5 |
+| Avg Trade | Mean P&L per trade | > 1% |
+
+---
+
+## 6. Safety & Compliance
+
+### 6.1 Human-Only Actions
+- Enabling live trading for a strategy
 - Changing risk limits
-- Adding funds or withdrawals
-- Tax-related decisions (wash sales, etc.)
+- Adding/removing protected holdings
+- Withdrawing funds
 
-### 4.2 Audit Requirements
-- Every order logged with timestamp, rationale, outcome
-- Daily P&L reconciliation
-- Weekly strategy performance review
-- Monthly full audit export
+### 6.2 Audit Trail
+- Every strategy version saved with timestamp
+- Every backtest logged with parameters and results
+- Every paper trade recorded
+- Every live trade with rationale and outcome
+- Weekly performance summary
 
-### 4.3 Regulatory Notes
-- Pattern Day Trader rules (>4 day trades in 5 days = $25k min)
-- Wash sale tracking for tax purposes
-- No insider trading signals (duh)
-
----
-
-## 5. Open Questions
-
-1. **Account type:** Cash or margin account?
-2. **Initial capital allocation:** How much to start with?
-3. **Trading style preference:** Conservative (few trades, high conviction) or active?
-4. **Holdings to protect:** Any positions that should NEVER be sold? (TSLA, NVDA = forever holds per MEMORY.md)
-5. **Preferred strategies:** Momentum? Value? Earnings plays?
-6. **Paper trading duration:** How long before going live?
+### 6.3 Regulatory Awareness
+- Pattern Day Trader rules ($25k minimum for >4 day trades/week)
+- Wash sale tracking
+- No trading on material non-public information
 
 ---
 
-## 6. Implementation Checklist
+## 7. Open Questions
 
-### Phase 1 Kickoff
-- [ ] Register on developer.schwab.com
-- [ ] Create app, get client ID/secret
-- [ ] Implement OAuth flow
-- [ ] Test account/positions endpoints
-- [ ] Add to morning brief
-- [ ] Set up price alerts
-
-### Phase 2 Kickoff
-- [ ] Design trade suggestion format
-- [ ] Implement inline button approval
-- [ ] Build order execution module
-- [ ] Test with small position
-- [ ] Run for 2 weeks in approval mode
-
-### Phase 3 Kickoff
-- [ ] Build paper trading mode
-- [ ] Implement first strategy
-- [ ] Build risk management module
-- [ ] Run paper trading for 1 month
-- [ ] Graduate to small real positions
+1. **Initial capital for live trading?** (Start small, scale up)
+2. **Risk tolerance?** Conservative (sortino > 1.5) or moderate (sortino > 1.0)?
+3. **Preferred strategy types?** Momentum, value, quality, or mix?
+4. **Rebalancing frequency?** Daily, weekly, monthly?
+5. **Benchmark?** SPY, QQQ, or total market?
+6. **Paper trading duration?** 30 days minimum, but longer?
+7. **Historical data source?** Schwab API sufficient or need premium data?
 
 ---
 
-## 7. References
+## 8. Implementation Roadmap
+
+### Phase 1: Portfolio Intelligence (Week 1)
+- [ ] Schwab developer account + OAuth
+- [ ] Portfolio endpoints (balances, positions)
+- [ ] Morning brief integration
+- [ ] Price alerts
+
+### Phase 2: Strategy Engine (Weeks 2-4)
+- [ ] VectorBT setup + historical data
+- [ ] Strategy template implementation
+- [ ] Backtesting framework
+- [ ] Genetic optimizer
+- [ ] First strategy: Simple momentum
+
+### Phase 3: Paper Trading (Week 5 + 30 days)
+- [ ] Paper trading simulator
+- [ ] Daily P&L tracking
+- [ ] Performance dashboard
+- [ ] Graduation criteria check
+
+### Phase 4: Live Deployment (After validation)
+- [ ] Order execution module
+- [ ] Risk management enforcement
+- [ ] Kill switches
+- [ ] First live strategy (small allocation)
+
+---
+
+## 9. References
 
 - [Schwab Developer Portal](https://developer.schwab.com)
-- [Schwab API Docs](https://developer.schwab.com/products/trader-api--individual)
+- [NexusTrade Article on AI Trading](https://nexustrade.io/blog/too-many-idiots-are-using-openclaw-to-trade-heres-how-to-trade-with-ai-the-right-way-20260203)
+- [VectorBT Documentation](https://vectorbt.dev/)
+- [Backtrader Documentation](https://www.backtrader.com/)
 - [Pattern Day Trader Rules](https://www.finra.org/investors/learn-to-invest/advanced-investing/day-trading-margin-requirements-know-rules)
-- [Wash Sale Rules](https://www.irs.gov/publications/p550)
 
 ---
 
-*Last updated: Feb 15, 2026*
+*Last updated: Feb 15, 2026 (v2 — Strategy Engineering Approach)*
