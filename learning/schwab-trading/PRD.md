@@ -307,6 +307,271 @@ Exit: Rotate when RS ranking changes
 Rebalance: Weekly
 ```
 
+### 3.6 CANSLIM (William O'Neil Methodology)
+
+CANSLIM is a growth stock investing strategy developed by William O'Neil, founder of Investor's Business Daily. It's a rules-based system that scores stocks across 7 fundamental and technical factors, plus market regime awareness.
+
+**Why CANSLIM fits our approach:**
+- Systematic and rules-based (not vibes)
+- Combines fundamentals + technicals + market timing
+- Historically validated methodology
+- Backtestable criteria
+
+#### The 7 CANSLIM Factors
+
+| Factor | Name | Criteria | Scoring |
+|--------|------|----------|---------|
+| **C** | Current Earnings | Quarterly EPS growth > 25% YoY | 0-2 pts |
+| **A** | Annual Earnings | 5-year annual EPS growth > 25% | 0-2 pts |
+| **N** | New Product/High | New products, management, or 52-week high | 0-2 pts |
+| **S** | Supply & Demand | Low float + high volume on up days | 0-2 pts |
+| **L** | Leader | RS Rating > 80 (top 20% of market) | 0-2 pts |
+| **I** | Institutional | Increasing institutional ownership | 0-2 pts |
+| **M** | Market Direction | Market in confirmed uptrend | Gate (see below) |
+
+**Total Score: 0-12 points** (higher = stronger candidate)
+
+#### Factor Details
+
+**C — Current Quarterly Earnings**
+```
+Criteria:
+  - EPS growth > 25% vs same quarter last year
+  - Revenue growth > 20% (confirms earnings quality)
+  - Accelerating growth preferred (this Q > last Q)
+
+Scoring:
+  - 2 pts: EPS growth > 50% + accelerating
+  - 1 pt:  EPS growth 25-50%
+  - 0 pts: EPS growth < 25%
+```
+
+**A — Annual Earnings Growth**
+```
+Criteria:
+  - 5-year EPS growth rate > 25%
+  - ROE > 17%
+  - Consistent growth (no negative years)
+
+Scoring:
+  - 2 pts: 5yr growth > 40% + ROE > 25%
+  - 1 pt:  5yr growth 25-40%
+  - 0 pts: 5yr growth < 25%
+```
+
+**N — New Products, Management, or Highs**
+```
+Criteria:
+  - Stock at or near 52-week high
+  - New product launches or catalysts
+  - Recent management changes (positive)
+  - Breaking out of proper base pattern
+
+Scoring:
+  - 2 pts: At 52-week high + recent catalyst
+  - 1 pt:  Within 5% of 52-week high
+  - 0 pts: > 5% below high
+```
+
+**S — Supply and Demand**
+```
+Criteria:
+  - Shares outstanding < 50M (tighter float = bigger moves)
+  - Volume on up days > volume on down days
+  - Accumulation/Distribution rating (more buying than selling)
+
+Scoring:
+  - 2 pts: Float < 25M + strong accumulation
+  - 1 pt:  Float 25-50M or moderate accumulation
+  - 0 pts: Float > 50M + distribution
+```
+
+**L — Leader or Laggard**
+```
+Criteria:
+  - Relative Strength (RS) Rating > 80
+  - Stock outperforming 80%+ of all stocks
+  - Industry group in top 40% of 197 groups
+
+Scoring:
+  - 2 pts: RS > 90 + industry group top 20%
+  - 1 pt:  RS 80-90
+  - 0 pts: RS < 80 (laggard — avoid)
+```
+
+**I — Institutional Sponsorship**
+```
+Criteria:
+  - Owned by quality institutions (mutual funds, etc.)
+  - Number of institutional owners increasing
+  - Not over-owned (< 60% institutional)
+
+Scoring:
+  - 2 pts: Increasing ownership + quality sponsors
+  - 1 pt:  Stable institutional ownership
+  - 0 pts: Decreasing ownership (selling)
+```
+
+**M — Market Direction (GATE)**
+```
+This is a GATE, not a score. If market is in correction, 
+we don't buy anything regardless of individual stock scores.
+
+Market Regimes:
+  - CONFIRMED UPTREND: Full position sizing allowed
+  - RALLY ATTEMPT: Reduced position sizing (50%)
+  - UNDER PRESSURE: No new buys, hold existing
+  - CORRECTION: No new buys, tighten stops
+
+Signals:
+  - Follow-through day (FTD): Day 4+ of rally with >1.5% gain on higher volume
+  - Distribution day: Down >0.2% on higher volume
+  - 4-5 distribution days in 25 days = correction warning
+```
+
+#### CANSLIM Strategy Implementation
+
+```yaml
+strategy: CANSLIM Growth
+version: 1.0
+
+universe:
+  base: US stocks
+  filters:
+    - market_cap > $1B              # Mid to large cap
+    - avg_volume > 400K             # Liquid
+    - price > $15                   # No penny stocks
+
+scoring:
+  c_current_earnings:
+    weight: 1
+    criteria:
+      - eps_growth_yoy > 0.25
+      - revenue_growth_yoy > 0.20
+  a_annual_earnings:
+    weight: 1
+    criteria:
+      - eps_growth_5yr > 0.25
+      - roe > 0.17
+  n_new_high:
+    weight: 1
+    criteria:
+      - price_vs_52w_high > 0.95    # Within 5% of high
+  s_supply_demand:
+    weight: 1
+    criteria:
+      - shares_outstanding < 50M
+      - accumulation_rating >= 'B'
+  l_leader:
+    weight: 1.5                     # Leadership is critical
+    criteria:
+      - rs_rating > 80
+      - industry_group_rank < 80    # Top 40%
+  i_institutional:
+    weight: 1
+    criteria:
+      - institutional_ownership_change > 0
+      - institutional_owners_count > 10
+
+market_regime_gate:
+  confirmed_uptrend: 
+    position_size: 100%
+    action: buy
+  rally_attempt:
+    position_size: 50%
+    action: buy_cautiously
+  under_pressure:
+    position_size: 0%
+    action: hold_only
+  correction:
+    position_size: 0%
+    action: tighten_stops
+
+entry_rules:
+  - min_score >= 8                  # Need 8+ out of 12
+  - market_regime in [confirmed_uptrend, rally_attempt]
+  - breaking_out_of_base = true     # Technical breakout
+  - volume > 1.5x average           # Volume confirmation
+
+exit_rules:
+  - trailing_stop: 8%               # Sell if drops 8% from high
+  - rs_rating < 70                  # No longer a leader
+  - market_regime = correction      # Tighten to 3-5% stop
+  - profit_target: 20-25%           # Take some profits
+
+position_sizing:
+  method: equal_weight
+  max_positions: 8
+  max_single_position: 12.5%
+  
+rebalance: weekly                   # Review scores weekly
+```
+
+#### Using CANSLIM in Practice
+
+**Step 1: Check Market Regime (M)**
+```
+Before looking at ANY individual stocks, determine market direction:
+- Count distribution days in last 25 sessions
+- Look for follow-through days after corrections
+- If M = Correction or Under Pressure → STOP, don't buy
+```
+
+**Step 2: Screen Universe**
+```
+Filter to stocks that pass minimum criteria:
+- RS Rating > 80
+- EPS growth > 25%
+- Near 52-week high
+- Adequate volume
+```
+
+**Step 3: Score Candidates**
+```
+For each passing stock, calculate CANSLIM score (0-12)
+Rank by score, focus on top 10-20 candidates
+```
+
+**Step 4: Wait for Breakout**
+```
+Don't chase! Wait for:
+- Price breaking out of consolidation base
+- Volume 50%+ above average on breakout day
+- Market regime is favorable
+```
+
+**Step 5: Execute with Risk Management**
+```
+- Buy at breakout point (pivot)
+- Set stop loss 7-8% below entry
+- Position size based on market regime
+- Never average down
+```
+
+#### Data Sources for CANSLIM
+
+| Data Point | Source |
+|------------|--------|
+| EPS/Revenue Growth | Schwab API, Yahoo Finance, or Alpha Vantage |
+| RS Rating | Calculate from price data or IBD (paid) |
+| Institutional Ownership | Schwab API, Finviz, or SEC 13F filings |
+| Industry Group Ranking | Calculate or IBD (paid) |
+| Base Patterns | Technical analysis on price data |
+| Distribution Days | Calculate from index price + volume |
+
+#### Why Build Our Own vs IBD?
+
+IBD (Investor's Business Daily) provides CANSLIM data but:
+- Costs $35-50/month
+- No API access (screen scraping required)
+- Can't backtest their data
+
+**Our approach:**
+- Calculate factors from raw market data
+- Full backtesting capability
+- Customizable scoring weights
+- Free (aside from market data costs)
+
 ---
 
 ## 4. Technical Architecture
