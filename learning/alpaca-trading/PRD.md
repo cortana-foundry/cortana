@@ -112,6 +112,74 @@ The AI Account is a separate Alpaca account dedicated to strategy execution. Thi
 
 This is the core differentiator. The AI doesn't suggest trades — it engineers trading systems.
 
+#### What is Backtesting?
+
+Testing a trading strategy against **historical data** to see how it *would have* performed in the past — before risking real money.
+
+**Example — Without vs With Backtesting:**
+
+Say we have a simple strategy:
+> "Buy when the stock's 10-day average crosses above its 50-day average. Sell when it crosses below."
+
+| Approach | What Happens |
+|----------|--------------|
+| **Without backtesting** | We guess it might work. Risk real money to find out. Could lose $10K learning it's a bad strategy. |
+| **With backtesting** | Run this rule against 5 years of AAPL prices. In 10 seconds: "47 trades, 58% win rate, 23% return, -12% max drawdown." Know before risking money. |
+
+**How the Backtesting Engine Works:**
+
+```
+┌─────────────────────────────────────────┐
+│  Historical Data (5 years of prices)    │
+└─────────────────┬───────────────────────┘
+                  │
+                  ▼
+┌─────────────────────────────────────────┐
+│  Strategy Rules (buy when X, sell when Y)│
+└─────────────────┬───────────────────────┘
+                  │
+                  ▼
+┌─────────────────────────────────────────┐
+│  Simulate every trade day-by-day        │
+└─────────────────┬───────────────────────┘
+                  │
+                  ▼
+┌─────────────────────────────────────────┐
+│  Output: Win rate, returns, drawdown    │
+└─────────────────────────────────────────┘
+```
+
+**Concrete CANSLIM Example:**
+
+Instead of guessing "do high RS Rating stocks outperform?", we:
+1. Get 5 years of stock data
+2. Apply CANSLIM scoring rules to each historical day
+3. Simulate buying top-scored stocks
+4. See exactly how it would have performed
+
+```
+📈 Backtest Results: CANSLIM Strategy
+Period: Jan 2021 - Jan 2026 (5 years)
+
+Performance:
+  Total Return: 89% (vs SPY 62%)
+  Annual Return: 13.6%
+  Win Rate: 58%
+  Max Drawdown: -18%
+
+Verdict: 
+  ✅ If backtest shows solid returns → worth trying on paper trading
+  ❌ If backtest shows losses → don't trade it, refine the rules
+```
+
+**The engine is software that:**
+1. Loads historical price data
+2. Runs your strategy rules day-by-day
+3. Tracks simulated buys/sells
+4. Calculates performance metrics
+
+**Key insight:** We're not trading yet — we're testing ideas before risking money.
+
 #### 2.1 Strategy Builder
 
 **Features:**
