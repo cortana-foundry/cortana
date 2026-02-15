@@ -34,7 +34,22 @@ curl -s http://localhost:8080/whoop/data
 curl -s http://localhost:8080/tonal/data
 ```
 
-**If Tonal unhealthy:** Skip Tonal data gracefully, report Whoop-only insights.
+**If Tonal unhealthy:** Auto-heal first, then retry:
+```bash
+# Self-heal: delete tokens to force re-auth
+rm -f ~/Desktop/services/tonal_tokens.json
+
+# Log the self-heal
+export PATH="/opt/homebrew/opt/postgresql@17/bin:$PATH"
+psql cortana -c "INSERT INTO cortana_events (event_type, source, severity, message) VALUES ('auto_heal', 'tonal_auth', 'info', 'Deleted tonal_tokens.json to force re-auth');" 2>/dev/null
+
+# Wait for service to re-auth on next call (give it a moment)
+sleep 2
+
+# Retry health check
+curl -s http://localhost:8080/tonal/health | jq -r '.status'
+```
+If still unhealthy after self-heal: skip Tonal data gracefully, report Whoop-only insights, and alert user that manual intervention may be needed.
 
 ## Output Style
 
@@ -186,6 +201,10 @@ curl -H "Authorization: Bearer $TONAL_TOKEN" \
 ## Troubleshooting
 
 **Tonal auth fails:**
+⚠️ **Self-healing is automatic** — see "If Tonal unhealthy" section above. 
+The agent should auto-delete tokens and retry before skipping Tonal data.
+
+Manual fix (if auto-heal fails):
 ```bash
 # Delete tokens to force re-auth
 rm ~/Desktop/services/tonal_tokens.json
