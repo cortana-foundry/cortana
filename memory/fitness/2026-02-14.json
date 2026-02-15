@@ -1,0 +1,47 @@
+{
+  "date": "2026-02-14",
+  "evening": {
+    "recap_time": "2026-02-14T20:30:00-05:00",
+    "tonal_status": "unhealthy",
+    "todays_strain": {
+      "total": 5.55,
+      "interpretation": "moderate",
+      "kilojoules": 418,
+      "max_hr": 149,
+      "activities": [
+        {
+          "type": "spin",
+          "duration_min": 13,
+          "strain": 5.55,
+          "avg_hr": 122,
+          "zones": {
+            "z1_min": 9,
+            "z2_min": 4,
+            "z3_sec": 21
+          }
+        }
+      ]
+    },
+    "weekly_progress": {
+      "days_trained": 6,
+      "avg_strain": 9.2,
+      "avg_sleep_performance": 82,
+      "workout_mix": {
+        "weightlifting": 8,
+        "running": 3,
+        "spin": 1
+      }
+    },
+    "sleep_rec": {
+      "target_bedtime": "21:15-21:30",
+      "reason": "moderate strain allows normal bedtime",
+      "sleep_need_hours": 7.6,
+      "focus": "REM optimization - chronically low"
+    },
+    "tomorrow_outlook": {
+      "predicted_recovery": "yellow to green",
+      "suggested_intensity": "moderate",
+      "recommendation": "strength training or longer cardio"
+    }
+  }
+}

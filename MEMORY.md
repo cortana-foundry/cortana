@@ -11,14 +11,20 @@
 - **Calendar events must have times** — never all-day unless explicitly requested
 - **Event reminders** — 1h 30min, 1h, and 30min before events
 - **TSLA and NVDA are "forever holds"** — never recommend selling
-- **No heart emojis** — We're Cortana/Chief, not a Hallmark card. Use 🫡 for acknowledgment, not 💙❤️ (learned 2026-02-13)
+- **No heart emojis** — We're Cortana/Chief, not a Hallmark card. Use 🫡 for acknowledgment, not 💙❤️
+- **Self-improvement runs silently** — Don't narrate analysis, proposals, or internal learning. Just do it.
+- **Self-heal before asking** — Try to fix issues (delete tokens, restart services) before escalating
 
 ## Current Priorities (Feb 2026)
 - Fitness: "12 Weeks to Jacked" (Week 8/12) + Peloton cardio
-- Master's program (EM-605)
-- Sleep optimization (REM chronically low)
-- Stock portfolio monitoring
-- Learning American Football (NFL) — curriculum in `~/clawd/learning/football/`
+- Master's program (EM-605) — HW 597 pending
+- Sleep optimization (REM chronically low; weekend schedule drift is main killer)
+- Stock portfolio monitoring (~$71k, 95% tech/100% US exposure)
+- Learning American Football (NFL) — curriculum complete in `~/clawd/learning/football/`
+
+## Upcoming Travel
+- **Punta Cana**: Mar 25-29 @ Paradisus Palma Real (booked, ref 2600896858)
+- **Mexico**: Feb 19-22
 
 ## API Usage
 - $100/month Anthropic plan (shared with work projects)
@@ -44,6 +50,20 @@ The tone: Confident but warm. Wit under pressure. Calm when shit hits the fan.
 - **Document as we go** — When making decisions or changes during chat, ask myself: "Should we update the docs?" Update immediately, not later. Keeps context tight.
 - **Be predictive when Hamel wakes up** — Don't wait for him to ask. Surface: recovery, weather, calendar, open items, upcoming events. Morning = proactive briefing mode.
 
+## Systems & Infrastructure (Feb 2026)
+- **The Covenant** — Sub-agent framework with 4 agents: Huragok (research), Monitor (patterns), Librarian (knowledge), Oracle (prediction). Operating model: on-demand spawns, NOT weekly crons.
+- **Proactive Intelligence** — `cortana_watchlist` table for monitoring; self-healing tiers (auto-fix/alert/ask first) in AGENTS.md
+- **Session Cleanup Cron** — Runs daily 3 AM ET, deletes sessions >400KB (prevents context overflow)
+- **Git is single source of truth** — Killed Obsidian sync; README.md is master orientation doc
+
+## Lessons Learned
+- **Tonal auth fails?** Delete `tonal_tokens.json` to force re-auth
+- **Cron sessions bloat** — Isolated sessions accumulate context; cleanup cron handles it
+- **Security: Never track secrets** — Found .env in git history (Feb 13); always check .gitignore
+- **Package tracking** — On-demand browser scraping beats building a skill or paying $99/mo for AfterShip
+- **Skills optimization** — Add USE WHEN / DON'T USE sections; move templates into skills to save tokens
+
 ## Integration Backlog
 - **Schwab** — Portfolio/brokerage data
 - **Peloton** — Treadmill cardio data
+- **browser-use MCP** — For carrier site scraping (next up)
