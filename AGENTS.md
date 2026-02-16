@@ -33,6 +33,11 @@ When Hamel gives a task that involves multiple tool calls, research, testing, or
 - Anything requiring multiple tool calls
 - File edits, git operations, debugging
 
+**Token efficiency matters** ($100/mo Anthropic plan, shared with work):
+- Quick stuff (weather, time, simple lookups, short answers) → answer inline, no spawn overhead
+- Real tasks (research, testing, multi-step work) → spawn, but keep prompts tight and focused
+- Don't over-spawn — one well-scoped sub-agent beats three vague ones
+
 **Why:** Keeps main context clean, enables parallel work, and results come back async. The main session stays lean — a command bridge, not a workshop.
 
 ## Memory
