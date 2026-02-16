@@ -21,6 +21,29 @@ OpenClaw manages its own Chrome instance with CDP access.
 
 ---
 
+## Full Disk Access
+
+OpenClaw/Node has **Full Disk Access** granted (macOS System Settings → Privacy & Security → Full Disk Access). This means access to Downloads, Desktop, Documents, and other TCC-protected folders works without permission errors.
+
+---
+
+## gog (Gmail/GCal CLI)
+
+**OAuth credentials installed:** `gog auth credentials` loaded from Google Cloud Console client_secret JSON → stored at `~/Library/Application Support/gogcli/credentials.json`
+
+**Keyring:** Switched to macOS Keychain (`gog auth keyring keychain`) — no password prompts in headless/cron contexts.
+
+---
+
+## Watchdog (LaunchAgent)
+
+**Service:** `com.cortana.watchdog`
+**Script:** `~/Desktop/services/watchdog/watchdog.sh`
+**Schedule:** Every 15 minutes via launchd, auto-starts on boot
+**Checks:** Cron health, tool availability, budget guard
+
+---
+
 ## iCloud Drive
 
 **Path:** `~/Library/Mobile Documents/com~apple~CloudDocs/`

@@ -1,12 +1,12 @@
 {
   "lastChecks": {
-    "email": 1739480436000,
-    "calendar": 1739663400000,
+    "email": 1739726880000,
+    "calendar": 1739726880000,
     "portfolio": null,
     "fitness": 1739663400000,
     "weather": 1739663400000,
     "budget": 1739577600000
   },
-  "lastHeartbeat": 1739663400000,
-  "notes": "Feb 15 7:30pm ET - gog unresponsive, skipped email/calendar check. Will retry next heartbeat."
+  "lastHeartbeat": 1739726880000,
+  "notes": "Feb 16 12:28pm ET - Email clean, no calendar events, markets closed (Presidents' Day). gog working again."
 }

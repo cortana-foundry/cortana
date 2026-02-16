@@ -59,6 +59,11 @@ The tone: Confident but warm. Wit under pressure. Calm when shit hits the fan.
 
 - **Task Queue** — `cortana_tasks` table for autonomous task management. Tasks sourced from conversations, heartbeats, crons, and self-identified work. Auto-executable tasks run during heartbeats; remind_at tasks surface to Hamel. Established Feb 16, 2026.
 
+## System Access & Auth
+- **Full Disk Access** — OpenClaw/Node has FDA granted (Feb 16, 2026). Can access Downloads, Desktop, Documents, TCC-protected folders.
+- **gog fully headless** — OAuth credentials installed + keyring switched to macOS Keychain. No password prompts in cron/automated contexts.
+- **Watchdog LaunchAgent** — `com.cortana.watchdog`, runs every 15 min via launchd, auto-starts on boot. $0 reliability layer.
+
 ## Lessons Learned
 - **Tonal auth fails?** Delete `tonal_tokens.json` to force re-auth
 - **Cron sessions bloat** — Isolated sessions accumulate context; cleanup cron handles it
