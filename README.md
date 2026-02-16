@@ -302,6 +302,19 @@ CANSLIM-based trading advisor with backtesting. Location: `~/Desktop/services/ba
 
 ---
 
+## Situational Awareness Engine (SAE)
+
+Background system that gathers world state data into `cortana_sitrep` for instant situational awareness.
+
+- **Cron:** 3x/day (7AM, 1PM, 9PM ET) via `🌐 SAE World State Builder`
+- **Sources:** Calendar, Email, Weather, Fitness, Finance, Tasks, Patterns, Watchlist, System Health
+- **Query:** `SELECT * FROM cortana_sitrep_latest ORDER BY domain;`
+- **Details:** `sae/README.md`
+
+**Phases:** Phase 1 (world state builder) ✅ → Phase 2 (intelligent briefings) → Phase 3 (consolidation + prediction)
+
+---
+
 ## Database (PostgreSQL)
 
 Cortana uses a local PostgreSQL database for structured data.
@@ -317,6 +330,7 @@ Cortana uses a local PostgreSQL database for structured data.
 | `cortana_events` | System events |
 | `cortana_feedback` | Learning from corrections |
 | `cortana_tasks` | Autonomous task queue (pending/in_progress/done) |
+| `cortana_sitrep` | SAE world state snapshots (domain/key/value) |
 
 **Access:**
 ```bash
