@@ -98,30 +98,69 @@ Long-running autonomous agents I spawn for deep work. Named after Halo factions.
 
 ---
 
-## Crons (Automated Jobs)
+## Cron Jobs
 
-Things that run on schedule without you asking.
+26 recurring jobs run via OpenClaw's built-in cron scheduler. All times are Eastern. Manage with `openclaw cron list`.
 
-### Daily Crons
+### Daily Briefings
+
+```
+ 5AM  6AM  7AM  8AM  9AM 10AM 11AM 12PM  1PM  2PM  3PM  4PM  5PM  6PM  7PM  8PM  9PM 10PM 11PM
+  │    │    │    │    │    │              │              │         │         │    │    │    │
+  │    ├────┤    │    │    │              │              │         │         │    │    │    │
+  │    │ 📰 │    │    │    │  Newsletter Alert (every 30min 6AM-4PM)       │    │    │    │
+  │    ├────┤    │    │    │              │              │         │         │    │    │    │
+  │    │ ⏰ Calendar Reminders (hourly 6AM-11PM) ─────────────────────────────────────┤    │
+  │    │    │    │    │    │              │              │         │         │    │    │    │
+  🖥️   │   ☀️   🏋️   │   🔧            🖥️             │         📰        🌙   🖥️  🔍   🌙
+  │    │    │    │  📈│    │             📈             📈         │        🌙    │    │    │
+  │    │    │    │ 9:30    │            12PM           3PM        │       8:30   │    │    │
+  │    │    │    │ (wkdy)  │           (wkdy)         (wkdy)    (wkdy)   │      │    │    │
+```
 
 | Time (ET) | Job | What It Does |
 |-----------|-----|--------------|
-| 6:00 AM | ☀️ Morning Brief | Weather, calendar, tasks, career tip |
-| 7:00 AM | 🏋️ Fitness Brief | Whoop recovery, sleep analysis, training rec |
-| 3:00 AM | 🧹 Session Cleanup | Deletes bloated session files (>400KB) |
+| 7:00 AM daily | ☀️ Morning Brief | News, weather, calendar, API usage |
+| 7:30 AM weekdays | 📈 Stock Market Brief | Portfolio snapshot, material events |
+| 8:00 AM daily | 🏋️ Fitness Morning Brief | Whoop recovery, sleep, readiness |
+| 9:30 AM / 12 PM / 3 PM wkdy | 📈 Trading Advisor | Market scan for buy setups |
+| 10:00 AM daily | 🔧 Daily Upgrade Protocol | Git auto-commit + self-improvement proposal |
+| Every 30 min, 6AM–4PM | 📰 Newsletter Alert | Real-time newsletter detection |
+| Hourly, 6AM–11PM | ⏰ Calendar Reminders | Smart event reminders |
+| 5 AM / 1 PM / 9 PM | 🖥️ Mac Mini Health | Process/resource summary |
+| 6:00 PM weekdays | 📰 Newsletter Digest | End-of-day newsletter roundup |
+| 8:30 PM daily | 🌙 Fitness Evening Recap | Strain, workout details, tomorrow's plan |
+| 9:00 PM daily | 🔍 System Health Summary | Aggregate error/event analysis |
+| 9:30 PM Fri/Sat | 🌙 Weekend Pre-Bedtime | REM drift prevention |
+| 10:00 PM daily | 🌙 Bedtime Check | Sleep accountability ping |
 
-### On-Demand (Covenant)
+### Healthchecks
 
-Covenant agents (Huragok, Monitor, Librarian, Oracle) are spawned by Cortana when needed — not on a schedule. Examples: pre-trip forecasts, earnings research, pattern concerns.
+| Frequency | Job | What It Does |
+|-----------|-----|--------------|
+| 4 AM / 4 PM | 🐦 X Session Healthcheck | Twitter auth validation |
+| 4 AM / 4 PM | 🌐 Browser Healthcheck | OpenClaw browser port check |
+| 4 AM / 4 PM | 🔧 Fitness Service Healthcheck | Port 8080 + auto-restart |
+| 4 AM / 4 PM | 🏠 Home Assistant Healthcheck | HA browser tab check |
+| Every 4h | 💪 Tonal Health Check | Auth validation + auto-retry |
+| Every 8h | 🐦 Twitter Auth Check | Cookie/session validation |
+| Every 8h | 🛒 Amazon Session Keep-Alive | Browser session check |
 
-### Event-Based
+### Maintenance
 
-| Trigger | Job | What It Does |
-|---------|-----|--------------|
-| 90/60/30 min before events | 🔔 Calendar Reminders | Pings you before meetings |
-| Earnings dates | 📈 Earnings Watch | Alerts on held positions |
+| Time (ET) | Job | What It Does |
+|-----------|-----|--------------|
+| 3:00 AM daily | 🧹 Cron Session Cleanup | Delete bloated session files (>400KB) |
+| 4:00 AM daily | 🔄 Daily Auto-Update | Homebrew, OpenClaw, skills updates |
 
-**Manage crons:** Cortana handles this, or use `openclaw cron list`
+### Weekly
+
+| Time (ET) | Job | What It Does |
+|-----------|-----|--------------|
+| 3:00 AM Sunday | 📦 Weekly Backup Sync | iCloud backup of configs |
+| 3:00 AM Sunday | 🧠 Weekly Memory Consolidation | Archive + distill MEMORY.md |
+| 6:00 PM Sunday | 🔮 Weekly Cortana Status | Self-reflection + improvement proposals |
+| 8:00 PM Sunday | 📊 Weekly Fitness Insights | Coach-style weekly analysis |
 
 ---
 
@@ -334,4 +373,4 @@ Cortana: This is your responsibility. Don't let it drift.
 
 ---
 
-*Last updated: 2026-02-13*
+*Last updated: 2026-02-16*
