@@ -93,7 +93,7 @@ UPDATE cortana_watchlist SET last_checked = NOW(), last_value = '{"price": 450}'
 
 ### Task Queue Execution (every heartbeat)
 - Check `cortana_tasks` for pending auto-executable tasks where `execute_at <= NOW()` or `execute_at IS NULL`
-- Execute highest priority one if time permits (spawn sub-agent for complex tasks)
+- **Always spawn a sub-agent for task execution** — heartbeats are for checking and dispatching, not doing multi-step work inline
 - Surface overdue `remind_at` tasks to Hamel
 ```sql
 -- Auto-executable tasks ready to run
