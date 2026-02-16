@@ -27,18 +27,26 @@ Consumers (Morning Brief, Heartbeat, On-demand queries)
 - Each run shares a `run_id` UUID for atomicity
 - Failures logged as error rows, never abort
 
-## Phase 2 — Intelligent Briefings
-- Morning/evening briefs pull from sitrep instead of raw APIs
-- Delta detection: "what changed since last run"
-- Alert thresholds: auto-notify on significant changes
-- Token savings: briefs read structured data, not raw API calls
+## Phase 2 (Current) — Cross-Domain Reasoner
+- `cortana_insights` table stores generated insights
+- Cron runs 3x/day at :15 past (7:15AM, 1:15PM, 9:15PM ET) — 15 min after World State Builder
+- Reads current + previous sitrep, diffs them, detects cross-domain signals
+- Insight types: convergence, conflict, anomaly, prediction, action
+- Priority 1-2 insights auto-message Hamel on Telegram; 3-5 stay silent for briefs
+- Targets 2-5 high-quality insights per run (quality > quantity)
+- Uses sonnet model for token efficiency
 
-## Phase 3 — Consolidation & Prediction
-- Replace individual data-gathering crons with SAE
+## Phase 3 — Intelligent Briefings
+- Morning/evening briefs pull from sitrep + insights
+- Token savings: briefs read structured data, not raw API calls
+- Consolidate individual data-gathering crons into SAE
+
+## Phase 4 — Prediction & Automation
 - Pattern detection across domains (e.g. poor sleep → market decisions)
-- Oracle agent reads sitrep for predictions
+- Auto-execute suggested actions from insights
 - Trend analysis over time
 
 ## Files
-- `world-state-builder.md` — Instructions for the cron sub-agent
+- `world-state-builder.md` — Phase 1 cron instructions
+- `cross-domain-reasoner.md` — Phase 2 cron instructions
 - `README.md` — This file

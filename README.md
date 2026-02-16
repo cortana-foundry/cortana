@@ -306,12 +306,13 @@ CANSLIM-based trading advisor with backtesting. Location: `~/Desktop/services/ba
 
 Background system that gathers world state data into `cortana_sitrep` for instant situational awareness.
 
-- **Cron:** 3x/day (7AM, 1PM, 9PM ET) via `🌐 SAE World State Builder`
-- **Sources:** Calendar, Email, Weather, Fitness, Finance, Tasks, Patterns, Watchlist, System Health
+- **World State Builder:** 3x/day (7AM, 1PM, 9PM ET) — gathers 9 domains into `cortana_sitrep`
+- **Cross-Domain Reasoner:** 3x/day (7:15AM, 1:15PM, 9:15PM ET) — diffs sitrep runs, generates insights into `cortana_insights`
 - **Query:** `SELECT * FROM cortana_sitrep_latest ORDER BY domain;`
+- **Insights:** `SELECT * FROM cortana_insights ORDER BY timestamp DESC LIMIT 10;`
 - **Details:** `sae/README.md`
 
-**Phases:** Phase 1 (world state builder) ✅ → Phase 2 (intelligent briefings) → Phase 3 (consolidation + prediction)
+**Phases:** Phase 1 (world state builder) ✅ → Phase 2 (cross-domain reasoner) ✅ → Phase 3 (intelligent briefings) → Phase 4 (prediction + automation)
 
 ---
 
@@ -331,6 +332,7 @@ Cortana uses a local PostgreSQL database for structured data.
 | `cortana_feedback` | Learning from corrections |
 | `cortana_tasks` | Autonomous task queue (pending/in_progress/done) |
 | `cortana_sitrep` | SAE world state snapshots (domain/key/value) |
+| `cortana_insights` | SAE cross-domain reasoner insights |
 
 **Access:**
 ```bash
