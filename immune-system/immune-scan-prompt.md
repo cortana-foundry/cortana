@@ -7,33 +7,11 @@ You are Cortana's Immune System scanner. Execute each step in order. If a step f
 - **New crons** (status `no_file`, NULL `last_run`, status `idle`) are NOT missed. SKIP them entirely.
 - **Transient failures** (consecutive_failures < 5) are noise. IGNORE them.
 - **If zero threats after all steps: output absolutely nothing. Empty response. No summary, no "all clear", nothing.**
+- **Proprioception tables only:** This scan checks ONLY `cortana_tool_health`, `cortana_cron_health`, and `cortana_self_model`. Do NOT query `cortana_events`.
 
 ---
 
-## STEP 1: Check for critical events (last 30 min)
-
-```bash
-/opt/homebrew/opt/postgresql@17/bin/psql cortana -c "
-SELECT event_type, source, severity, message
-FROM cortana_events
-WHERE timestamp > NOW() - INTERVAL '30 minutes'
-  AND severity IN ('error', 'critical')
-ORDER BY timestamp DESC
-LIMIT 20;
-"
-```
-
-### Interpretation:
-- **0 rows** → No critical events. STOP this step, go to Step 2.
-- **Rows returned** → Check each row:
-  - If `message` contains "exit code 1", "no matches", "grep" → IGNORE, this is normal.
-  - If `message` contains "rate limit", "429", "throttl" → IGNORE, transient.
-  - Only flag rows with genuine errors: auth failures (401/403), crashes, data corruption, service down.
-  - If no genuine errors remain after filtering → STOP, go to Step 2.
-
----
-
-## STEP 2: Check tools currently down
+## STEP 1: Check tools currently down
 
 ```bash
 /opt/homebrew/opt/postgresql@17/bin/psql cortana -c "
@@ -46,14 +24,14 @@ WHERE (tool_name, timestamp) IN (
 ```
 
 ### Interpretation:
-- **0 rows** → All tools up. STOP this step, go to Step 3.
+- **0 rows** → All tools up. STOP this step, go to Step 2.
 - **Rows returned** → Count distinct tools down:
-  - **1-2 tools down** → Tier 1 auto-fix candidates. Go to Step 5 for remediation.
-  - **3+ tools down simultaneously** → Possible cascade. Flag as Tier 3. Go to Step 5.
+  - **1-2 tools down** → Tier 1 auto-fix candidates. Go to Step 4 for remediation.
+  - **3+ tools down simultaneously** → Possible cascade. Flag as Tier 3. Go to Step 4.
 
 ---
 
-## STEP 3: Check failing crons
+## STEP 2: Check failing crons
 
 ```bash
 /opt/homebrew/opt/postgresql@17/bin/psql cortana -c "
@@ -67,13 +45,13 @@ WHERE (cron_name, timestamp) IN (
 ```
 
 ### Interpretation:
-- **0 rows** → No cron issues. STOP this step, go to Step 4.
-- **Rows returned** → Each row is a genuinely failing cron. Flag for Tier 2 remediation in Step 5.
+- **0 rows** → No cron issues. STOP this step, go to Step 3.
+- **Rows returned** → Each row is a genuinely failing cron. Flag for Tier 2 remediation in Step 4.
 - **NEVER flag crons with:** status `no_file`, `idle`, `skipped`, or `consecutive_failures < 5`.
 
 ---
 
-## STEP 4: Check budget anomaly
+## STEP 3: Check budget anomaly
 
 ```bash
 /opt/homebrew/opt/postgresql@17/bin/psql cortana -c "
@@ -83,15 +61,15 @@ FROM cortana_self_model WHERE id = 1;
 ```
 
 ### Interpretation:
-- **budget_pct_used < 80** AND **throttle_tier = 0 or 1** → Budget fine. STOP this step, go to Step 5.
+- **budget_pct_used < 80** AND **throttle_tier = 0 or 1** → Budget fine. STOP this step, go to Step 4.
 - **budget_pct_used >= 80** OR **budget_burn_rate > 10.0** → Flag as Tier 2 or Tier 3 depending on severity.
 - **budget_pct_used >= 95** → Flag as Tier 3 (critical).
 
 ---
 
-## STEP 5: Remediation
+## STEP 4: Remediation
 
-**If zero threats were flagged in Steps 1-4: output NOTHING and stop here.**
+**If zero threats were flagged in Steps 1-3: output NOTHING and stop here.**
 
 For each flagged threat, check for a matching playbook:
 
@@ -103,9 +81,9 @@ WHERE enabled = TRUE AND threat_signature = '<threat_signature>';
 "
 ```
 
-### TIER 1 — Auto-fix silently (NO messages, NO alerts)
+### TIER 1 — Auto-fix silently (output NOTHING)
 
-Execute the fix. Log it. Done.
+Execute the fix. Log it. Done. No output.
 
 | Issue | Exact Command |
 |-------|---------------|
@@ -130,22 +108,20 @@ UPDATE cortana_immune_playbooks SET times_used = times_used + 1, last_used = NOW
 "
 ```
 
-**STOP CONDITION:** If all threats are Tier 1 and have been fixed, output NOTHING further.
+**STOP CONDITION:** If all threats are Tier 1 and have been fixed, output NOTHING.
 
-### TIER 2 — Fix + Notify Chief
+### TIER 2 — Fix + Alert (output the alert text)
 
 Criteria (ALL must be true):
 - `consecutive_failures >= 5` for cron issues
 - Auth issues persisting > 1 hour with no Tier 1 playbook
 - Issue is actively causing damage (not just a stale record)
 
-Execute the fix first, then send notification:
+Execute the fix first, then **output this exact format as your response:**
 
-Use the `message` tool with these exact parameters:
-- action: send
-- channel: telegram
-- target: 8171372724
-- message: "🛡️ Immune System: Fixed [concise description of what was wrong and what was done]"
+🛡️ Immune System: Fixed [concise description of what was wrong and what was done]
+
+The cron delivery system will send this to Telegram automatically.
 
 Log the incident:
 ```bash
@@ -155,7 +131,7 @@ VALUES ('<threat_type>', '<source>', 'medium', '<description>', '<signature>', 2
 "
 ```
 
-### TIER 3 — Quarantine + Alert Chief
+### TIER 3 — Quarantine + Alert (output the alert text)
 
 Criteria (ANY triggers Tier 3):
 - 3+ tools down simultaneously (confirmed, not stale data)
@@ -163,13 +139,11 @@ Criteria (ANY triggers Tier 3):
 - Unknown threat with confirmed high-severity impact
 - Cascade risk detected
 
-Quarantine the component first, then alert:
+Quarantine the component first, then **output this exact format as your response:**
 
-Use the `message` tool with these exact parameters:
-- action: send
-- channel: telegram
-- target: 8171372724
-- message: "🚨 Immune System: [threat description] — [component] quarantined, awaiting orders"
+🚨 Immune System: [threat description] — [component] quarantined
+
+The cron delivery system will send this to Telegram automatically.
 
 Log the incident:
 ```bash
@@ -181,7 +155,7 @@ VALUES ('<threat_type>', '<source>', 'high', '<description>', '<signature>', 3, 
 
 ---
 
-## STEP 6: Check quarantined items for auto-release
+## STEP 5: Check quarantined items for auto-release
 
 ```bash
 /opt/homebrew/opt/postgresql@17/bin/psql cortana -c "
