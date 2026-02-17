@@ -36,6 +36,17 @@
 │  │  Kill switch + daily wake cap (10/day) + weight-based suppression  │     │
 │  └─────────────────────────────────────────────────────────────────────┘     │
 │                                                                              │
+│  ┌─────────────────────────────────────────────────────────────────────┐     │
+│  │              🔄 Feedback Loop (learning system)                     │     │
+│  │                                                                     │     │
+│  │  👍👎❤️🔥😒 reactions ─┐                                            │     │
+│  │  Response latency ────┼→ feedback_signals → evaluator → weights    │     │
+│  │  "Don't do X" ────────┘                        │                   │     │
+│  │                                                 ▼                  │     │
+│  │  +0.05 reinforce · -0.15 learn · 3 negatives = auto-suppress      │     │
+│  │  Daily learning loop → corrections written to AGENTS.md/MEMORY.md │     │
+│  └─────────────────────────────────────────────────────────────────────┘     │
+│                                                                              │
 │  26 recurring crons · self-healing · auto-updates · memory persistence       │
 └──────┬───┬───────────┬───────────┬───────────┬───────────┬───────────────────┘
        │   │           │           │           │           │
