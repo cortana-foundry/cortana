@@ -80,6 +80,21 @@ OpenClaw/Node has **Full Disk Access** granted (macOS System Settings → Privac
 - Schema: id, timestamp, feedback_type, context, lesson, applied
 - Use for: corrections, preferences, approval/rejection reasons
 
+**cortana_self_model** — Proprioception health dashboard (singleton)
+- Schema: id (always 1), health_score, status, budget_used/pct/burn_rate/projected, throttle_tier, crons_total/healthy/failing/missed, tools_up/down, top_cost_crons (JSONB), brief_engagement, alerts, metadata (JSONB), updated_at
+
+**cortana_budget_log** — Budget tracking over time
+- Schema: id, timestamp, spend_to_date, burn_rate, projected, breakdown (JSONB), pct_used
+
+**cortana_cron_health** — Cron health history
+- Schema: id, timestamp, cron_name, status, consecutive_failures, run_duration_sec, metadata (JSONB)
+
+**cortana_tool_health** — Tool availability history
+- Schema: id, timestamp, tool_name, status, response_ms, error, self_healed
+
+**cortana_throttle_log** — Auto-throttle tier change events
+- Schema: id, timestamp, tier_from, tier_to, reason, actions_taken (TEXT[])
+
 **cortana_tasks** — Autonomous task queue
 - Schema: id, created_at, source, title, description, priority (1-5), status, due_at, remind_at, execute_at, auto_executable, execution_plan, depends_on, completed_at, outcome, metadata (JSONB)
 - Use for: tracking work from conversations, heartbeat auto-execution, reminders

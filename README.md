@@ -57,6 +57,17 @@
 │  │  Connect (xref DB for patterns) · Dream (creative associations)   │     │
 │  └─────────────────────────────────────────────────────────────────────┘     │
 │                                                                              │
+│  ┌─────────────────────────────────────────────────────────────────────┐     │
+│  │              🫀 Proprioception (self-awareness & auto-throttle)     │     │
+│  │                                                                     │     │
+│  │  Every 15 min: Cron health + Tool health probes ($0 shell)         │     │
+│  │  Every 30 min: Budget tracker + Self-model writer ($0 shell)       │     │
+│  │  Daily 2:30 AM: Efficiency analyzer (cost-per-cron, engagement)    │     │
+│  │                                                                     │     │
+│  │  cortana_self_model ── health_score · throttle_tier · alerts       │     │
+│  │  Auto-throttle: Tier 0-3 based on budget burn rate                 │     │
+│  └─────────────────────────────────────────────────────────────────────┘     │
+│                                                                              │
 │  27 recurring crons · self-healing · auto-updates · memory persistence       │
 └──────┬───┬───────────┬───────────┬───────────┬───────────┬───────────────────┘
        │   │           │           │           │           │
@@ -197,6 +208,12 @@ LLM Wake (only when it matters)
     │
     ▼
 Cortana acts with full context
+                                       ▲
+Proprioception (24/7, $0)              │ throttle tier
+Cron health ──→ Self-Model ──→ cortana_self_model
+Tool health ──→ (aggregator)           │
+Budget track ──→    │                  ▼
+                    └──→ Auto-Throttle (budget guard)
 ```
 
 ### The Full Cycle, Concrete
@@ -212,6 +229,8 @@ Cortana acts with full context
 **You react 👎 to a late-night bedtime ping.** The feedback handler catches it. It maps the reaction to the `late_night_activity` rule. Weight drops from 1.0 to 0.85 (delta: -0.15). `negative_feedback` counter increments. Two more 👎s and the weight hits 0.55, then 0.40. One more and it's below 0.3 — the evaluator starts skipping it. If `negative_feedback` hits 3+ *and* weight < 0.3, auto-suppress fires: the rule is disabled, an event is logged, and Cortana tells you: "⚠️ Auto-suppressed wake rule 'late_night_activity' — got 3+ negative reactions. Re-enable anytime."
 
 **11:00 PM — Learning Loop runs.** It processes all unapplied `cortana_feedback` entries (direct corrections like "don't ping me about bedtime"). If a correction maps to a wake rule name, it generates a feedback signal with -0.15 delta. It checks for repeated lessons: same correction 3+ times in 30 days? That means the rule isn't sticking — it escalates, alerts you, and asks if it should write it into `SOUL.md` for permanent reinforcement. Finally, it applies weight decay (-0.02) to any rule that triggered today but got zero engagement (no 👍, no 👎, nothing — you didn't care enough to react).
+
+**Meanwhile, 24/7 — Proprioception monitors Cortana herself.** Every 15 minutes, shell-based probes check cron health (are all 27+ crons running? any silent failures?) and tool availability (PostgreSQL, Whoop, Tonal, Gmail, weather — all smoke-tested with timeouts). Every 30 minutes, the budget tracker computes spend-to-date, burn rate, and projected monthly cost, then the self-model writer aggregates everything into `cortana_self_model` — a single-row health dashboard. Health score: 100 minus penalties for down tools (-10 each), failing crons (-5), missed crons (-15), throttle tier, and budget overrun. If projected spend crosses 50%/75%/90% of the $100 budget, auto-throttle kicks in: Tier 1 (conservative) reduces non-essential cron frequency and switches Covenant to haiku. Tier 2 (austere) pauses informational crons entirely. Tier 3 (survival) kills everything except critical crons and forces all models to haiku. Throttle can only escalate automatically — de-escalation requires a new billing cycle or Hamel's manual override. At 2:30 AM daily, the efficiency analyzer computes per-cron token costs, sub-agent spawn rates, and brief engagement metrics. Total LLM cost of proprioception: $0. Everything is pure shell + SQL.
 
 **3:00 AM — Memory Consolidation runs.** Cortana's sleep cycle. It scans the last 1-3 days of `memory/YYYY-MM-DD.md` files, cross-references `cortana_feedback`, `cortana_patterns`, and `cortana_tasks`, and distills the raw logs into long-term knowledge. A decision you made on Tuesday, a preference correction from Thursday, a behavioral pattern detected over the week — all extracted, strengthened in `MEMORY.md`, and the originals archived to `memory/archive/`. Stale entries get pruned — that completed task from 3 weeks ago, the flight that already happened. Then the Dream phase: creative cross-domain associations, the REM sleep equivalent. "You check your portfolio faster on high-recovery mornings." 0-3 dream insights per night, inserted into `cortana_insights` for the morning brief. The raw daily files move to archive; MEMORY.md gets sharper. Every night, Cortana wakes up knowing more and carrying less noise.
 
@@ -298,6 +317,14 @@ Long-running autonomous agents I spawn for deep work. Named after Halo factions.
 | Every 4h | 💪 Tonal Health Check | Auth validation + auto-retry |
 | Every 8h | 🐦 Twitter Auth Check | Cookie/session validation |
 | Every 8h | 🛒 Amazon Session Keep-Alive | Browser session check |
+
+### Proprioception (Self-Monitoring)
+
+| Frequency | Job | What It Does |
+|-----------|-----|--------------|
+| Every 15 min | 🔍 Cron & Tool Health | Cron state checks + tool smoke tests + self-heal |
+| Every 30 min | 📊 Budget & Self-Model | Budget tracking + health score + auto-throttle |
+| 2:30 AM daily | 📈 Efficiency Analyzer | Per-cron costs, engagement metrics, spending trends |
 
 ### Maintenance
 
@@ -420,6 +447,10 @@ QQQ  ███░░░░░░░░░░░░░░░░░░░░░░
 ├── memory-consolidation/  ← Sleep cycle system
 │   ├── README.md          ← Full design doc
 │   └── consolidation-prompt.md
+│
+├── proprioception/        ← Self-awareness & auto-throttle
+│   ├── README.md          ← Full design doc
+│   └── schema.sql         ← PostgreSQL table definitions
 │
 ├── skills/                ← Installed capabilities
 │   ├── fitness-coach/     ← Whoop/Tonal
@@ -831,6 +862,56 @@ memory/YYYY-MM-DD.md (last 1-3 days)
 
 ---
 
+## Proprioception
+
+Cortana's self-awareness system. Maintains a real-time model of her own health, budget, and operational state — the way a body knows where its limbs are without looking. Total LLM cost: **$0**. Everything is pure shell + SQL.
+
+### Components
+
+| Component | Interval | What It Does |
+|-----------|----------|--------------|
+| **Cron Health Monitor** | Every 15 min | Checks each cron's last run time, exit status, consecutive failures. Flags silent failures (lastRun > 2× expected interval) |
+| **Tool Health Prober** | Every 15 min | Smoke-tests PostgreSQL, Whoop, Tonal, Gmail, Weather with timeouts. Self-heals when possible |
+| **Budget Tracker** | Every 30 min | Computes spend-to-date, burn rate, projected monthly spend, per-category breakdown |
+| **Self-Model Writer** | Every 30 min | Aggregates all data into `cortana_self_model` — single-row health dashboard |
+| **Efficiency Analyzer** | Daily 2:30 AM | Token cost per cron, top 5 expensive crons, sub-agent spawn rate, brief engagement rate |
+| **Auto-Throttler** | With self-model | Escalates throttle tier (0-3) when budget thresholds crossed |
+
+### Auto-Throttle Tiers
+
+| Tier | Trigger | Actions |
+|------|---------|---------|
+| **0 — Normal** | Budget < 50%, projected < $90 | All systems nominal |
+| **1 — Conservative** | Budget > 50% OR projected > $90 | Covenant → haiku. Non-essential crons reduce frequency |
+| **2 — Austere** | Budget > 75% OR projected > $95 | Disable Covenant (except Monitor). Informational crons pause |
+| **3 — Survival** | Budget > 90% OR projected > $99 | Only critical crons run. All models → haiku. No sub-agent spawns |
+
+Throttle can only **increase** automatically. Decrease requires next billing cycle or manual override.
+
+### Health Score
+
+```
+health = 100
+  - (10 × tools_down)
+  - (5  × crons_failing)
+  - (15 × crons_missed)
+  - throttle_penalty (tier 1: -5, tier 2: -15, tier 3: -30)
+  - budget_penalty (>75%: -5, >90%: -15)
+
+Status: ≥80 nominal · 50-79 degraded · <50 critical
+```
+
+### Integration
+
+- **→ SAE:** Self-model feeds into sitrep's "system" domain. Morning brief gains ⚙️ System Health section when status ≠ nominal
+- **→ Cortical Loop:** Health degradation events can trigger LLM wake for intelligent response
+- **→ Memory Consolidation:** Reviews throttle and cron health logs for patterns worth remembering
+- **← Watchdog:** Fully absorbed — cron checks, tool probes, budget guard all migrated here
+
+**Files:** `proprioception/README.md` (full design), `proprioception/schema.sql` (table definitions)
+
+---
+
 ## Database (PostgreSQL)
 
 Cortana uses a local PostgreSQL database for structured data.
@@ -847,6 +928,11 @@ Cortana uses a local PostgreSQL database for structured data.
 | `cortana_feedback` | Learning from corrections |
 | `cortana_tasks` | Autonomous task queue (pending/in_progress/done) |
 | `cortana_memory_consolidation` | Nightly memory consolidation run log |
+| `cortana_self_model` | Proprioception self-model (singleton health dashboard) |
+| `cortana_budget_log` | Budget tracking over time (spend, burn rate, projected) |
+| `cortana_cron_health` | Cron health history (status, failures, duration) |
+| `cortana_tool_health` | Tool availability history (up/down, response time, self-heal) |
+| `cortana_throttle_log` | Auto-throttle tier change events |
 | `cortana_feedback_signals` | Reaction/behavioral/correction signals for weight adjustment |
 | `cortana_sitrep` | SAE world state snapshots (domain/key/value) |
 | `cortana_insights` | SAE cross-domain reasoner insights |
@@ -977,6 +1063,11 @@ psql cortana -c "UPDATE cortana_chief_model SET value = '\"true\"' WHERE key = '
 | `cortana_watchlist` | Active monitoring items | `category`, `item`, `condition`, `threshold`, `last_value` |
 | `cortana_upgrades` | Self-improvement proposals | `gap_identified`, `proposed_fix`, `effort`, `status` |
 | `cortana_memory_consolidation` | Nightly memory consolidation run log | `run_id`, `days_reviewed`, `items_distilled`, `items_pruned`, `status` |
+| `cortana_self_model` | Proprioception health dashboard (singleton) | `health_score`, `status`, `throttle_tier`, `budget_pct_used`, `alerts[]` |
+| `cortana_budget_log` | Budget tracking history | `spend_to_date`, `burn_rate`, `projected`, `breakdown` (jsonb) |
+| `cortana_cron_health` | Cron health history | `cron_name`, `status`, `consecutive_failures`, `run_duration_sec` |
+| `cortana_tool_health` | Tool availability history | `tool_name`, `status`, `response_ms`, `error`, `self_healed` |
+| `cortana_throttle_log` | Auto-throttle events | `tier_from`, `tier_to`, `reason`, `actions_taken[]` |
 
 ### LaunchAgents
 
