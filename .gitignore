@@ -8,3 +8,7 @@ node_modules/
 
 # OS files
 .DS_Store
+
+# Runtime state/logs
+cortical-loop/logs/
+cortical-loop/state/
