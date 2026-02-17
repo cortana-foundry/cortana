@@ -319,7 +319,7 @@ Long-running autonomous agents I spawn for deep work. Named after Halo factions.
 | 9:30 AM / 12 PM / 3 PM wkdy | 📈 Trading Advisor | Market scan for buy setups |
 | 10:00 AM daily | 🔧 Daily Upgrade Protocol | Git auto-commit + self-improvement proposal |
 | Every 30 min, 6AM–4PM | 📰 Newsletter Alert | Real-time newsletter detection |
-| Hourly, 6AM–11PM | ⏰ Calendar Reminders | Smart event reminders |
+| Hourly, 6AM–11PM | ⏰ Calendar Reminders | 60-min and 30-min event reminders (silent when nothing due) |
 | 5 AM / 1 PM / 9 PM | 🖥️ Mac Mini Health | Process/resource summary |
 | 6:00 PM weekdays | 📰 Newsletter Digest | End-of-day newsletter roundup |
 | 8:30 PM daily | 🌙 Fitness Evening Recap | Strain, workout details, tomorrow's plan |
