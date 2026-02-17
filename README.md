@@ -332,9 +332,7 @@ Long-running autonomous agents I spawn for deep work. Named after Halo factions.
 | Frequency | Job | What It Does |
 |-----------|-----|--------------|
 | 4 AM / 4 PM | 🐦 X Session Healthcheck | Twitter auth validation |
-| 4 AM / 4 PM | 🌐 Browser Healthcheck | OpenClaw browser port check |
 | 4 AM / 4 PM | 🔧 Fitness Service Healthcheck | Port 8080 + auto-restart |
-| 4 AM / 4 PM | 🏠 Home Assistant Healthcheck | HA browser tab check |
 | Every 4h | 💪 Tonal Health Check | Auth validation + auto-retry |
 | Every 8h | 🐦 Twitter Auth Check | Cookie/session validation |
 | Every 8h | 🛒 Amazon Session Keep-Alive | Browser session check |
