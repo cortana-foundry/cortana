@@ -1,0 +1,4 @@
+2026-02-16 23:00:01 === Learning Loop starting ===
+2026-02-16 23:00:02   Decay: late_night_activity 1 → 0.98 (no engagement)
+2026-02-16 23:00:02   Decay: low_recovery_workout 1 → 0.98 (no engagement)
+2026-02-16 23:00:02 === Learning Loop complete ===

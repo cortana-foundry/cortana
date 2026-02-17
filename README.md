@@ -47,7 +47,17 @@
 │  │  Daily learning loop → corrections written to AGENTS.md/MEMORY.md │     │
 │  └─────────────────────────────────────────────────────────────────────┘     │
 │                                                                              │
-│  26 recurring crons · self-healing · auto-updates · memory persistence       │
+│  ┌─────────────────────────────────────────────────────────────────────┐     │
+│  │              🌙 Memory Consolidation (sleep cycle)                  │     │
+│  │                                                                     │     │
+│  │  3 AM daily ─→ Review daily files ─→ Distill insights              │     │
+│  │       │            │                      │                        │     │
+│  │       ▼            ▼                      ▼                        │     │
+│  │  Strengthen MEMORY.md · Prune stale · Archive old dailies          │     │
+│  │  Connect (xref DB for patterns) · Dream (creative associations)   │     │
+│  └─────────────────────────────────────────────────────────────────────┘     │
+│                                                                              │
+│  27 recurring crons · self-healing · auto-updates · memory persistence       │
 └──────┬───┬───────────┬───────────┬───────────┬───────────┬───────────────────┘
        │   │           │           │           │           │
        │   │     spawns│     spawns│     spawns│     spawns│
@@ -203,6 +213,8 @@ Cortana acts with full context
 
 **11:00 PM — Learning Loop runs.** It processes all unapplied `cortana_feedback` entries (direct corrections like "don't ping me about bedtime"). If a correction maps to a wake rule name, it generates a feedback signal with -0.15 delta. It checks for repeated lessons: same correction 3+ times in 30 days? That means the rule isn't sticking — it escalates, alerts you, and asks if it should write it into `SOUL.md` for permanent reinforcement. Finally, it applies weight decay (-0.02) to any rule that triggered today but got zero engagement (no 👍, no 👎, nothing — you didn't care enough to react).
 
+**3:00 AM — Memory Consolidation runs.** Cortana's sleep cycle. It scans the last 1-3 days of `memory/YYYY-MM-DD.md` files, cross-references `cortana_feedback`, `cortana_patterns`, and `cortana_tasks`, and distills the raw logs into long-term knowledge. A decision you made on Tuesday, a preference correction from Thursday, a behavioral pattern detected over the week — all extracted, strengthened in `MEMORY.md`, and the originals archived to `memory/archive/`. Stale entries get pruned — that completed task from 3 weeks ago, the flight that already happened. Then the Dream phase: creative cross-domain associations, the REM sleep equivalent. "You check your portfolio faster on high-recovery mornings." 0-3 dream insights per night, inserted into `cortana_insights` for the morning brief. The raw daily files move to archive; MEMORY.md gets sharper. Every night, Cortana wakes up knowing more and carrying less noise.
+
 **The result:** Every day, Cortana gets slightly better at knowing what matters to you, when to speak up, and when to shut up. No manual tuning. The system tunes itself.
 
 ---
@@ -241,7 +253,7 @@ Long-running autonomous agents I spawn for deep work. Named after Halo factions.
 
 ## Cron Jobs
 
-26 recurring jobs run via OpenClaw's built-in cron scheduler. All times are Eastern. Manage with `openclaw cron list`.
+27 recurring jobs run via OpenClaw's built-in cron scheduler. All times are Eastern. Manage with `openclaw cron list`.
 
 ### Daily Briefings
 
@@ -291,6 +303,7 @@ Long-running autonomous agents I spawn for deep work. Named after Halo factions.
 
 | Time (ET) | Job | What It Does |
 |-----------|-----|--------------|
+| 3:00 AM daily | 🧠 Memory Consolidation | Process daily memories → MEMORY.md, archive old files |
 | 3:00 AM daily | 🧹 Cron Session Cleanup | Delete bloated session files (>400KB) |
 | 4:00 AM daily | 🔄 Daily Auto-Update | Homebrew, OpenClaw, skills updates |
 
@@ -401,7 +414,12 @@ QQQ  ███░░░░░░░░░░░░░░░░░░░░░░
 │
 ├── memory/                ← Daily logs
 │   ├── 2026-02-13.md      ← Today's events
-│   └── heartbeat-state.json
+│   ├── heartbeat-state.json
+│   └── archive/           ← Consolidated daily files (YYYY/MM/)
+│
+├── memory-consolidation/  ← Sleep cycle system
+│   ├── README.md          ← Full design doc
+│   └── consolidation-prompt.md
 │
 ├── skills/                ← Installed capabilities
 │   ├── fitness-coach/     ← Whoop/Tonal
@@ -755,6 +773,64 @@ The feedback handler:
 
 ---
 
+## Memory Consolidation
+
+Cortana's sleep cycle. Every night at 3 AM ET, raw daily memories are processed into long-term knowledge — like biological memory consolidation during deep sleep.
+
+### The 7 Phases
+
+```
+memory/YYYY-MM-DD.md (last 1-3 days)
+    │
+    ▼
+ Review → Distill → Strengthen → Prune → Connect → Archive → Dream
+ (scan)   (extract)  (update     (remove   (xref    (move old  (creative
+           insights)  MEMORY.md)  stale)    DB)      files)     connect)
+    │                    │                    │          │
+    ▼                    ▼                    ▼          ▼
+ cortana_feedback   MEMORY.md           memory/    cortana_insights
+ cortana_patterns   (updated)           archive/   (dream type)
+ cortana_tasks
+```
+
+| Phase | What It Does |
+|-------|-------------|
+| **Review** | Scan unconsolidated daily files + query `cortana_feedback`, `cortana_patterns`, `cortana_events`, `cortana_tasks` |
+| **Distill** | Extract decisions, lessons, preferences, patterns, project state. Discard routine heartbeats, transient data |
+| **Strengthen** | Update `MEMORY.md` — add new entries, reinforce confirmed patterns, merge duplicates |
+| **Prune** | Remove completed one-off tasks, stale context (>30 days), superseded preferences. Log everything pruned |
+| **Connect** | Cross-reference DB for feedback clusters (same correction 3+ times = rule not strong enough). Surface overdue tasks |
+| **Archive** | Move consolidated files older than 3 days to `memory/archive/YYYY/MM/`. Preserve as-is |
+| **Dream** | Creative associations — find cross-domain correlations, non-obvious insights. 0-3 dream insights per run |
+
+### Integration With Other Systems
+
+- **→ SAE:** Dream insights land in `cortana_insights`, surfaced in morning brief's 🧠 section
+- **→ Cortical Loop:** Strengthened MEMORY.md rules improve wake response quality; archived files reduce heartbeat noise
+- **→ Feedback Loop:** Reviews `cortana_feedback` for repeated corrections; auto-suppressed rules get reviewed during Connect
+
+### cortana_memory_consolidation Schema
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `id` | serial PK | Auto-increment |
+| `run_id` | uuid | Unique run identifier |
+| `started_at` | timestamptz | Run start time |
+| `completed_at` | timestamptz | Run completion time |
+| `status` | text | `running`, `completed`, `failed` |
+| `days_reviewed` | text[] | Which daily files were processed |
+| `items_distilled` | int | Items extracted from raw logs |
+| `items_strengthened` | int | MEMORY.md entries added/reinforced |
+| `items_pruned` | int | Stale entries removed |
+| `items_archived` | int | Daily files moved to archive |
+| `dream_insights` | int | Creative insights generated |
+| `feedback_clusters` | jsonb | Repeated correction themes found |
+| `summary` | text | Human-readable run summary |
+
+**Files:** `memory-consolidation/README.md` (full design), `memory-consolidation/consolidation-prompt.md` (cron prompt)
+
+---
+
 ## Database (PostgreSQL)
 
 Cortana uses a local PostgreSQL database for structured data.
@@ -770,6 +846,7 @@ Cortana uses a local PostgreSQL database for structured data.
 | `cortana_events` | System events |
 | `cortana_feedback` | Learning from corrections |
 | `cortana_tasks` | Autonomous task queue (pending/in_progress/done) |
+| `cortana_memory_consolidation` | Nightly memory consolidation run log |
 | `cortana_feedback_signals` | Reaction/behavioral/correction signals for weight adjustment |
 | `cortana_sitrep` | SAE world state snapshots (domain/key/value) |
 | `cortana_insights` | SAE cross-domain reasoner insights |
@@ -899,6 +976,7 @@ psql cortana -c "UPDATE cortana_chief_model SET value = '\"true\"' WHERE key = '
 | `cortana_patterns` | Behavioral pattern tracking | `pattern_type`, `value`, `day_of_week`, `metadata` (jsonb) |
 | `cortana_watchlist` | Active monitoring items | `category`, `item`, `condition`, `threshold`, `last_value` |
 | `cortana_upgrades` | Self-improvement proposals | `gap_identified`, `proposed_fix`, `effort`, `status` |
+| `cortana_memory_consolidation` | Nightly memory consolidation run log | `run_id`, `days_reviewed`, `items_distilled`, `items_pruned`, `status` |
 
 ### LaunchAgents
 
@@ -944,4 +1022,4 @@ Cortana: This is your responsibility. Don't let it drift.
 
 ---
 
-*Last updated: 2026-02-16*
+*Last updated: 2026-02-17*
