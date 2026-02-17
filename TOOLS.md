@@ -126,6 +126,20 @@ psql cortana -c "SELECT * FROM cortana_feedback WHERE applied = FALSE;"
 
 ---
 
+## Weather
+
+**Primary:** `wttr.in` (simple text output)
+**Fallback:** Open-Meteo API (free, no key needed) — used when wttr.in is down/slow
+
+```bash
+# Fallback URL (Warren NJ)
+curl -s "https://api.open-meteo.com/v1/forecast?latitude=40.63&longitude=-74.49&current_weather=true&temperature_unit=fahrenheit&daily=temperature_2m_max,temperature_2m_min,precipitation_sum,weathercode&timezone=America/New_York&forecast_days=3"
+```
+
+See `skills/weather/SKILL.md` for full details and weather code reference.
+
+---
+
 ## Skill-Specific Config
 
 Most tool configs now live in their skills:
