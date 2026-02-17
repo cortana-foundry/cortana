@@ -321,7 +321,7 @@ Long-running autonomous agents I spawn for deep work. Named after Halo factions.
 | 5 AM / 1 PM / 9 PM | 🖥️ Mac Mini Health | Process/resource summary |
 | 6:00 PM weekdays | 📰 Newsletter Digest | End-of-day newsletter roundup |
 | 8:30 PM daily | 🌙 Fitness Evening Recap | Strain, workout details, tomorrow's plan |
-| 9:00 PM daily | 🔍 System Health Summary | Aggregate error/event analysis |
+| 9:00 PM daily | 🔍 System Health Summary | Aggregate error/event analysis + cron run digest |
 | 9:30 PM Fri/Sat | 🌙 Weekend Pre-Bedtime | REM drift prevention |
 | 10:00 PM daily | 🌙 Bedtime Check | Sleep accountability ping |
 
