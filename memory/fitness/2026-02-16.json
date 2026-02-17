@@ -1,0 +1,43 @@
+{
+  "date": "2026-02-16",
+  "morning": {
+    "recovery": {
+      "score": 93,
+      "hrv": 140.6,
+      "rhr": 46,
+      "spo2": 98.7
+    }
+  },
+  "evening": {
+    "recap_delivered": "2026-02-16T20:30:00-05:00",
+    "total_strain": 13.72,
+    "total_kilojoules": 3054,
+    "workouts": [
+      {
+        "time": "10:28-11:00",
+        "type": "weightlifting", 
+        "strain": 9.5,
+        "kilojoules": 665,
+        "avg_hr": 107,
+        "max_hr": 145
+      },
+      {
+        "time": "11:01-11:51",
+        "type": "running",
+        "strain": 13.7, 
+        "kilojoules": 2388,
+        "avg_hr": 143,
+        "max_hr": 170
+      }
+    ],
+    "insights_delivered": [
+      "Tonal auth broken - strength data incomplete",
+      "Recovery 93% - green light for high intensity"  
+    ],
+    "tonal_status": "unhealthy_auth_error",
+    "sleep_rec": {
+      "target_bedtime": "22:30",
+      "hours_needed": 7.6
+    }
+  }
+}
