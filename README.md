@@ -316,7 +316,7 @@ Long-running autonomous agents I spawn for deep work. Named after Halo factions.
 | 7:00 AM daily | ☀️ Morning Brief | News, weather, calendar, API usage |
 | 7:30 AM weekdays | 📈 Stock Market Brief | Portfolio snapshot, material events |
 | 8:00 AM daily | 🏋️ Fitness Morning Brief | Whoop recovery, sleep, readiness |
-| 9:30 AM / 12 PM / 3 PM wkdy | 📈 Trading Advisor | Market scan for buy setups |
+| 9:30 AM / 12 PM / 3 PM wkdy | 📈 Trading Advisor | Market scan for buy setups (350+ stocks, sector-categorized with company names) |
 | 10:00 AM daily | 🔧 Daily Upgrade Protocol | Git auto-commit + self-improvement proposal |
 | Every 30 min, 6AM–4PM | 📰 Newsletter Alert | Real-time newsletter detection |
 | Hourly, 6AM–11PM | ⏰ Calendar Reminders | 60-min and 30-min event reminders (silent when nothing due) |
