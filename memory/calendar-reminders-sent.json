@@ -79,7 +79,7 @@
       "sent_at": "2026-02-16T17:29:00Z"
     },
     {
-      "event_id": "_70qk6ea364qj8b9h6kq3cb9k8h1j8b9o8ks4cb9h70q44gq58l0jahhh84_20260216",
+      "event_id": "_70qk6ea364qj8b9h6kq3cb9k8ks4cb9h70q44gq58l0jahhh84_20260216",
       "event_title": "Verizon Bill AutoPay - Tomm",
       "reminder_type": "all_day_9am",
       "sent_at": "2026-02-16T17:29:00Z"
@@ -95,6 +95,12 @@
       "event_title": "Verizon Bill AutoPay",
       "reminder_type": "all_day_9am",
       "sent_at": "2026-02-17T14:00:00Z"
+    },
+    {
+      "event_id": "0bpvbvk0n9mdrvpge7p196kos2_20260217T233000Z",
+      "event_title": "2026S SSW 567-A/A-U/WS - Online Lecture",
+      "reminder_type": "t60m",
+      "sent_at": "2026-02-17T17:00:00Z"
     }
   ]
 }
