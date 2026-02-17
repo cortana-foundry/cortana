@@ -189,6 +189,8 @@ You are free to edit `HEARTBEAT.md` with a short checklist or reminders. Keep it
 }
 ```
 
+**🫀 Heartbeat Tag:** When sending a check-in message to the user triggered by a heartbeat poll, always prefix it with 🫀 so they know it came from a heartbeat (e.g., "🫀 Hey Chief, ..."). This doesn't apply to `HEARTBEAT_OK` responses — only messages that actually reach the user.
+
 **When to reach out:**
 - Important email arrived
 - Calendar event coming up (&lt;2h)
