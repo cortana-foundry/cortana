@@ -1,0 +1,38 @@
+{
+  "date": "2026-02-17",
+  "morning": null,
+  "evening": {
+    "timestamp": "2026-02-17T20:30:00-05:00",
+    "recovery_baseline": 70,
+    "total_strain": 22.2,
+    "workouts": [
+      {
+        "sport": "running",
+        "strain": 12.7,
+        "kilojoules": 2052,
+        "duration_min": 48,
+        "avg_hr": 137,
+        "max_hr": 164
+      },
+      {
+        "sport": "weightlifting", 
+        "strain": 9.5,
+        "kilojoules": 618,
+        "duration_min": 35,
+        "avg_hr": 105,
+        "max_hr": 141
+      }
+    ],
+    "sleep_performance": 75,
+    "sleep_efficiency": 86.7,
+    "sleep_debt_hours": 3.5,
+    "predicted_recovery_range": "60-75%",
+    "tonal_status": "unhealthy_auth_issue",
+    "insights_delivered": 3,
+    "recommendations": {
+      "bedtime": "10:30-11:00 PM",
+      "sleep_need_hours": 10.4,
+      "tomorrow_intensity": "light-moderate"
+    }
+  }
+}
