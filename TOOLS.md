@@ -38,9 +38,9 @@ OpenClaw/Node has **Full Disk Access** granted (macOS System Settings → Privac
 ## Watchdog (LaunchAgent)
 
 **Service:** `com.cortana.watchdog`
-**Script:** `~/Desktop/services/watchdog/watchdog.sh`
+**Script:** `~/Developer/services/watchdog/watchdog.sh`
 **Schedule:** Every 15 minutes via launchd, auto-starts on boot
-**Checks:** Cron health, tool availability, budget guard
+**Checks:** PostgreSQL, fitness service, OpenClaw gateway, disk space
 
 ---
 
