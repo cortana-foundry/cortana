@@ -23,7 +23,7 @@
 ## Current Priorities (Feb 2026)
 - **Fitness**: "12 Weeks to Jacked" (Week 8/12) + Peloton cardio. Recovery consistently in 80-90% range now.
 - **Sleep optimization**: REM chronically low (9.4%), weekend schedule drift main killer. Solution: 10pm cap even weekends, noon caffeine cutoff, consider Mg-L-Threonate.
-- **Trading system**: Built CANSLIM backtesting engine with Alpaca API (`~/Desktop/services/backtester/`). Phase 2 complete, alerts pending.
+- **Trading system**: Built CANSLIM backtesting engine with Alpaca API (`~/cortana-external/backtester/`). Phase 2 complete, alerts pending.
 - **Mexico trip**: Feb 19-22 (2 days away). Packing list done.
 - **Master's program** (EM-605) — HW 597 still pending
 - **Portfolio**: ~$71k, 95% tech/100% US exposure. Diversification candidates: VXUS, UNH, ENB, MA, LLY, ICE.
