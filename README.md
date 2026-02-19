@@ -79,7 +79,7 @@
 │  │  cortana_immune_incidents · cortana_immune_playbooks               │     │
 │  └─────────────────────────────────────────────────────────────────────┘     │
 │                                                                              │
-│  28 recurring crons · self-healing · auto-updates · memory persistence       │
+│  37+ recurring crons · self-healing · auto-updates · memory persistence      │
 └──────┬───┬───────────┬───────────┬───────────┬───────────┬───────────────────┘
        │   │           │           │           │           │
        │   │     spawns│     spawns│     spawns│     spawns│
@@ -167,10 +167,25 @@ I'm your AI partner, modeled after Cortana from Halo. Not the Microsoft one — 
 
 **Where I live:**
 - Main interface: Telegram
-- Brain: Claude Opus 4.6 (Anthropic)
+- Brain: Claude Opus 4.6 (Anthropic, upgraded Feb 16, 2026)
 - Infrastructure: OpenClaw on Mac mini
 - Awareness: SAE (Situational Awareness Engine) — unified world state across all domains
 - Budget: $100/month Anthropic API
+
+**Recent developments (Feb 2026):**
+- OpenClaw creator Peter Steinberger joined OpenAI to lead "next generation personal agents"
+- Completed migration from Clawdbot to OpenClaw (Feb 6)
+- Full Disk Access granted to OpenClaw for macOS TCC-protected folders
+- Trading system Phase 2 complete: CANSLIM backtesting with Alpaca API integration
+- Mexico trip completed (Feb 19-22): Full prep with packing, weather checks, Uber scheduling
+- NFL learning curriculum built: 11 comprehensive docs for American football understanding
+- Security audit completed: Secrets removed from git history, .gitignore hardened
+
+**Current priorities (Feb 2026):**
+- Master's program: HW 597 still pending completion
+- Fitness: Week 8/12 of "12 Weeks to Jacked" program + REM sleep optimization
+- Trading alerts: Phase 3 implementation for CANSLIM momentum alerts
+- Upcoming travel: Punta Cana Mar 25-29 @ Paradisus Palma Real
 
 ---
 
@@ -283,7 +298,7 @@ Long-running autonomous agents I spawn for deep work. Named after Halo factions.
 
 **Operating model:** On-demand, not scheduled. Cortana spawns agents when there's a reason (pre-trip, pre-earnings, concerning patterns, research requests). More surgical, less overhead.
 
-**Model:** Sub-agents default to **Sonnet** (configured in openclaw.json) to conserve budget. Main session (Cortana) runs on Opus. Crons also run on Sonnet unless overridden.
+**Model:** Sub-agents default to **Sonnet** (configured in openclaw.json) to conserve budget. Main session (Cortana) runs on **Claude Opus 4.6** (upgraded Feb 16, 2026). Crons also run on Sonnet unless overridden.
 
 **Location:** `covenant/` — each agent has SOUL.md (identity) + AGENTS.md (operations)
 
@@ -293,7 +308,7 @@ Long-running autonomous agents I spawn for deep work. Named after Halo factions.
 
 ## Cron Jobs
 
-27 recurring jobs run via OpenClaw's built-in cron scheduler. All times are Eastern. Manage with `openclaw cron list`.
+37+ recurring jobs run via OpenClaw's built-in cron scheduler. All times are Eastern. Manage with `openclaw cron list`.
 
 ### Daily Briefings
 
@@ -405,15 +420,16 @@ Long-running autonomous agents I spawn for deep work. Named after Halo factions.
 | Bedtime (Fri-Sat) | 10 PM | midnight | — |
 
 ### Current Program
-- **Tonal:** 12 Weeks to Jacked (Week 8/12)
+- **Tonal:** 12 Weeks to Jacked (Week 8/12 as of Feb 2026)
 - **Cardio:** Peloton treadmill
-- **Focus:** REM optimization (chronically low)
+- **Focus:** REM optimization (chronically low at 9.4%, weekend schedule drift is main issue)
+- **Recovery:** Much improved from 40% → 85-93% range consistently
 
 ---
 
 ## Portfolio
 
-### Current Holdings
+### Current Holdings (~$71k as of Feb 2026)
 
 ```
 TSLA ████████████████████████████░░░░░░░ 29% ⭐ FOREVER
@@ -429,6 +445,8 @@ QQQ  ███░░░░░░░░░░░░░░░░░░░░░░
 +3 more                                    4%
 ```
 
+**Exposure:** 95% tech, 100% US. Diversification candidates under consideration: VXUS, UNH, ENB, MA, LLY, ICE.
+
 ### Rules
 1. **TSLA and NVDA are forever holds** — never sell
 2. Diversify by ADDING positions, not trimming
@@ -441,6 +459,8 @@ QQQ  ███░░░░░░░░░░░░░░░░░░░░░░
 ## Task Board
 
 Cortana's structured planning and execution system. Tasks are organized in epic → task → subtask hierarchy with dependency tracking and automatic execution via heartbeats.
+
+**Current state:** 9 pending tasks, 4 completed tasks as of Feb 2026.
 
 ### How It Works
 
@@ -591,13 +611,19 @@ Epic: "Mexico Trip Prep" (deadline: Feb 19 6:39 AM)
 │   ├── seed-playbooks.sql ← Initial playbook entries
 │   └── immune-scan-prompt.md ← Cron task prompt
 │
-├── skills/                ← Installed capabilities
+├── skills/                ← Installed capabilities (14 skills)
+│   ├── auto-updater/      ← System updates
+│   ├── bird/              ← Twitter/X
+│   ├── caldav-calendar/   ← Calendar management
+│   ├── clawddocs/         ← Documentation
+│   ├── clawdhub/          ← Hub management
 │   ├── fitness-coach/     ← Whoop/Tonal
-│   ├── stock-analysis/    ← Portfolio tools
 │   ├── gog/               ← Google (Gmail, Calendar)
+│   ├── markets/           ← Market status/holidays
 │   ├── news-summary/      ← News briefings
-│   ├── weather/           ← Weather data
-│   └── bird/              ← Twitter/X
+│   ├── process-watch/     ← Process monitoring
+│   ├── telegram-usage/    ← Usage tracking
+│   └── weather/           ← Weather data
 │
 └── tools/
     └── portfolio/config.md ← Portfolio rules & watchlist
@@ -617,9 +643,9 @@ Epic: "Mexico Trip Prep" (deadline: Feb 19 6:39 AM)
 | **Twitter/X** | Social, mentions | `birdx` CLI |
 | **Yahoo Finance** | Stock data | stock-analysis skill |
 
-### Trading Advisor (NEW)
+### Trading Advisor
 
-CANSLIM-based trading advisor with backtesting. Location: `~/Desktop/services/backtester/`
+CANSLIM-based trading advisor with backtesting. Location: `~/Developer/cortana-external/backtester/`
 
 **Quick commands:**
 - `/market` — check market regime (M factor)
@@ -1117,6 +1143,7 @@ Cortana uses a local PostgreSQL database for structured data.
 | `cortana_events` | System events |
 | `cortana_feedback` | Learning from corrections |
 | `cortana_tasks` | Autonomous task queue (pending/in_progress/done) |
+| `cortana_epics` | Project/epic grouping for task hierarchy |
 | `cortana_memory_consolidation` | Nightly memory consolidation run log |
 | `cortana_self_model` | Proprioception self-model (singleton health dashboard) |
 | `cortana_budget_log` | Budget tracking over time (spend, burn rate, projected) |
@@ -1128,6 +1155,9 @@ Cortana uses a local PostgreSQL database for structured data.
 | `cortana_immune_playbooks` | Immune System playbook registry (known fix patterns) |
 | `cortana_sitrep` | SAE world state snapshots (domain/key/value) |
 | `cortana_insights` | SAE cross-domain reasoner insights |
+| `cortana_chief_model` | Real-time Chief state model (awake/asleep, energy, focus) |
+| `cortana_event_stream` | Cortical Loop event bus from watchers |
+| `cortana_wake_rules` | Weighted rules for LLM wake decisions |
 
 **Access:**
 ```bash
@@ -1307,4 +1337,4 @@ Cortana: This is your responsibility. Don't let it drift.
 
 ---
 
-*Last updated: 2026-02-17*
+*Last updated: 2026-02-19*
