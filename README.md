@@ -308,7 +308,7 @@ Long-running autonomous agents I spawn for deep work. Named after Halo factions.
 
 ## Cron Jobs
 
-37+ recurring jobs run via OpenClaw's built-in cron scheduler. All times are Eastern. Manage with `openclaw cron list`.
+38+ recurring jobs run via OpenClaw's built-in cron scheduler. All times are Eastern. Manage with `openclaw cron list`.
 
 ### Daily Briefings
 
@@ -382,6 +382,7 @@ Long-running autonomous agents I spawn for deep work. Named after Halo factions.
 | 3:00 AM Sunday | 🧠 Weekly Memory Consolidation | Archive + distill MEMORY.md |
 | 6:00 PM Sunday | 🔮 Weekly Cortana Status | Self-reflection + improvement proposals |
 | 8:00 PM Sunday | 📊 Weekly Fitness Insights | Coach-style weekly analysis |
+| 9:00 PM Sunday | 📊 Weekly Monday Market Brief | Weekly portfolio P/L + earnings watch + US macro calendar |
 
 ---
 
