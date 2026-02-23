@@ -34,7 +34,7 @@ Track last check times in `memory/heartbeat-state.json`.
 
 ### API Budget Check (weekly, or if usage seems high)
 - Always run fresh: `node /Users/hd/clawd/skills/telegram-usage/handler.js json` (pulls live `clawdbot models status`, no caching)
-- If `~/.clawdbot/quota-tracker.json` looks stale/corrupt (older than ~4h or bad data), delete it first, then rerun the command
+- If `~/.openclaw/quota-tracker.json` looks stale/corrupt (older than ~4h or bad data), delete it first, then rerun the command
 - Check percentage of $100 monthly budget used
 - If >50% before mid-month → alert
 - If >75% any time → alert with recommendation to throttle

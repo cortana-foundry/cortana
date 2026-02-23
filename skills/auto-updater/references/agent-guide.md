@@ -9,7 +9,7 @@ When asked to set up auto-updates, follow this procedure.
 npm list -g clawdbot 2>/dev/null && echo "npm-global"
 
 # Check if installed via source (git)
-[ -d ~/.clawdbot/.git ] || [ -f /opt/clawdbot/.git/config ] && echo "source-install"
+[ -d ~/.openclaw/.git ] || [ -f /opt/clawdbot/.git/config ] && echo "source-install"
 
 # Check pnpm
 pnpm list -g clawdbot 2>/dev/null && echo "pnpm-global"
@@ -20,13 +20,13 @@ bun pm ls -g 2>/dev/null | grep clawdbot && echo "bun-global"
 
 ## Step 2: Create the Update Script (Optional)
 
-For complex setups, create a helper script at `~/.clawdbot/scripts/auto-update.sh`:
+For complex setups, create a helper script at `~/.openclaw/scripts/auto-update.sh`:
 
 ```bash
 #!/bin/bash
 set -e
 
-LOG_FILE="${HOME}/.clawdbot/logs/auto-update.log"
+LOG_FILE="${HOME}/.openclaw/logs/auto-update.log"
 mkdir -p "$(dirname "$LOG_FILE")"
 
 log() {

@@ -1,5 +1,5 @@
 {
-  "comment": "Add this to ~/.clawdbot/clawdbot.json to configure the telegram-usage skill",
+  "comment": "Add this to ~/.openclaw/clawdbot.json to configure the telegram-usage skill",
   "channels": {
     "telegram": {
       "enabled": true,

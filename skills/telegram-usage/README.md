@@ -27,7 +27,7 @@ The skill is located at `/skills/telegram-usage` in your Clawdbot workspace.
 
 ### 1. Enable the Skill
 
-Ensure the skill is enabled in `~/.clawdbot/clawdbot.json`:
+Ensure the skill is enabled in `~/.openclaw/clawdbot.json`:
 
 ```json
 {
@@ -115,7 +115,7 @@ No additional configuration required. The skill reads from Clawdbot's session st
 
 ### Optional: Adjust Reset Time
 
-The default session reset is 4:00 AM. Configure in `~/.clawdbot/clawdbot.json`:
+The default session reset is 4:00 AM. Configure in `~/.openclaw/clawdbot.json`:
 
 ```json
 {
@@ -186,7 +186,7 @@ Expected output: Raw statistics as JSON
 
 - The skill reads from your current session state
 - Start a new session with `/new` and try again
-- Verify session file exists: `~/.clawdbot/agents/main/sessions/sessions.json`
+- Verify session file exists: `~/.openclaw/agents/main/sessions/sessions.json`
 
 ### HTML formatting looks wrong
 

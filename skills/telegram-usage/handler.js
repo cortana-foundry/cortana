@@ -99,7 +99,7 @@ function parseTimeToMs(timeStr) {
  */
 function getQuotaTrackerPath() {
   const homeDir = process.env.HOME || process.env.USERPROFILE;
-  return path.join(homeDir, '.clawdbot', 'quota-tracker.json');
+  return path.join(homeDir, '.openclaw', 'quota-tracker.json');
 }
 
 /**
