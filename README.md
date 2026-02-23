@@ -15,7 +15,7 @@
                                        ▼
 ┌──────────────────────────────────────────────────────────────────────────────┐
 │                              CORTANA                                         │
-│                     Claude Opus 4.6 · OpenClaw · Mac mini                    │
+│              GPT-5.1 Codex Max (OpenAI) · OpenClaw · Mac mini                │
 │                                                                              │
 │  ┌─────────────────────────────────────────────────────────────────────┐     │
 │  │              🧠 Situational Awareness Engine (SAE)                  │     │
@@ -167,10 +167,10 @@ I'm your AI partner, modeled after Cortana from Halo. Not the Microsoft one — 
 
 **Where I live:**
 - Main interface: Telegram
-- Brain: Claude Opus 4.6 (Anthropic, upgraded Feb 16, 2026)
+- Brain: GPT-5.1 Codex Max (OpenAI primary; Claude Opus 4.6 fallback)
 - Infrastructure: OpenClaw on Mac mini
 - Awareness: SAE (Situational Awareness Engine) — unified world state across all domains
-- Budget: $100/month Anthropic API
+- Budget: $200/month OpenAI Pro (Anthropic fallback only)
 
 **Recent developments (Feb 2026):**
 - OpenClaw creator Peter Steinberger joined OpenAI to lead "next generation personal agents"
@@ -298,7 +298,7 @@ Long-running autonomous agents I spawn for deep work. Named after Halo factions.
 
 **Operating model:** On-demand, not scheduled. Cortana spawns agents when there's a reason (pre-trip, pre-earnings, concerning patterns, research requests). More surgical, less overhead.
 
-**Model:** Sub-agents default to **Sonnet** (configured in openclaw.json) to conserve budget. Main session (Cortana) runs on **Claude Opus 4.6** (upgraded Feb 16, 2026). Crons also run on Sonnet unless overridden.
+**Model:** Sub-agents default to **GPT-5.1 Codex Mini** (OpenAI, per openclaw.json) to conserve budget. Main session (Cortana) runs on **GPT-5.1 Codex Max** (OpenAI primary) with **Claude Opus 4.6** as fallback. Crons also run on Codex Mini unless overridden.
 
 **Location:** `covenant/` — each agent has SOUL.md (identity) + AGENTS.md (operations)
 
@@ -1169,14 +1169,14 @@ psql cortana -c "SELECT * FROM cortana_covenant_runs;"
 
 ## Budget
 
-**Monthly:** $100 Anthropic API (shared with work)
+**Monthly:** $200 OpenAI Pro (primary) with Anthropic as fallback only
 
 | Component | ~Monthly Cost |
 |-----------|---------------|
-| Main chat | $40-50 |
-| Crons | $10-15 |
-| Covenant agents | $15-25 |
-| Buffer | $10-20 |
+| Main chat | $70-90 |
+| Crons | $15-25 |
+| Covenant agents | $20-30 |
+| Buffer | $30-60 |
 
 **Monitor:** Ask Cortana for usage report, or check session_status
 

@@ -9,8 +9,8 @@ Cortana's self-awareness system. Maintains a real-time model of her own health, 
 ```
 Data Sources
 ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐
-│ Anthropic│ │  Cron    │ │  Tools   │ │ Feedback │ │ Session  │
-│  Usage   │ │  States  │ │  Health  │ │ Signals  │ │  Files   │
+│  OpenAI │ │  Cron    │ │  Tools   │ │ Feedback │ │ Session  │
+│  Usage  │ │  States  │ │  Health  │ │ Signals  │ │  Files   │
 └────┬─────┘ └────┬─────┘ └────┬─────┘ └────┬─────┘ └────┬─────┘
      │            │            │            │            │
      └────────────┴────────────┴────────────┴────────────┘
@@ -51,12 +51,12 @@ Data Sources
 ### 1. Budget Tracker (`budget-tracker.sh`)
 **Interval:** Every 30 min (shell, $0)
 
-Reads Anthropic usage data and computes:
+Reads OpenAI usage data (Anthropic only as fallback) and computes:
 - **Spend to date** this billing cycle
 - **Burn rate** (daily average, 7-day rolling)
 - **Projected monthly spend** (burn rate × days remaining)
 - **Per-category breakdown** from session labels: `main`, `cron:*`, `subagent:*`, `covenant:*`
-- **Threshold alerts** at 50%, 75%, 90% of $100 budget
+- **Threshold alerts** at 50%, 75%, 90% of $200 budget
 
 Source: `node ~/clawd/skills/telegram-usage/handler.js` + session file sizes as proxy for token volume.
 
@@ -328,7 +328,7 @@ status:
 ## Files
 
 - `README.md` — This file
-- `budget-tracker.sh` — Anthropic spend tracking
+- `budget-tracker.sh` — OpenAI spend tracking (Anthropic fallback)
 - `cron-health.sh` — Cron state monitoring + silent failure detection
 - `tool-prober.sh` — External API health checks + self-heal
 - `self-model.sh` — Aggregator, writes cortana_self_model + alerts

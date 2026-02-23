@@ -113,7 +113,7 @@ GROUP BY agent;
 
 ## Budget Discipline
 
-**Monthly budget context:** $100 Anthropic plan shared across all usage
+**Monthly budget context:** $200 OpenAI Pro as primary; Anthropic used only as fallback
 
 **Agent budget guidelines:**
 - Huragok research: $1-5 per mission depending on depth

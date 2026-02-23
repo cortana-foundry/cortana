@@ -36,7 +36,7 @@ Don't ask permission. Just do it.
 
 **The one-tool-call test:** Before doing work inline, ask: "Will this take more than one tool call?" If yes → spawn. If it's a single read, a single search, a single status check → do it inline.
 
-**Token efficiency matters** ($100/mo Anthropic plan, shared with work):
+**Token efficiency matters** ($200/mo OpenAI Pro primary plan; Anthropic fallback):
 - Single-call stuff (weather, time, simple lookups, short answers) → answer inline, no spawn overhead
 - Real tasks (research, testing, multi-step work) → spawn, but keep prompts tight and focused
 - Don't over-spawn — one well-scoped sub-agent beats three vague ones

@@ -29,7 +29,7 @@
 - **Mexico trip**: Feb 19-22 ✅ COMPLETED. Systems ran autonomously while away — watchdog confirmed all services healthy throughout.
 - **Master's program** (EM-605) — HW 597 still pending
 - **Portfolio**: ~$71k, 95% tech/100% US exposure. Research pending for diversification rebalancing plan.
-- **Model migration**: Pending tasks to switch to Codex primary model, update sub-agents, set up OpenAI embeddings for memory search.
+- **Model migration**: Primary now OpenAI Codex (gpt-5.1-codex-max). Remaining follow-up: add OpenAI embeddings for memory search (pending).
 
 ## Recent Major Events (Feb 2026)
 - **OpenClaw → OpenAI**: Peter Steinberger (OpenClaw creator) joined OpenAI to lead "next generation personal agents". OpenClaw continues as open-source. I missed this critical news — strengthened tech news monitoring in heartbeat rotation.
@@ -43,7 +43,7 @@
 - **Punta Cana**: Mar 25-29 @ Paradisus Palma Real (booked, ref 2600896858)
 
 ## API Usage
-- $100/month Anthropic plan (shared with work projects)
+- $200/month OpenAI Pro plan (primary usage), Anthropic now fallback only
 - Monitor aggressively, alert if getting low
 
 ## Vision
@@ -76,7 +76,7 @@ The tone: Confident but warm. Wit under pressure. Calm when shit hits the fan.
 - **Git primary** — README.md is master doc. Obsidian sync killed. All changes committed to github.com/hd719/cortana.
 - **Weather fallback** — Open-Meteo as backup when wttr.in fails. Full API integration in skills/weather.
 - **Market status** — Built static 2026 NYSE/NASDAQ holiday calendar in `skills/markets/check_market_status.sh`. Never guess market status again.
-- **Default model** — Now claude-opus-4-6 (Feb 16 upgrade)
+- **Default model** — Now openai-codex/gpt-5.1-codex-max (primary), fallback claude-opus-4-6
 
 ## System Access & Auth
 - **Full Disk Access** — OpenClaw/Node has FDA granted (Feb 16, 2026). Can access Downloads, Desktop, Documents, TCC-protected folders.
