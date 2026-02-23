@@ -461,7 +461,7 @@ QQQ  ███░░░░░░░░░░░░░░░░░░░░░░
 
 Cortana's structured planning and execution system. Tasks are organized in epic → task → subtask hierarchy with dependency tracking and automatic execution via heartbeats.
 
-**Status:** ✅ Live (conversation detection + heartbeat sweep + Telegram task commands + morning brief task summary).
+**Status:** ✅ Live (conversation detection + heartbeat sweep + Telegram task commands + morning brief task summary + auto-executor dispatch for safe whitelisted actions).
 
 ### How It Works
 
@@ -533,8 +533,9 @@ LIMIT 1;
 ```
 
 **Execution rules:**
-- Always spawn sub-agents for task execution (heartbeats dispatch, don't do)
-- Sub-agents update task status and outcome when complete
+- Heartbeat may dispatch one safe queued command via `tools/task-board/auto-executor.sh` (repo-local whitelist only)
+- Multi-step/ambiguous tasks still spawn sub-agents
+- Executors update task status and outcome when complete/fail
 - Dependencies block execution until all prerequisite tasks are 'done'
 - Overdue reminders (`remind_at`) surface to Hamel during briefs
 
@@ -579,6 +580,43 @@ Epic: "Mexico Trip Prep" (deadline: Feb 19 6:39 AM)
     └── Subtask: Check exchange rates → pending
     └── Subtask: Find nearby exchange → pending
 ```
+
+---
+
+## Email Triage Autopilot
+
+`tools/gmail/email-triage-autopilot.sh`
+
+- Pulls unread Gmail with minimal query window
+- Classifies into `urgent`, `action`, `read_later`
+- Auto-creates `cortana_tasks` for urgent/action items (no duplicate task per gmail id)
+- Produces Telegram-safe digest text
+- Guardrail: **no outbound email sends**; optional send is digest-only
+
+---
+
+## Cron Quality Gate (Preflight + Quarantine)
+
+`tools/alerting/cron-preflight.sh`
+
+- Run before high-value cron tasks: `cron-preflight.sh <cron_name> <checks...>`
+- Built-in checks: `pg`, `gog`, `fitness`, `gateway`
+- On failure: writes `~/.openclaw/cron/quarantine/<cron>.quarantined`, logs reason to `cortana_events`, exits non-zero
+- Auto-release: if a quarantined cron later passes all checks, quarantine marker is removed
+- Watchdog integration: external watchdog now surfaces quarantined crons in alerts
+
+---
+
+## Brief 2.0 (Unified AM/PM)
+
+Template: `sae/brief-2.0-template.md`
+
+Adds one shared brief skeleton for AM and PM runs with:
+- fitness + calendar + portfolio snapshot/movers
+- top tasks + overdue + ready-to-run counts
+- breaking tech/tool news
+- explicit **delta since last brief** section
+- preflight gate step before generation
 
 ---
 

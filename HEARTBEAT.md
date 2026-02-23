@@ -6,8 +6,9 @@ Track last check times in `memory/heartbeat-state.json`.
 ## Check Rotation
 
 ### Email Triage (2-3x daily)
-- Check for urgent unread emails via gog
-- Flag anything needing immediate attention
+- Run `tools/gmail/email-triage-autopilot.sh` (minimal query, no outbound sends)
+- Auto-create tasks for urgent/action emails in `cortana_tasks`
+- Send/prepare Telegram digest only (guardrail: no external email sends)
 - Skip if checked within last 4 hours
 
 ### Calendar Lookahead (2x daily)
@@ -58,6 +59,8 @@ Track last check times in `memory/heartbeat-state.json`.
 ## 🔮 Proactive Intelligence
 
 ### System Health (every heartbeat)
+- Run cron quality gate where relevant: `tools/alerting/cron-preflight.sh <cron_name> <checks...>` before high-value cron work
+- Quarantine failing crons via `~/.openclaw/cron/quarantine/*.quarantined`; watchdog surfaces these automatically
 Query watchlist and auto-heal or alert:
 ```sql
 SELECT * FROM cortana_watchlist WHERE enabled = TRUE;
@@ -110,7 +113,8 @@ UPDATE cortana_watchlist SET last_checked = NOW(), last_value = '{"price": 450}'
 
 ### Task Queue Execution (every heartbeat)
 - Check `cortana_tasks` for dependency-ready auto-executable tasks
-- **Always spawn a sub-agent for task execution** — heartbeats are for checking and dispatching, not doing multi-step work inline
+- Dispatch via `tools/task-board/auto-executor.sh` (whitelisted repo-only commands; logs outcome + marks done/pending)
+- **Always spawn a sub-agent for multi-step execution** — heartbeat can dispatch one safe queued command, but anything broader stays delegated
 - Surface overdue `remind_at` tasks to Hamel
 - Alert on approaching deadlines
 
