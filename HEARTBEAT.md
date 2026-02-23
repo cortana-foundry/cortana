@@ -18,6 +18,9 @@ Track last check times in `memory/heartbeat-state.json`.
 ### Portfolio Alerts (1-2x daily, market hours only)
 - Big movers in watchlist (>3% change)
 - Earnings surprises
+- Use Alpaca service on port **3033** (no web search needed):
+  - Portfolio: `curl -s http://localhost:3033/alpaca/portfolio | jq '.positions[] | {symbol, market_value, unrealized_plpc}'`
+  - Stats: `curl -s http://localhost:3033/alpaca/stats`
 - Skip weekends and after-hours
 
 ### Fitness Check-in (1x daily, morning)
@@ -30,7 +33,8 @@ Track last check times in `memory/heartbeat-state.json`.
 - Anything notable (rain, extreme temps)?
 
 ### API Budget Check (weekly, or if usage seems high)
-- Run: `node /Users/hd/clawd/skills/telegram-usage/handler.js`
+- Always run fresh: `node /Users/hd/clawd/skills/telegram-usage/handler.js json` (pulls live `clawdbot models status`, no caching)
+- If `~/.clawdbot/quota-tracker.json` looks stale/corrupt (older than ~4h or bad data), delete it first, then rerun the command
 - Check percentage of $100 monthly budget used
 - If >50% before mid-month → alert
 - If >75% any time → alert with recommendation to throttle
@@ -60,7 +64,7 @@ SELECT * FROM cortana_watchlist WHERE enabled = TRUE;
 ```
 
 **Auto-heal checks:**
-- Session files >400KB → delete silently, log to `cortana_events`
+- Session files >400KB (path: `~/.openclaw/agents/main/sessions/*.jsonl`) → delete silently, log to `cortana_events`
 - Cron run times trending up → flag for review
 
 **Alert checks:**
