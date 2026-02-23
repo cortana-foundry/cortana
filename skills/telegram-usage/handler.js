@@ -44,34 +44,47 @@ function getQuotaIndicator(percentage) {
  * Get real quota data from clawdbot models status
  */
 function getRealQuotaData() {
-  try {
-    const output = execSync('clawdbot models status', { encoding: 'utf-8' });
+  const commands = [
+    // OpenClaw is the active runtime here
+    'openclaw models status',
+    // Legacy fallback
+    'clawdbot models status'
+  ];
 
-    // Parse the line like: "- anthropic usage: 5h 58% left ⏱1h 1m"
-    const usageMatch = output.match(/usage:\s+\d+h\s+(\d+)%\s+left\s+⏱(.+)/);
+  for (const cmd of commands) {
+    try {
+      const output = execSync(cmd, { encoding: 'utf-8' });
 
-    if (usageMatch) {
-      const percentage = parseInt(usageMatch[1], 10);
-      const timeRemaining = usageMatch[2].trim();
+      // Parse lines like:
+      // "- openai-codex usage: 5h 87% left ⏱37m · Day 94% left ⏱1d 16h"
+      // "- anthropic usage: 5h 58% left ⏱1h 1m"
+      const usageLine = output.split('\n').find(line => line.includes(' usage: '));
+      if (!usageLine) continue;
 
-      // Convert time string to milliseconds for consistency
-      const timeMs = parseTimeToMs(timeRemaining);
+      const pctMatch = usageLine.match(/(\d+)%\s+left/);
+      const timeMatch = usageLine.match(/⏱\s*([^·\n]+)/);
 
-      return {
-        quotaRemaining: percentage,
-        sessionTimeRemaining: timeMs,
-        timeRemainingFormatted: timeRemaining
-      };
+      if (pctMatch) {
+        const percentage = parseInt(pctMatch[1], 10);
+        const timeRemaining = (timeMatch?.[1] || '0m').trim();
+        const timeMs = parseTimeToMs(timeRemaining);
+
+        return {
+          quotaRemaining: percentage,
+          sessionTimeRemaining: timeMs,
+          timeRemainingFormatted: timeRemaining
+        };
+      }
+    } catch (error) {
+      // Try next command
     }
-  } catch (error) {
-    console.error('Failed to get quota data:', error.message);
   }
 
-  // Fallback to defaults
+  // Unknown/unavailable => return null-ish instead of false critical 0%
   return {
-    quotaRemaining: 0,
-    sessionTimeRemaining: 0,
-    timeRemainingFormatted: '0m'
+    quotaRemaining: null,
+    sessionTimeRemaining: null,
+    timeRemainingFormatted: 'unknown'
   };
 }
 
@@ -165,16 +178,19 @@ function getTimeUntilReset() {
  */
 function generateUsageReport(stats) {
   const {
-    quotaRemaining = 85,
-    sessionTimeRemaining = 14400000, // 4 hours in ms
+    quotaRemaining = null,
+    sessionTimeRemaining = null,
     provider = 'anthropic'
   } = stats;
 
-  const quotaIndicator = getQuotaIndicator(quotaRemaining);
-  const timeRemaining = formatDuration(sessionTimeRemaining);
+  const quotaKnown = Number.isFinite(quotaRemaining);
+  const timeKnown = Number.isFinite(sessionTimeRemaining);
+
+  const quotaIndicator = quotaKnown ? getQuotaIndicator(quotaRemaining) : '⚪️';
+  const timeRemaining = timeKnown ? formatDuration(sessionTimeRemaining) : 'unknown';
 
   let message = `📊 API Usage\n\n`;
-  message += `🔋 Quota: ${quotaIndicator} ${quotaRemaining}%\n`;
+  message += `🔋 Quota: ${quotaIndicator} ${quotaKnown ? `${quotaRemaining}%` : 'unknown'}\n`;
   message += `⏱️ Resets in: ${timeRemaining}`;
 
   return message;
