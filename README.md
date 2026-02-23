@@ -1134,7 +1134,7 @@ Cortana's self-defense layer. Detects threats (credential failures, API errors, 
 
 | Frequency | Job | Cost |
 |-----------|-----|------|
-| Every 15 min | 🛡️ Immune Scan | ~$0.02/run (sonnet, only when threats detected) |
+| Every 15 min | 🛡️ Immune Scan | ~$0.02/run (codex, only when threats detected) |
 
 **Files:** `immune-system/README.md` (full design), `immune-system/schema.sql`, `immune-system/seed-playbooks.sql`
 

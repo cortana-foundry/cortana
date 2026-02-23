@@ -1,7 +1,7 @@
 # OpenAI Migration Plan
 
 **Decision date:** Feb 19, 2026
-**Status:** Planned (post-Mexico trip, after Feb 22)
+**Status:** Completed (updated Feb 23, 2026)
 
 ## Why
 - Single provider for LLM + embeddings (one key, one bill)
@@ -11,9 +11,9 @@
 
 ## Migration Steps (status)
 1. ✅ **Re-auth Codex** — `openclaw models auth login --provider openai-codex` (done Feb 19)
-2. ✅ **Switch primary model** — now using `openai-codex/gpt-5.1-codex-max` as primary; Anthropic/Opus kept as fallback during transition
-3. ⏸️ **Set up OpenAI embeddings** — memory search indexes all files + sessions **ON HOLD (Hamel reviewing)**
-4. ✅ **Update sub-agent model** — sub-agents pointed to OpenAI equivalent
+2. ✅ **Switch primary model** — now using `openai-codex/gpt-5.3-codex` as primary; Anthropic/Opus kept as fallback during transition
+3. ✅ **Set up OpenAI embeddings** — memory search enabled with provider `openai` and model `text-embedding-3-small` (files + sessions)
+4. ✅ **Update sub-agent model** — sub-agent default set to `openai-codex/gpt-5.3-codex` (no Sonnet default)
 5. ✅ **Test everything** — Feb 23 quick checks: cron history reviewed (Tonal health check intermittently timing out but latest run OK), fitness service endpoints 200, gog Gmail search works, gateway healthy
 6. ✅ **Tune SOUL.md / AGENTS.md** — reviewed for provider-specific language; no Anthropic-only references; OpenAI now primary
 7. 🟡 **Remove Opus fallback** — **PENDING STABILITY CONFIRMATION** (do not remove yet)

@@ -121,11 +121,11 @@ CREATE INDEX idx_consolidation_started ON cortana_memory_consolidation(started_a
 
 **When:** 3:00 AM ET daily — Cortana's deep sleep window (Hamel is asleep, no interactions expected).
 
-**Model:** `sonnet` — good enough for synthesis, token-efficient.
+**Model:** `gpt-5.3-codex` — default OpenAI model for consistency across main + sub-agents.
 
 ```
 Schedule: 0 3 * * *
-Model: anthropic/claude-sonnet-4-20250514
+Model: openai-codex/gpt-5.3-codex
 Label: memory-consolidation
 ```
 
