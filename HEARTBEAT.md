@@ -57,7 +57,14 @@ Track last check times in `memory/heartbeat-state.json`.
 ### Unified Memory Ingestion (1-2x daily)
 - Run: `python3 /Users/hd/clawd/tools/memory/ingest_unified_memory.py --since-hours 24`
 - Purpose: keep episodic/semantic/procedural memory tables fresh
-- Skip if run in past 12h and no major new corrections/events
+- Skip if already run in past 12 hours and no major new corrections/events
+
+### Reflection Sweep (1x daily, evening)
+- Run automated reflection + correction loop:
+  - `python3 /Users/hd/clawd/tools/reflection/reflect.py --mode sweep --trigger-source heartbeat --window-days 30`
+- Purpose: post-task reflections, confidence-scored rule extraction, policy auto-apply, repeated-correction KPI
+- If repeated correction rate rises (>25%), alert Hamel and propose stronger rule wording
+- Skip if already run in the last 12 hours
 
 ---
 

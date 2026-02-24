@@ -8,6 +8,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import List, Dict, Any, Tuple
 
+from autonomy_scorecard import compute_and_store_scorecard
+
 PSQL_BIN = "/opt/homebrew/opt/postgresql@17/bin/psql"
 JOBS_FILE = Path.home() / ".openclaw/cron/jobs.json"
 HEARTBEAT_STATE_FILE = Path.home() / "clawd/memory/heartbeat-state.json"
@@ -445,11 +447,33 @@ def main():
     cron_rows = collect_cron_health(jobs, now_ms)
     events, _ = remediate_heartbeat_misses(jobs, cron_rows, now_ms, dry_run=args.dry_run)
 
+    memory_health = collect_memory_health_summary()
+    if memory_health:
+        events.append({
+            "event_type": "memory_health",
+            "source": "proprioception",
+            "severity": "info",
+            "message": "Unified memory health snapshot",
+            "metadata": memory_health,
+        })
+    autonomy_summary = None
+    try:
+        autonomy_summary = compute_and_store_scorecard(window_days=7, dry_run=args.dry_run)
+    except Exception as e:
+        events.append({
+            "event_type": "autonomy_scorecard_error",
+            "source": "proprioception",
+            "severity": "warning",
+            "message": "Autonomy scorecard computation failed",
+            "metadata": {"error": str(e)[:500]},
+        })
+
     if args.dry_run:
         print(json.dumps({
             "tool_rows": len(tool_rows),
             "cron_rows": len(cron_rows),
             "events": events,
+            "autonomy_scorecard": autonomy_summary,
         }, indent=2))
         return
 
