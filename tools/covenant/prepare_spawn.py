@@ -16,12 +16,14 @@ import argparse
 import json
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 from typing import Any
 
 WORKSPACE_ROOT = Path("/Users/hd/clawd")
 HANDSHAKE_VALIDATOR = WORKSPACE_ROOT / "tools" / "covenant" / "validate_spawn_handshake.py"
 PROMPT_BUILDER = WORKSPACE_ROOT / "tools" / "covenant" / "build_identity_spawn_prompt.py"
+ROUTER = WORKSPACE_ROOT / "tools" / "covenant" / "route_workflow.py"
 
 DEFAULT_OUTPUT_FORMAT = {
     "type": "markdown",
@@ -121,11 +123,59 @@ def _run(cmd: list[str]) -> None:
         raise PrepError(msg or f"command failed: {' '.join(cmd)}")
 
 
+def maybe_auto_route_identity(payload: dict[str, Any], auto_route: bool) -> tuple[dict[str, Any], list[str]]:
+    if not auto_route or payload.get("agent_identity_id"):
+        return payload, []
+
+    if not ROUTER.exists():
+        raise PrepError(f"routing tool not found: {ROUTER}")
+
+    with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as tmp:
+        tmp.write(json.dumps(payload))
+        tmp_path = Path(tmp.name)
+
+    try:
+        result = subprocess.run(
+            ["python3", str(ROUTER), "--plan", str(tmp_path)],
+            capture_output=True,
+            text=True,
+        )
+    finally:
+        tmp_path.unlink(missing_ok=True)
+
+    if result.returncode != 0:
+        msg = (result.stderr or result.stdout).strip()
+        raise PrepError(f"auto-route failed: {msg}")
+
+    line = None
+    for raw in (result.stdout or "").splitlines():
+        if raw.startswith("ROUTING_PLAN_JSON:"):
+            line = raw[len("ROUTING_PLAN_JSON:") :].strip()
+            break
+    if not line:
+        raise PrepError("auto-route failed: missing ROUTING_PLAN_JSON output")
+
+    try:
+        route = json.loads(line)
+    except json.JSONDecodeError as exc:
+        raise PrepError(f"auto-route failed: invalid routing JSON: {exc}") from exc
+
+    identity = route.get("primary_agent_identity_id")
+    if not isinstance(identity, str) or not identity.strip():
+        raise PrepError("auto-route failed: missing primary_agent_identity_id")
+
+    updated = dict(payload)
+    updated["agent_identity_id"] = identity
+    notes = [f"auto-routed missing 'agent_identity_id' -> '{identity}'"]
+    return updated, notes
+
+
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="Prepare Covenant identity-v1 spawn artifacts")
     p.add_argument("payload", help="Path to handshake payload (or legacy payload with --legacy-shim)")
     p.add_argument("--output-dir", default="/tmp/covenant-spawn", help="Directory to write normalized handshake + prompt")
     p.add_argument("--legacy-shim", action="store_true", help="Apply compatibility shim for legacy payload shapes")
+    p.add_argument("--auto-route", action="store_true", help="Infer agent_identity_id via route_workflow.py when missing")
     return p.parse_args()
 
 
@@ -141,6 +191,8 @@ def main() -> None:
             raise PrepError("payload root must be an object")
 
         normalized, notes = normalize_payload(raw, args.legacy_shim)
+        normalized, route_notes = maybe_auto_route_identity(normalized, args.auto_route)
+        notes.extend(route_notes)
 
         output_dir.mkdir(parents=True, exist_ok=True)
         normalized_path = output_dir / "handshake.normalized.json"
