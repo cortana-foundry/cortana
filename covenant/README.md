@@ -70,6 +70,17 @@ sessions_spawn({
 })
 ```
 
+Sub-agents must emit machine-parseable lines in their response:
+- `COVENANT_STATUS_JSON: { ... }`
+- `COVENANT_COMPLETION_JSON: { ... }`
+
+Validate payloads (or extracted output) before accepting completion:
+```bash
+python3 /Users/hd/clawd/tools/covenant/validate_agent_protocol.py --type status /path/to/status.json
+python3 /Users/hd/clawd/tools/covenant/validate_agent_protocol.py --type completion /path/to/completion.json
+python3 /Users/hd/clawd/tools/covenant/validate_agent_protocol.py --extract /path/to/subagent-output.txt
+```
+
 ---
 
 ## Cost Tracking

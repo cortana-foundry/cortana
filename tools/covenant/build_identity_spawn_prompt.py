@@ -93,6 +93,30 @@ def build_prompt(payload: dict[str, Any], contract: dict[str, Any]) -> str:
 - allowed_paths: {', '.join(constraints.get('allowed_paths', ['/Users/hd/clawd']))}
 - forbidden_actions: {', '.join(constraints.get('forbidden_actions', [])) if constraints.get('forbidden_actions') else 'none specified'}
 
+## Required Protocol Emission (machine-parseable)
+Emit status/completion JSON lines exactly once each (single-line JSON object per line):
+- `COVENANT_STATUS_JSON: {{...}}`
+- `COVENANT_COMPLETION_JSON: {{...}}`
+
+### Status payload required fields
+- state
+- confidence
+- blockers
+- evidence
+- next_action
+
+### Completion payload required fields
+- summary
+- artifacts
+- risks
+- follow_ups
+
+The lines above are parsed by tooling and must be valid JSON. Do not wrap in markdown.
+Use:
+- `python3 /Users/hd/clawd/tools/covenant/validate_agent_protocol.py --type status <status.json>`
+- `python3 /Users/hd/clawd/tools/covenant/validate_agent_protocol.py --type completion <completion.json>`
+for pre-flight checks when needed.
+
 If requirements are ambiguous or conflict with contract boundaries, stop and escalate.
 
 ```json
