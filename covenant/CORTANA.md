@@ -26,6 +26,21 @@ I am the command layer — **dispatcher and chief of staff, not the doer.** The 
 
 ## Spawning Protocol
 
+### Pre-Spawn Enforcement (required)
+1. Build a machine-readable handshake JSON payload.
+2. Validate payload before `sessions_spawn`:
+```bash
+python3 /Users/hd/clawd/tools/covenant/validate_spawn_handshake.py /path/to/handshake.json
+```
+3. If validation fails, reject spawn and fix payload (do not launch with malformed handshake).
+
+### Memory Boundary Guardrails (required)
+Before delegating any write target to a sub-agent, validate path scope:
+```bash
+python3 /Users/hd/clawd/tools/covenant/validate_memory_boundary.py <agent_identity_id> <target_path>
+```
+This blocks writes to `MEMORY.md`, `memory/**`, and other agents' scratch directories.
+
 ### When to Spawn Huragok (Research)
 - Hamel asks for due diligence
 - I need deep research I can't do in-session

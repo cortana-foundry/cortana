@@ -1,0 +1,144 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://clawd.local/agents/identities/schema.json",
+  "title": "Covenant Agent Identity Schemas",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "spawn_handshake": {
+      "$ref": "#/$defs/spawn_handshake"
+    },
+    "status_update": {
+      "$ref": "#/$defs/status_update"
+    },
+    "completion": {
+      "$ref": "#/$defs/completion"
+    }
+  },
+  "required": ["spawn_handshake", "status_update", "completion"],
+  "$defs": {
+    "output_format": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "type": {"type": "string", "minLength": 1},
+        "sections": {
+          "type": "array",
+          "minItems": 1,
+          "items": {"type": "string", "minLength": 1}
+        }
+      },
+      "required": ["type", "sections"]
+    },
+    "timeout_retry_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "timeout_seconds": {"type": "integer", "minimum": 1},
+        "max_retries": {"type": "integer", "minimum": 0},
+        "retry_on": {"type": "array", "items": {"type": "string", "minLength": 1}},
+        "escalate_on": {"type": "array", "items": {"type": "string", "minLength": 1}}
+      },
+      "required": ["timeout_seconds", "max_retries", "retry_on", "escalate_on"]
+    },
+    "callback": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "update_channel": {"type": "string", "minLength": 1},
+        "final_channel": {"type": "string"},
+        "heartbeat_interval_seconds": {"type": "integer", "minimum": 1},
+        "on_blocked": {"type": "string"}
+      },
+      "required": ["update_channel"]
+    },
+    "constraints": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "workspace_root": {"type": "string", "minLength": 1},
+        "allowed_paths": {
+          "type": "array",
+          "minItems": 1,
+          "items": {"type": "string", "minLength": 1}
+        },
+        "forbidden_actions": {
+          "type": "array",
+          "items": {"type": "string", "minLength": 1}
+        }
+      }
+    },
+    "spawn_handshake": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "request_id": {"type": "string", "minLength": 1},
+        "spawned_by": {"type": "string", "minLength": 1},
+        "agent_identity_id": {"type": "string", "minLength": 1},
+        "objective": {"type": "string", "minLength": 1},
+        "success_criteria": {
+          "type": "array",
+          "minItems": 1,
+          "items": {"type": "string", "minLength": 1}
+        },
+        "output_format": {"$ref": "#/$defs/output_format"},
+        "timeout_retry_policy": {"$ref": "#/$defs/timeout_retry_policy"},
+        "callback": {"$ref": "#/$defs/callback"},
+        "constraints": {"$ref": "#/$defs/constraints"}
+      },
+      "required": [
+        "agent_identity_id",
+        "objective",
+        "success_criteria",
+        "output_format",
+        "timeout_retry_policy",
+        "callback"
+      ]
+    },
+    "status_update": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "request_id": {"type": "string", "minLength": 1},
+        "agent_identity_id": {"type": "string", "minLength": 1},
+        "state": {
+          "type": "string",
+          "enum": ["queued", "in_progress", "blocked", "waiting_input", "validating", "completed", "failed"]
+        },
+        "confidence": {"type": "number", "minimum": 0, "maximum": 1},
+        "blockers": {"type": "array"},
+        "evidence": {"type": "array", "items": {"type": "string"}},
+        "next_action": {"type": "string"},
+        "eta_seconds": {"type": "integer", "minimum": 0},
+        "timestamp": {"type": "string", "minLength": 1}
+      },
+      "required": ["request_id", "agent_identity_id", "state", "confidence", "timestamp"]
+    },
+    "completion": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "request_id": {"type": "string", "minLength": 1},
+        "agent_identity_id": {"type": "string", "minLength": 1},
+        "state": {"type": "string", "const": "completed"},
+        "summary": {"type": "string", "minLength": 1},
+        "artifacts": {"type": "array"},
+        "risks": {"type": "array", "items": {"type": "string"}},
+        "follow_ups": {"type": "array", "items": {"type": "string"}},
+        "confidence": {"type": "number", "minimum": 0, "maximum": 1},
+        "timestamp": {"type": "string", "minLength": 1}
+      },
+      "required": [
+        "request_id",
+        "agent_identity_id",
+        "state",
+        "summary",
+        "artifacts",
+        "risks",
+        "follow_ups",
+        "confidence",
+        "timestamp"
+      ]
+    }
+  }
+}

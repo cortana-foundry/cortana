@@ -1,0 +1,123 @@
+#!/usr/bin/env python3
+"""Validate Covenant sub-agent spawn handshake payloads.
+
+Usage:
+  python3 tools/covenant/validate_spawn_handshake.py <payload.json>
+"""
+
+from __future__ import annotations
+
+import json
+import sys
+from pathlib import Path
+from typing import Any
+
+REQUIRED_FIELDS = {
+    "agent_identity_id",
+    "objective",
+    "success_criteria",
+    "output_format",
+    "timeout_retry_policy",
+    "callback",
+}
+
+REQUIRED_CALLBACK_FIELDS = {"update_channel"}
+REQUIRED_OUTPUT_FORMAT_FIELDS = {"type", "sections"}
+REQUIRED_TIMEOUT_FIELDS = {"timeout_seconds", "max_retries", "retry_on", "escalate_on"}
+
+
+def fail(msg: str) -> None:
+    print(f"HANDSHAKE_INVALID: {msg}", file=sys.stderr)
+    raise SystemExit(1)
+
+
+def _expect_object(value: Any, field: str) -> dict[str, Any]:
+    if not isinstance(value, dict):
+        fail(f"'{field}' must be an object")
+    return value
+
+
+def _expect_non_empty_string(value: Any, field: str) -> None:
+    if not isinstance(value, str) or not value.strip():
+        fail(f"'{field}' must be a non-empty string")
+
+
+def _expect_non_empty_string_list(value: Any, field: str) -> None:
+    if not isinstance(value, list) or not value:
+        fail(f"'{field}' must be a non-empty array")
+    for idx, item in enumerate(value):
+        if not isinstance(item, str) or not item.strip():
+            fail(f"'{field}[{idx}]' must be a non-empty string")
+
+
+def validate(payload: dict[str, Any]) -> None:
+    missing = sorted(REQUIRED_FIELDS - set(payload.keys()))
+    if missing:
+        fail(f"missing required field(s): {', '.join(missing)}")
+
+    _expect_non_empty_string(payload["agent_identity_id"], "agent_identity_id")
+    _expect_non_empty_string(payload["objective"], "objective")
+    _expect_non_empty_string_list(payload["success_criteria"], "success_criteria")
+
+    output_format = _expect_object(payload["output_format"], "output_format")
+    missing_output = sorted(REQUIRED_OUTPUT_FORMAT_FIELDS - set(output_format.keys()))
+    if missing_output:
+        fail(f"output_format missing required field(s): {', '.join(missing_output)}")
+    _expect_non_empty_string(output_format["type"], "output_format.type")
+    _expect_non_empty_string_list(output_format["sections"], "output_format.sections")
+
+    timeout_retry = _expect_object(payload["timeout_retry_policy"], "timeout_retry_policy")
+    missing_timeout = sorted(REQUIRED_TIMEOUT_FIELDS - set(timeout_retry.keys()))
+    if missing_timeout:
+        fail(f"timeout_retry_policy missing required field(s): {', '.join(missing_timeout)}")
+
+    timeout_seconds = timeout_retry["timeout_seconds"]
+    if not isinstance(timeout_seconds, int) or timeout_seconds <= 0:
+        fail("'timeout_retry_policy.timeout_seconds' must be a positive integer")
+
+    max_retries = timeout_retry["max_retries"]
+    if not isinstance(max_retries, int) or max_retries < 0:
+        fail("'timeout_retry_policy.max_retries' must be a non-negative integer")
+
+    _expect_non_empty_string_list(timeout_retry["retry_on"], "timeout_retry_policy.retry_on")
+    _expect_non_empty_string_list(timeout_retry["escalate_on"], "timeout_retry_policy.escalate_on")
+
+    callback = _expect_object(payload["callback"], "callback")
+    missing_callback = sorted(REQUIRED_CALLBACK_FIELDS - set(callback.keys()))
+    if missing_callback:
+        fail(f"callback missing required field(s): {', '.join(missing_callback)}")
+    _expect_non_empty_string(callback["update_channel"], "callback.update_channel")
+
+    # Optional constraints validation when provided.
+    constraints = payload.get("constraints")
+    if constraints is not None:
+        constraints = _expect_object(constraints, "constraints")
+        allowed_paths = constraints.get("allowed_paths")
+        if allowed_paths is not None:
+            _expect_non_empty_string_list(allowed_paths, "constraints.allowed_paths")
+
+
+
+def main() -> None:
+    if len(sys.argv) != 2:
+        print("Usage: validate_spawn_handshake.py <payload.json>", file=sys.stderr)
+        raise SystemExit(2)
+
+    payload_path = Path(sys.argv[1]).expanduser().resolve()
+    if not payload_path.exists():
+        fail(f"payload file not found: {payload_path}")
+
+    try:
+        payload = json.loads(payload_path.read_text())
+    except json.JSONDecodeError as exc:
+        fail(f"invalid JSON: {exc}")
+
+    if not isinstance(payload, dict):
+        fail("payload root must be an object")
+
+    validate(payload)
+    print("HANDSHAKE_VALID")
+
+
+if __name__ == "__main__":
+    main()
