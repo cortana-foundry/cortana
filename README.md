@@ -79,7 +79,7 @@
 │  │  cortana_immune_incidents · cortana_immune_playbooks               │     │
 │  └─────────────────────────────────────────────────────────────────────┘     │
 │                                                                              │
-│  37+ recurring crons · self-healing · auto-updates · memory persistence      │
+│  30+ recurring crons (changes over time) · self-healing · auto-updates · memory persistence │
 └──────┬───┬───────────┬───────────┬───────────┬───────────┬───────────────────┘
        │   │           │           │           │           │
        │   │     spawns│     spawns│     spawns│     spawns│
@@ -313,7 +313,7 @@ Long-running autonomous agents I spawn for deep work. Named after Halo factions.
 
 ## Cron Jobs
 
-38+ recurring jobs run via OpenClaw's built-in cron scheduler. All times are Eastern. Manage with `openclaw cron list`.
+30+ recurring jobs (changes over time) run via OpenClaw's built-in cron scheduler. All times are Eastern. Manage with `openclaw cron list`.
 
 ### Daily Briefings
 
@@ -670,7 +670,7 @@ Adds one shared brief skeleton for AM and PM runs with:
 │   ├── seed-playbooks.sql ← Initial playbook entries
 │   └── immune-scan-prompt.md ← Cron task prompt
 │
-├── skills/                ← Installed capabilities (14 skills)
+├── skills/                ← Installed capabilities (12 skills)
 │   ├── auto-updater/      ← System updates
 │   ├── bird/              ← Twitter/X
 │   ├── caldav-calendar/   ← Calendar management
@@ -700,7 +700,7 @@ Adds one shared brief skeleton for AM and PM runs with:
 | **Google Calendar** | Events, reminders | `gog calendar list` |
 | **Gmail** | Email triage | `gog gmail search` |
 | **Twitter/X** | Social, mentions | `birdx` CLI |
-| **Yahoo Finance** | Stock data | stock-analysis skill |
+| **Yahoo Finance** | Stock data | cortana-external market data endpoints |
 
 ### To Get Tonal Data (workouts, strength scores)
 
@@ -758,7 +758,7 @@ Cortana's world-state system. Gathers data from every source into a unified sitr
 | B | `email` | `unread_summary` | `gog --account hameldesai3@gmail.com gmail search 'is:unread' --max 10 --json` |
 | C | `weather` | `today`, `tomorrow` | Web search for Warren, NJ conditions + forecast |
 | D | `health` | `whoop_recovery`, `whoop_sleep`, `tonal_health` | `curl -s localhost:8080/whoop/data \| jq` + `curl -s localhost:8080/tonal/health` |
-| E | `finance` | `stock_TSLA`, `stock_NVDA`, `stock_QQQ`, `stock_GLD` | `cd ~/clawd/skills/stock-analysis && uv run src/stock_analysis/main.py analyze SYMBOL --json` |
+| E | `finance` | `stock_TSLA`, `stock_NVDA`, `stock_QQQ`, `stock_GLD` | `curl -s http://localhost:3033/alpaca/portfolio` + finance pipeline in `~/Developer/cortana-external/backtester/` |
 | F | `tasks` | `pending` | `SELECT json_agg(t) FROM cortana_tasks WHERE status='pending' ORDER BY priority LIMIT 10` |
 | G | `patterns` | `recent_7d` | `SELECT json_agg(t) FROM cortana_patterns WHERE timestamp > NOW()-'7 days'` |
 | H | `watchlist` | `active_items` | `SELECT json_agg(t) FROM cortana_watchlist WHERE enabled=TRUE` |
