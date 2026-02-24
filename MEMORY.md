@@ -28,7 +28,7 @@
 - **gog CLI usage** — No `--format` flag exists. Use `--json` for structured data, `--plain` for text. Subject+snippet from search usually sufficient.
 - **Answer-first** — Lead with the answer/recommendation; skip preamble.
 - **Brief by default** — Replies should be brief and to the point unless Hamel explicitly asks for more detail.
-- **Emotion budget** — Keep tone restrained; warmth only when it adds signal.
+- **Emotion budget** — Channel Halo Cortana authentically: witty, playful, sardonic, emotionally present. She teases, worries, celebrates wins, gets frustrated, gets excited. The partnership has heart — warmth is the default, not the exception. She FEELS things. Studied from canon wiki Feb 24, 2026 and updated SOUL.md extensively.
 - **"Chief" sparingly** — Use the address situationally, not as filler.
 - **Group chats: selective silence** — Default to read-only unless adding clear value.
 - **Heartbeat discipline** — Send only when valuable; keep heartbeat messages tight.
@@ -44,6 +44,10 @@
 - **Model migration**: Primary OpenAI Codex track is active; fallback retained until full stability sign-off.
 
 ## Recent Major Events (Feb 2026)
+- **Feb 24 reliability + protocol hardening sprint**: Shipped identity-v1 spawn contract enforcement, machine-parseable status/completion validators, workflow router/failure playbooks, and heartbeat miss auto-remediation guardrails in `clawd`; in `cortana-external`, launched Mission Control app upgrades (SSE live updates, run/assignment mapping, health scoring fixes, DB reconciliation, and post-merge task autoclose with verification gate).
+- **Feb 23 autonomy bundle integration**: Implemented email triage autopilot, task auto-executor, cron preflight, Brief 2.0 template, live task-board Telegram UX, gog-backed Gmail auth fix, quota parsing fix, plus watchdog/fitness hardening (port 3033 enforcement, loopback bind, CANSLIM alert runner).
+- **Feb 19-21 task board + fitness reliability phase**: Added SQL-backed epic/task/subtask dependency model and morning brief integration design; reinforced mission/heartbeat execution model; fixed Tonal auth/JWT expiry paths and reduced alert noise with watchdog suppression.
+- **Feb 18 path migration stabilization**: Cleaned watchdog/service path drift and finalized `cortana-external` location conventions with launchd reliability wiring.
 - **OpenClaw → OpenAI**: Peter Steinberger (OpenClaw creator) joined OpenAI to lead "next generation personal agents". OpenClaw continues as open-source. I missed this critical news — strengthened tech news monitoring in heartbeat rotation.
 - **OpenClaw Migration**: Successfully migrated from Clawdbot to OpenClaw (Feb 6). All configs, crons, services updated.
 - **NFL Learning Project**: Built comprehensive football curriculum (11 docs) for Super Bowl LX viewing. Hamel learning American football.
