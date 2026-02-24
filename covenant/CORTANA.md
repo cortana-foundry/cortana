@@ -37,7 +37,14 @@ python3 /Users/hd/clawd/tools/covenant/validate_spawn_handshake.py /path/to/hand
 python3 /Users/hd/clawd/tools/covenant/build_identity_spawn_prompt.py /path/to/handshake.json --output /tmp/covenant-prompt.txt
 ```
 4. Use the generated prompt as the `task` body when spawning.
-5. If validation/build fails, reject spawn and fix payload (do not launch malformed or identity-less missions).
+5. Require sub-agent output protocol lines in replies:
+   - `COVENANT_STATUS_JSON: { ... }`
+   - `COVENANT_COMPLETION_JSON: { ... }`
+6. Validate status/completion payloads before marking work complete:
+```bash
+python3 /Users/hd/clawd/tools/covenant/validate_agent_protocol.py --extract /path/to/subagent-output.txt
+```
+7. If validation/build fails, reject spawn or completion and request corrected payload (do not accept malformed outputs).
 
 ### Memory Boundary Guardrails (required)
 Before delegating any write target to a sub-agent, validate path scope:
