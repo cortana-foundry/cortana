@@ -448,6 +448,15 @@ def main():
     cron_rows = collect_cron_health(jobs, now_ms)
     events, _ = remediate_heartbeat_misses(jobs, cron_rows, now_ms, dry_run=args.dry_run)
 
+    memory_health = collect_memory_health_summary()
+    if memory_health:
+        events.append({
+            "event_type": "memory_health",
+            "source": "proprioception",
+            "severity": "info",
+            "message": "Unified memory health snapshot",
+            "metadata": memory_health,
+        })
     autonomy_summary = None
     try:
         autonomy_summary = compute_and_store_scorecard(window_days=7, dry_run=args.dry_run)
