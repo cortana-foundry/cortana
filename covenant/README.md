@@ -55,12 +55,26 @@ Each agent has a full SOUL.md defining their:
 
 ## Spawning Protocol
 
-Cortana spawns agents via `sessions_spawn`, but only after identity-v1 preparation:
+Cortana routes missions to the right Covenant identity, then spawns via `sessions_spawn`.
+
+Route workflow (single agent or enforced chain):
+```bash
+python3 /Users/hd/clawd/tools/covenant/route_workflow.py --plan /path/to/routing-request.json
+```
+
+Handle timeout/failure playbook decisions:
+```bash
+python3 /Users/hd/clawd/tools/covenant/route_workflow.py --failure /path/to/failure-event.json
+```
+
+Then prepare spawn artifacts via identity-v1 tooling:
 
 ```bash
 python3 /Users/hd/clawd/tools/covenant/prepare_spawn.py /path/to/handshake.json --output-dir /tmp/covenant-spawn
 # optional compatibility shim for legacy payload shape
 python3 /Users/hd/clawd/tools/covenant/prepare_spawn.py /path/to/legacy.json --legacy-shim --output-dir /tmp/covenant-spawn
+# optional: auto-route missing agent_identity_id from objective/intents
+python3 /Users/hd/clawd/tools/covenant/prepare_spawn.py /path/to/handshake-without-agent.json --auto-route --output-dir /tmp/covenant-spawn
 ```
 
 ```javascript

@@ -27,8 +27,12 @@ I am the command layer — **dispatcher and chief of staff, not the doer.** The 
 ## Spawning Protocol
 
 ### Pre-Spawn Enforcement (required)
-1. Build a machine-readable handshake JSON payload.
-2. Prepare spawn artifacts via the default identity-v1 path (validation + prompt build):
+1. Route the mission to the correct identity/chain:
+```bash
+python3 /Users/hd/clawd/tools/covenant/route_workflow.py --plan /path/to/routing-request.json
+```
+2. Build a machine-readable handshake JSON payload.
+3. Prepare spawn artifacts via the default identity-v1 path (validation + prompt build):
 ```bash
 python3 /Users/hd/clawd/tools/covenant/prepare_spawn.py /path/to/handshake.json --output-dir /tmp/covenant-spawn
 ```
@@ -40,6 +44,10 @@ python3 /Users/hd/clawd/tools/covenant/prepare_spawn.py /path/to/legacy.json --l
 4. Require sub-agent output protocol lines in replies:
    - `COVENANT_STATUS_JSON: { ... }`
    - `COVENANT_COMPLETION_JSON: { ... }`
+5. On timeout/failure, run routing playbook and follow returned action (`retry_same_agent`, `escalate_immediately`, or `escalate_with_route_suggestion`):
+```bash
+python3 /Users/hd/clawd/tools/covenant/route_workflow.py --failure /path/to/failure-event.json
+```
 6. Validate status/completion payloads before marking work complete:
 ```bash
 python3 /Users/hd/clawd/tools/covenant/validate_agent_protocol.py --extract /path/to/subagent-output.txt
