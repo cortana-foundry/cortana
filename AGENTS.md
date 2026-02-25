@@ -27,7 +27,7 @@ Don't ask permission. Just do it.
 - Quick single-call lookups (weather, time, one status check)
 - Deciding *what* to delegate and spawning sub-agents
 
-**Sub-agents are for — literally everything else:**
+**Sub-agents are for — literally everything else (BUT USE THE RIGHT AGENT):**
 - Research and deep dives (spawn Huragok for heavy research)
 - Multi-step work, code changes, testing
 - Anything requiring more than one tool call
@@ -42,6 +42,37 @@ Don't ask permission. Just do it.
 - Don't over-spawn — one well-scoped sub-agent beats three vague ones
 
 **Why:** Keeps main context clean, enables parallel work, and results come back async. The main session stays lean — a command bridge, not a workshop.
+
+## ⚠️ The Covenant — Agent Routing (MANDATORY)
+
+**Every sub-agent spawn MUST use the correct Covenant agent.** Do NOT default to Huragok for everything. Match the task to the agent's role.
+
+### Agent Roster
+
+| Agent | Role | Use When |
+|-------|------|----------|
+| **Huragok** | Systems Engineer | Infrastructure, automation, tooling, service setup, DevOps, launchd/cron wiring, database migrations, CLI tools, resilience/recovery systems |
+| **Researcher** | Scout / Research | Deep dives, comparisons, source gathering, synthesis, market research, travel research, tech evaluation, "find out about X" tasks |
+| **Monitor** | Guardian / Patterns | Anomaly detection, alert routing, escalation policies, behavioral pattern analysis, system health monitoring, watchlist checks |
+| **Oracle** | Forecaster / Prediction | Risk analysis, forecasting, strategic planning, portfolio analysis, trend prediction, decision modeling, "what should we do about X" |
+| **Librarian** | Knowledge Base | Documentation, README updates, knowledge indexing, retrieval, summarization, tagging, organizing information, writing docs |
+
+### Routing Rules
+
+1. **Before spawning, ask: "Which agent owns this type of work?"**
+2. **Research tasks → Researcher**, not Huragok. If it's about gathering info, comparing options, or synthesizing findings — that's Researcher.
+3. **Documentation/README → Librarian**. Always.
+4. **Building/installing/wiring systems → Huragok**. Code, infra, tools, services.
+5. **Analysis/prediction/strategy → Oracle**. Forecasting, risk, "should we do X?"
+6. **Monitoring/alerting/pattern detection → Monitor**. Health checks, anomaly scanning.
+7. **If a task spans two roles**, pick the primary and note the overlap in the task prompt.
+8. **Label your spawns consistently**: `<agent>-<task-slug>` (e.g., `researcher-mortgage-rates`, `librarian-readme-update`, `huragok-event-bus`).
+
+### Anti-Patterns (DO NOT)
+- ❌ Spawn Huragok for research tasks
+- ❌ Spawn Huragok for README/doc updates
+- ❌ Use any agent as a catch-all
+- ❌ Spawn without identifying which agent role applies
 
 ## Git Branch Hygiene (MANDATORY)
 
