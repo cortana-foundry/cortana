@@ -74,12 +74,12 @@ graph TD
 ```
 
 ### ⚔️ The Covenant (Agent Team)
-Five specialized agents execute as a coordinated strike team. Cortana orchestrates a Planner → Critic → Executor loop, injects role-scoped memory, and continuously compiles lessons back into future runs.
+Five specialized agents execute as a coordinated strike team. Cortana orchestrates a Roland → Arbiter → Executor loop, injects role-scoped memory, and continuously compiles lessons back into future runs.
 
 ```mermaid
 graph LR
-    C2[🎯 Cortana<br/>Command & Control] --> P0[🧠 Planner]
-    P0 --> C1[🧐 Critic]
+    C2[🎯 Cortana<br/>Command & Control] --> P0[🧠 Roland<br/>Tactical Planner]
+    P0 --> C1[⚔️ Arbiter<br/>Plan Critic]
     C1 --> E0[⚙️ Executor]
 
     E0 --> H[🔧 Huragok<br/>Systems Engineer]
@@ -206,7 +206,7 @@ If you’re onboarding fresh: start with **`AGENTS.md` → `SOUL.md` → `USER.m
 - **Proprioception model/prompt upgrade** — proprioception crons now run on `gpt-5.3-codex` with slimmed prompts for lower token load and tighter signal.
 
 ### Covenant communication infrastructure (2026-02-25)
-- **Covenant Agent Routing** — intent-based routing now uses a Planner → Critic → Executor pipeline across the 5-agent roster: **Huragok, Researcher, Monitor, Oracle, Librarian**. Researcher identity is now first-class, intent→agent signal mapping was corrected, and handoff chain patterns are explicit (`Researcher→Librarian`, `Researcher→Oracle→Huragok`, `Monitor→Huragok`).
+- **Covenant Agent Routing** — intent-based routing now uses a Roland (Planner) → Arbiter (Critic) → Executor pipeline across the 5-agent roster: **Huragok, Researcher, Monitor, Oracle, Librarian**. Researcher identity is now first-class, intent→agent signal mapping was corrected, and handoff chain patterns are explicit (`Researcher→Librarian`, `Researcher→Oracle→Huragok`, `Monitor→Huragok`).
 - **Handoff Artifact Bus (HAB)** — Cortana-controlled persistent artifact store for passing structured context between chained spawns; PostgreSQL-backed and integrated with the event bus for durable cross-agent context flow. Doc: `docs/handoff-artifact-bus.md`
 - **Agent Feedback Compiler (AFC)** — compiles `cortana_feedback` into per-agent lesson blocks and auto-injects role-specific corrections at spawn time. Doc: `docs/agent-feedback-compiler.md`
 - **Event Lifecycle Integration** — sub-agent lifecycle events (`spawn`, `complete`, `fail`, `timeout`) now publish to the PostgreSQL event bus, enabling real-time monitoring and health analytics for the Covenant runtime. Doc: `docs/agent-lifecycle-events.md`
