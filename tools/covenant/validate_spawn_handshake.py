@@ -25,6 +25,7 @@ ALLOWED_FIELDS = {
     "timeout_retry_policy",
     "callback",
     "constraints",
+    "metadata",
 }
 
 REQUIRED_FIELDS = {
@@ -43,6 +44,7 @@ REQUIRED_OUTPUT_FORMAT_FIELDS = {"type", "sections"}
 ALLOWED_TIMEOUT_FIELDS = {"timeout_seconds", "max_retries", "retry_on", "escalate_on"}
 REQUIRED_TIMEOUT_FIELDS = {"timeout_seconds", "max_retries", "retry_on", "escalate_on"}
 ALLOWED_CONSTRAINT_FIELDS = {"workspace_root", "allowed_paths", "forbidden_actions"}
+ALLOWED_METADATA_FIELDS = {"chain_id"}
 
 
 def fail(msg: str) -> None:
@@ -163,6 +165,15 @@ def validate(payload: dict[str, Any]) -> None:
         forbidden_actions = constraints.get("forbidden_actions")
         if forbidden_actions is not None:
             _expect_non_empty_string_list(forbidden_actions, "constraints.forbidden_actions")
+
+    metadata = payload.get("metadata")
+    if metadata is not None:
+        metadata = _expect_object(metadata, "metadata")
+        extra_metadata = sorted(set(metadata.keys()) - ALLOWED_METADATA_FIELDS)
+        if extra_metadata:
+            fail(f"metadata contains unsupported field(s): {', '.join(extra_metadata)}")
+        if "chain_id" in metadata:
+            _expect_non_empty_string(metadata["chain_id"], "metadata.chain_id")
 
 
 
