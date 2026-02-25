@@ -1,0 +1,6 @@
+[2026-02-25 17:11:07] 🚀 Starting mission-control deploy
+[2026-02-25 17:11:07] Pulling latest changes from origin/main
+[2026-02-25 17:11:07] Installing dependencies (frozen lockfile)
+[2026-02-25 17:11:08] Building app
+[2026-02-25 17:11:11] Restarting launchd service
+[2026-02-25 17:11:12] ✅ DEPLOY SUCCESS

@@ -1245,6 +1245,60 @@
         "to": "8171372724",
         "bestEffort": true
       }
+    },
+    {
+      "id": "eac7a31d-3c17-4d60-95a7-04cbb49ed71e",
+      "agentId": "main",
+      "name": "Earnings scan (held positions)",
+      "enabled": true,
+      "createdAtMs": 1772056736938,
+      "updatedAtMs": 1772056736938,
+      "schedule": {
+        "kind": "cron",
+        "expr": "0 7 * * *",
+        "tz": "America/New_York"
+      },
+      "sessionTarget": "isolated",
+      "wakeMode": "now",
+      "payload": {
+        "kind": "agentTurn",
+        "message": "Run the earnings morning scan and output the script result exactly (no extra text). If output is empty, return empty output.\\n\\nCommand:\\n~/clawd/tools/earnings-alert/earnings-check.sh --mode scan",
+        "model": "openai-codex/gpt-5.1"
+      },
+      "state": {},
+      "delivery": {
+        "mode": "announce",
+        "channel": "telegram",
+        "to": "8171372724",
+        "bestEffort": true
+      }
+    },
+    {
+      "id": "92e4ae89-d486-4718-bb2f-9de86320e56e",
+      "agentId": "main",
+      "name": "Earnings T-minus alert (held positions)",
+      "enabled": true,
+      "createdAtMs": 1772056736938,
+      "updatedAtMs": 1772056736938,
+      "schedule": {
+        "kind": "cron",
+        "expr": "0 13 * * *",
+        "tz": "America/New_York"
+      },
+      "sessionTarget": "isolated",
+      "wakeMode": "now",
+      "payload": {
+        "kind": "agentTurn",
+        "message": "Run the earnings T-minus alert and output ONLY the alert text. If there is no alert due, output nothing.\\n\\nCommand:\\n~/clawd/tools/earnings-alert/earnings-check.sh --mode tminus",
+        "model": "openai-codex/gpt-5.1"
+      },
+      "state": {},
+      "delivery": {
+        "mode": "announce",
+        "channel": "telegram",
+        "to": "8171372724",
+        "bestEffort": true
+      }
     }
   ]
 }

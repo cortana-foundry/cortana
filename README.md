@@ -58,6 +58,8 @@ Core mission: compound **Time, Health, Wealth, Career**.
 - `tools/reflection/` — reflection and repeated-correction analysis
 - `tools/proactive/` — cross-signal proactive detection/calibration
 - `tools/alerting/` — cron preflight + alert playbooks
+- `tools/trade-alerts/` — Alpaca-backed trade alert pipeline and execution wiring
+- `tools/earnings-alert/` — earnings calendar capture and alert scheduling
 
 ### Additional major tool groups present
 `behavioral-twin`, `briefing`, `covenant`, `email`, `embeddings`, `event-bus`, `failsafe`, `fitness`, `governor`, `guardrails`, `health`, `market-intel`, `mortgage`, `ops-eye`, `policy`, `portfolio`, `resilience`, `self-upgrade`, `tracing`, `trading`, `travel`, and others under `tools/`.
