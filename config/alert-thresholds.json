@@ -1,0 +1,8 @@
+{
+  "portfolio": 0.7,
+  "email": 0.65,
+  "calendar": 0.6,
+  "weather": 0.55,
+  "health": 0.65,
+  "tech_news": 0.6
+}
