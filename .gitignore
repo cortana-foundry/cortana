@@ -15,3 +15,8 @@ cortical-loop/state/
 tmp/
 tmp/research/
 __pycache__/
+
+# Runtime local state (do not track)
+memory/heartbeat-state.json
+.openclaw/workspace-state.json
+proprioception/state/heartbeat-remediation.json
