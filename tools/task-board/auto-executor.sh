@@ -46,7 +46,18 @@ TITLE="$(echo "$TASK_ROW" | jq -r '.title')"
 PLAN="$(echo "$TASK_ROW" | jq -r '.execution_plan // ""')"
 ASSIGNED="auto-executor"
 
-# Mark in-progress
+# Autonomy Governor v2 gate: risk-score before execution.
+GOVERNOR_JSON="$(python3 /Users/hd/clawd/tools/governor/risk_score.py --db "$DB" --task-json "$TASK_ROW" --actor "$ASSIGNED" --log --apply-task-state)"
+GOVERNOR_DECISION="$(echo "$GOVERNOR_JSON" | jq -r '.decision')"
+GOVERNOR_RISK="$(echo "$GOVERNOR_JSON" | jq -r '.risk_score')"
+GOVERNOR_ACTION_TYPE="$(echo "$GOVERNOR_JSON" | jq -r '.action_type')"
+
+if [[ "$GOVERNOR_DECISION" != "approved" ]]; then
+  echo "Governor ${GOVERNOR_DECISION}: task #${TASK_ID} queued/blocked (action_type=${GOVERNOR_ACTION_TYPE}, risk=${GOVERNOR_RISK})."
+  exit 0
+fi
+
+# Mark in-progress only after governor approval.
 psql "$DB" -v ON_ERROR_STOP=1 -c "UPDATE cortana_tasks SET status='in_progress', assigned_to='${ASSIGNED}' WHERE id=${TASK_ID};" >/dev/null
 
 # Determine command source:

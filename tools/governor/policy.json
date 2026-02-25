@@ -1,0 +1,43 @@
+{
+  "version": 2,
+  "default_action_type": "internal-write",
+  "auto_approve_threshold": 0.5,
+  "deny_unknown_action_type": true,
+  "action_types": {
+    "read-only": {
+      "risk_score": 0.0,
+      "requires_human_approval": false,
+      "description": "Read-only inspection or retrieval actions"
+    },
+    "internal-write": {
+      "risk_score": 0.2,
+      "requires_human_approval": false,
+      "description": "Local/internal writes with no external side effects"
+    },
+    "external-send": {
+      "risk_score": 0.7,
+      "requires_human_approval": true,
+      "description": "Messages, email, posting, or other outbound communications"
+    },
+    "financial": {
+      "risk_score": 0.9,
+      "requires_human_approval": true,
+      "description": "Purchases, transfers, trades, or other financial impact actions"
+    },
+    "destructive": {
+      "risk_score": 1.0,
+      "requires_human_approval": true,
+      "description": "Irreversible deletes/destructive operations"
+    }
+  },
+  "command_action_hints": [
+    {
+      "pattern": "^(cat|head|tail|grep|find|ls|jq|git\\s+(status|log|show|diff|rev-parse))\\b",
+      "action_type": "read-only"
+    },
+    {
+      "pattern": "\\b(psql|python3?|node|npm|go test|git pull|git fetch|openclaw)\\b",
+      "action_type": "internal-write"
+    }
+  ]
+}

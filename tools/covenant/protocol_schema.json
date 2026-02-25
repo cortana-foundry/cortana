@@ -83,7 +83,12 @@
           "additionalProperties": false,
           "properties": {
             "action": {"type": "string", "enum": ["retry_same_agent", "escalate_immediately", "escalate_with_route_suggestion", "mark_failed", "none"]},
-            "route_to": {"type": ["string", "null"]},
+            "route_to": {
+              "anyOf": [
+                {"$ref": "#/$defs/agent_identity_id"},
+                {"type": "null"}
+              ]
+            },
             "reason": {"type": "string"}
           },
           "required": ["action", "route_to", "reason"]
@@ -93,6 +98,16 @@
     }
   },
   "$defs": {
+    "agent_identity_id": {
+      "type": "string",
+      "enum": [
+        "agent.monitor.v1",
+        "agent.huragok.v1",
+        "agent.researcher.v1",
+        "agent.oracle.v1",
+        "agent.librarian.v1"
+      ]
+    },
     "quality_gate": {
       "type": "object",
       "additionalProperties": false,
@@ -129,7 +144,7 @@
       "additionalProperties": false,
       "properties": {
         "step_id": {"type": "string", "minLength": 1},
-        "agent_identity_id": {"type": "string", "minLength": 1},
+        "agent_identity_id": {"$ref": "#/$defs/agent_identity_id"},
         "objective": {"type": "string", "minLength": 1},
         "depends_on": {"type": "array", "items": {"type": "string"}},
         "confidence": {"type": "number", "minimum": 0, "maximum": 1},

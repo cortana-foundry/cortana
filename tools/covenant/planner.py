@@ -9,17 +9,26 @@ from typing import Any
 
 AGENT_MONITOR = "agent.monitor.v1"
 AGENT_HURAGOK = "agent.huragok.v1"
+AGENT_RESEARCHER = "agent.researcher.v1"
 AGENT_ORACLE = "agent.oracle.v1"
 AGENT_LIBRARIAN = "agent.librarian.v1"
 
 HANDOFF_PATTERNS: dict[str, tuple[str, list[str]]] = {
-    "oracle_librarian_huragok": (
-        "Research/options first, lock implementation contract, then execute.",
-        [AGENT_ORACLE, AGENT_LIBRARIAN, AGENT_HURAGOK],
+    "researcher_to_librarian": (
+        "Research evidence first, then transform findings into durable documentation.",
+        [AGENT_RESEARCHER, AGENT_LIBRARIAN],
     ),
-    "monitor_huragok_monitor": (
-        "Detect/triage incident, implement fix, then verify recovery.",
-        [AGENT_MONITOR, AGENT_HURAGOK, AGENT_MONITOR],
+    "researcher_to_oracle": (
+        "Gather and compare evidence first, then perform strategic/risk analysis.",
+        [AGENT_RESEARCHER, AGENT_ORACLE],
+    ),
+    "researcher_to_oracle_to_huragok": (
+        "Research options, choose strategy, then implement execution changes.",
+        [AGENT_RESEARCHER, AGENT_ORACLE, AGENT_HURAGOK],
+    ),
+    "monitor_to_huragok": (
+        "Detect/triage issue patterns, then implement the corrective fix.",
+        [AGENT_MONITOR, AGENT_HURAGOK],
     ),
     "librarian_huragok_librarian": (
         "Define contract, implement, then align documentation/spec integrity.",
@@ -28,10 +37,103 @@ HANDOFF_PATTERNS: dict[str, tuple[str, list[str]]] = {
 }
 
 KEYWORDS = {
-    AGENT_MONITOR: {"monitor", "health", "watchdog", "uptime", "budget", "incident", "triage", "verify", "verification"},
-    AGENT_HURAGOK: {"implement", "implementation", "code", "fix", "patch", "test", "refactor", "build"},
-    AGENT_ORACLE: {"research", "options", "compare", "investigate", "decision", "analysis", "evaluate"},
-    AGENT_LIBRARIAN: {"spec", "contract", "runbook", "architecture", "documentation", "doc", "align"},
+    AGENT_HURAGOK: {
+        "build",
+        "install",
+        "wire",
+        "migrate",
+        "setup",
+        "set",
+        "up",
+        "deploy",
+        "configure",
+        "automate",
+        "automation",
+        "infra",
+        "service",
+        "daemon",
+        "launchd",
+        "cron",
+        "implement",
+        "implementation",
+        "code",
+        "fix",
+        "patch",
+        "test",
+        "refactor",
+    },
+    AGENT_RESEARCHER: {
+        "research",
+        "compare",
+        "evaluate",
+        "find",
+        "investigate",
+        "analyze_data",
+        "deep_dive",
+        "gather",
+        "scout",
+        "synthesize",
+        "sources",
+        "synthesize_sources",
+        "look_into",
+        "what_are_the_options",
+        "options",
+        "benchmark",
+    },
+    AGENT_MONITOR: {
+        "monitor",
+        "alert",
+        "detect",
+        "anomaly",
+        "health",
+        "check",
+        "health_check",
+        "watch",
+        "triage",
+        "pattern",
+        "escalate",
+        "uptime",
+        "incident",
+        "verification",
+        "verify",
+    },
+    AGENT_ORACLE: {
+        "forecast",
+        "predict",
+        "strategy",
+        "risk",
+        "plan",
+        "model",
+        "should",
+        "we",
+        "should_we",
+        "tradeoff",
+        "decision",
+        "advise",
+        "scenario",
+        "probability",
+        "timing",
+    },
+    AGENT_LIBRARIAN: {
+        "document",
+        "readme",
+        "summarize",
+        "index",
+        "tag",
+        "organize",
+        "write",
+        "docs",
+        "knowledge",
+        "base",
+        "catalog",
+        "spec",
+        "contract",
+        "runbook",
+        "architecture",
+        "documentation",
+        "doc",
+        "align",
+    },
 }
 
 DEFAULT_RETRY = {
@@ -48,19 +150,42 @@ def normalize_tokens(payload: dict[str, Any]) -> set[str]:
     tokens: set[str] = set()
     objective = payload.get("objective")
     if isinstance(objective, str):
-        for part in objective.lower().replace("→", " ").replace("-", " ").split():
+        objective_lc = objective.lower()
+        normalized = (
+            objective_lc.replace("→", " ")
+            .replace("->", " ")
+            .replace("-", " ")
+            .replace("/", " ")
+        )
+        for part in normalized.split():
             clean = "".join(c for c in part if c.isalnum() or c == "_")
             if clean:
                 tokens.add(clean)
+
+        phrase_signals = {
+            "analyze data": "analyze_data",
+            "deep dive": "deep_dive",
+            "look into": "look_into",
+            "synthesize sources": "synthesize_sources",
+            "what are the options": "what_are_the_options",
+            "health check": "health_check",
+            "should we": "should_we",
+        }
+        for phrase, token in phrase_signals.items():
+            if phrase in objective_lc:
+                tokens.add(token)
 
     for key in ("intents", "workflow_type"):
         value = payload.get(key)
         if isinstance(value, list):
             for item in value:
                 if isinstance(item, str) and item.strip():
-                    tokens.add(item.strip().lower())
+                    item_normalized = item.strip().lower().replace("-", " ")
+                    tokens.update(piece for piece in item_normalized.split() if piece)
         elif isinstance(value, str) and value.strip():
-            tokens.add(value.strip().lower())
+            item_normalized = value.strip().lower().replace("-", " ")
+            tokens.update(piece for piece in item_normalized.split() if piece)
+
     return tokens
 
 
@@ -72,17 +197,24 @@ def choose_pattern(tokens: set[str], explicit: str | None = None) -> tuple[str |
         reason, chain = HANDOFF_PATTERNS[key]
         return key, chain, reason
 
-    has_research = any(t in tokens for t in {"research", "decision", "compare", "evaluate", "analysis"})
-    has_spec = any(t in tokens for t in {"spec", "contract", "architecture", "runbook", "documentation", "doc"})
-    has_impl = any(t in tokens for t in {"implement", "implementation", "code", "fix", "patch", "build", "test"})
-    has_monitor = any(t in tokens for t in {"monitor", "health", "incident", "triage", "verify", "verification", "uptime"})
+    has_research = bool(tokens.intersection(KEYWORDS[AGENT_RESEARCHER]))
+    has_oracle = bool(tokens.intersection(KEYWORDS[AGENT_ORACLE]))
+    has_spec = bool(tokens.intersection(KEYWORDS[AGENT_LIBRARIAN]))
+    has_impl = bool(tokens.intersection(KEYWORDS[AGENT_HURAGOK]))
+    has_monitor = bool(tokens.intersection(KEYWORDS[AGENT_MONITOR]))
 
-    if has_research and has_spec and has_impl:
-        reason, chain = HANDOFF_PATTERNS["oracle_librarian_huragok"]
-        return "oracle_librarian_huragok", chain, reason
+    if has_research and has_oracle and has_impl:
+        reason, chain = HANDOFF_PATTERNS["researcher_to_oracle_to_huragok"]
+        return "researcher_to_oracle_to_huragok", chain, reason
+    if has_research and has_spec:
+        reason, chain = HANDOFF_PATTERNS["researcher_to_librarian"]
+        return "researcher_to_librarian", chain, reason
+    if has_research and has_oracle:
+        reason, chain = HANDOFF_PATTERNS["researcher_to_oracle"]
+        return "researcher_to_oracle", chain, reason
     if has_monitor and has_impl:
-        reason, chain = HANDOFF_PATTERNS["monitor_huragok_monitor"]
-        return "monitor_huragok_monitor", chain, reason
+        reason, chain = HANDOFF_PATTERNS["monitor_to_huragok"]
+        return "monitor_to_huragok", chain, reason
     if has_spec and has_impl:
         reason, chain = HANDOFF_PATTERNS["librarian_huragok_librarian"]
         return "librarian_huragok_librarian", chain, reason
@@ -90,12 +222,14 @@ def choose_pattern(tokens: set[str], explicit: str | None = None) -> tuple[str |
     scores = {agent: len(tokens.intersection(words)) for agent, words in KEYWORDS.items()}
     primary = max(scores, key=scores.get)
     if scores[primary] == 0:
-        return None, [AGENT_HURAGOK], "Defaulted to Huragok for execution-oriented fallback when signal is weak."
+        return None, [AGENT_ORACLE], "Weak/ambiguous routing signal; defaulted to Oracle for triage and recommendation."
+
     reasons = {
-        AGENT_MONITOR: "Detected health/triage/run-state signals.",
-        AGENT_HURAGOK: "Detected implementation/fix/test signals.",
-        AGENT_ORACLE: "Detected research/decision-support signals.",
-        AGENT_LIBRARIAN: "Detected spec/contract/documentation signals.",
+        AGENT_MONITOR: "Detected monitoring/health/anomaly signals.",
+        AGENT_HURAGOK: "Detected implementation/automation/infrastructure signals.",
+        AGENT_RESEARCHER: "Detected research/comparison/evidence-gathering signals.",
+        AGENT_ORACLE: "Detected forecasting/risk/decision-modeling signals.",
+        AGENT_LIBRARIAN: "Detected documentation/knowledge-organization signals.",
     }
     return None, [primary], reasons[primary]
 

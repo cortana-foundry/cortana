@@ -19,6 +19,13 @@ WORKSPACE_ROOT = Path("/Users/hd/clawd")
 SCHEMA_PATH = WORKSPACE_ROOT / "agents" / "identities" / "schema.json"
 STATUS_PREFIX = "COVENANT_STATUS_JSON:"
 COMPLETION_PREFIX = "COVENANT_COMPLETION_JSON:"
+KNOWN_IDENTITIES = {
+    "agent.monitor.v1",
+    "agent.huragok.v1",
+    "agent.researcher.v1",
+    "agent.oracle.v1",
+    "agent.librarian.v1",
+}
 
 
 class ValidationError(Exception):
@@ -104,6 +111,8 @@ def validate_status(payload: dict[str, Any], defs: dict[str, Any]) -> None:
 
     _expect_str(payload["request_id"], "request_id")
     _expect_str(payload["agent_identity_id"], "agent_identity_id")
+    if payload["agent_identity_id"] not in KNOWN_IDENTITIES:
+        raise ValidationError("'agent_identity_id' must be a known Covenant identity")
 
     state = payload["state"]
     allowed_states = set(status_def["properties"]["state"].get("enum", []))
@@ -135,6 +144,8 @@ def validate_completion(payload: dict[str, Any], defs: dict[str, Any]) -> None:
 
     _expect_str(payload["request_id"], "request_id")
     _expect_str(payload["agent_identity_id"], "agent_identity_id")
+    if payload["agent_identity_id"] not in KNOWN_IDENTITIES:
+        raise ValidationError("'agent_identity_id' must be a known Covenant identity")
 
     if payload.get("state") != "completed":
         raise ValidationError("completion 'state' must be 'completed'")

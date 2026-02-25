@@ -21,6 +21,7 @@ from planner import build_plan
 ALLOWED_AGENTS = {
     "agent.monitor.v1",
     "agent.huragok.v1",
+    "agent.researcher.v1",
     "agent.oracle.v1",
     "agent.librarian.v1",
 }

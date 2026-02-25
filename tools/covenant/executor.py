@@ -11,6 +11,7 @@ HARD_ESCALATE_FAILURES = {"auth_failure", "permission_denied", "requirements_amb
 TRANSIENT_FAILURES = {"transient_tool_failure", "network_timeout", "timeout"}
 
 ROUTE_SUGGESTION = {
+    "agent.researcher.v1": "agent.oracle.v1",
     "agent.oracle.v1": "agent.librarian.v1",
     "agent.monitor.v1": "agent.huragok.v1",
     "agent.huragok.v1": "agent.monitor.v1",

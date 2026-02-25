@@ -17,6 +17,14 @@ WORKSPACE_ROOT = Path("/Users/hd/clawd")
 REGISTRY_PATH = WORKSPACE_ROOT / "agents" / "identities" / "registry.json"
 HANDSHAKE_VALIDATOR = WORKSPACE_ROOT / "tools" / "covenant" / "validate_spawn_handshake.py"
 
+IDENTITY_PROMPT_TEMPLATES = {
+    "agent.monitor.v1": "Focus on signal quality, anomaly detection, and actionable triage paths.",
+    "agent.huragok.v1": "Focus on implementation safety, resilience, and reproducible execution artifacts.",
+    "agent.researcher.v1": "Focus on high-quality source gathering, evidence synthesis, and option comparisons with confidence.",
+    "agent.oracle.v1": "Focus on strategic forecasts, risk tradeoffs, and recommendation logic grounded in evidence.",
+    "agent.librarian.v1": "Focus on clear documentation structure, durable references, and organized knowledge artifacts.",
+}
+
 
 def fail(msg: str) -> None:
     print(f"PROMPT_BUILD_INVALID: {msg}", file=sys.stderr)
@@ -56,6 +64,7 @@ def build_prompt(payload: dict[str, Any], contract: dict[str, Any]) -> str:
 - role: {contract['role']}
 - mission_scope: {contract['mission_scope']}
 - tone_voice: {contract['tone_voice']}
+- identity_template: {IDENTITY_PROMPT_TEMPLATES.get(payload['agent_identity_id'], 'Use role-consistent reasoning and deliver contract-compliant outputs.')}
 
 ### Tool Permissions (ALLOWLIST — strict)
 {_format_bullets(allowed_tools)}
