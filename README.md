@@ -205,6 +205,18 @@ If you’re onboarding fresh: start with **`AGENTS.md` → `SOUL.md` → `USER.m
 - **Behavioral Twin** — predictive Chief-state model for timing, tone calibration, and alert gating. Doc: `docs/behavioral-twin.md`
 - **Proprioception model/prompt upgrade** — proprioception crons now run on `gpt-5.3-codex` with slimmed prompts for lower token load and tighter signal.
 
+### Sprint completion updates (Tasks 131–140, excluding 134) — 2026-02-25
+- **Task 131 · Atomic Fact Extraction Pipeline** — Added structured extraction from conversations into normalized, deduplicated atomic facts to improve downstream recall and reasoning precision. Doc: `docs/atomic-fact-extraction.md`
+- **Task 132 · Memory Decay + Supersession Chains** — Introduced recency/validity decay logic plus supersession graphing so stale knowledge is demoted and replaced facts are traceable. Doc: `docs/memory-decay-supersession.md`
+- **Task 133 · Correlation ID Propagation + Boundary Timing** — End-to-end correlation IDs and boundary timing instrumentation now track request lineage and latency across Cortana, Roland, Arbiter, and executor boundaries. Doc: `docs/correlation-tracing.md`
+- **Task 135 · Token Economics Ledger + Prompt Cache Analytics** — Added token/cost accounting with prompt cache hit-rate visibility for budget governance and prompt efficiency tuning. Doc: `docs/token-economics.md`
+- **Task 136 · Agent Output Quality Scorecards** — Added measurable quality scoring per agent run for regression detection, trend monitoring, and targeted coaching. Doc: `docs/agent-quality-scorecards.md`
+- **Task 137 · Conversation Insight Promotion Pipeline** — Added promotion flow to elevate high-value conversation insights into durable memory/knowledge artifacts. Doc: `docs/conversation-insight-promotion.md`
+- **Task 138 · Feedback Closure Verifier** — Added closure checks ensuring applied feedback is validated end-to-end instead of only logged. Doc: `docs/feedback-closure-verifier.md`
+- **Task 139 · Proactive Signal Precision Calibrator** — Added calibration loop for proactive alerts to increase precision and suppress noisy triggers. Doc: `docs/proactive-signal-calibration.md`
+- **Task 140 · Durable Workflow Checkpointing Prototype** — Added checkpoint/recovery prototype for long-running workflows to improve resilience under interruption/failure. Doc: `docs/workflow-checkpointing.md`
+- **Task 134 status** — explicitly deprioritized for this sprint and intentionally not included in shipped scope.
+
 ### Covenant communication infrastructure (2026-02-25)
 - **Covenant Agent Routing** — intent-based routing now uses a Roland → Arbiter → Executor pipeline across the 5-agent roster: **Huragok, Researcher, Monitor, Oracle, Librarian**. Researcher identity is now first-class, intent→agent signal mapping was corrected, and handoff chain patterns are explicit (`Researcher→Librarian`, `Researcher→Oracle→Huragok`, `Monitor→Huragok`).
 - **Handoff Artifact Bus (HAB)** — Cortana-controlled persistent artifact store for passing structured context between chained spawns; PostgreSQL-backed and integrated with the event bus for durable cross-agent context flow. Doc: `docs/handoff-artifact-bus.md`
