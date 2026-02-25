@@ -12,3 +12,6 @@ node_modules/
 # Runtime state/logs
 cortical-loop/logs/
 cortical-loop/state/
+tmp/research/
+tmp/research/
+__pycache__/
