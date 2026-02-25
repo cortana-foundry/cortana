@@ -85,14 +85,23 @@ If you’re onboarding fresh: start with **`AGENTS.md` → `SOUL.md` → `USER.m
 - `tools/policy/engine.py` + `tools/policy/policies.yaml` — policy/risk guardrails
 
 ### Tooling updates (2026-02-25)
-- `tools/guardrails/tone_drift_sentinel.py` — scores response tone quality against `SOUL.md` alignment targets.
-- `tools/task-board/auto_sync_enforcer.py` — forces task-board sync when sub-agents complete work.
-- `tools/task-board/state-audit.sql` — PostgreSQL triggers enforcing task lifecycle invariants.
-- `tools/task-board/state_integrity.py` — heartbeat-side audit for task state drift and mismatch detection.
-- `tools/reflection/recurrence_radar.py` — semantic clustering of repeated corrections for recurrence detection.
-- `tools/memory/memory_quality_gate.py` — quality scoring gate for memory entries during ingest.
-- `tools/proactive/evaluate_accuracy.py` — tracks precision/accuracy of proactive signals over time.
-- `tools/immune_scan.sh` — expanded to include flap detection, quarantine hooks, and path verification.
+- `tools/guardrails/tone_drift_sentinel.py` — tone quality scoring aligned to `SOUL.md` behavior targets.
+- `tools/task-board/auto_sync_enforcer.py` — auto-sync task board state when sub-agents complete.
+- `tools/task-board/state-audit.sql` — PostgreSQL triggers for task lifecycle invariants.
+- `tools/task-board/state_integrity.py` — heartbeat audit for task state drift and mismatch detection.
+- `tools/reflection/recurrence_radar.py` — semantic clustering of recurring corrections.
+- `tools/memory/memory_quality_gate.py` — memory entry quality scoring gate.
+- `tools/proactive/evaluate_accuracy.py` — proactive signal precision/accuracy tracking.
+- `tools/proactive/risk_radar.py` — cross-signal risk detection (sleep × calendar × market).
+- `tools/trading/trade_guardrails.py` — pre-trade guardrail engine.
+- `tools/briefing/decision_queue.py` — Morning Brief 3.0 decision queue orchestration.
+- `tools/chaos/resilience_harness.py` — controlled failure injection and MTTR measurement.
+- `tools/health/adaptive_sleep.py` — adaptive sleep protocol orchestrator.
+- `tools/mortgage/mortgage_intel.py` — mortgage rate + policy intelligence monitor.
+- `tools/career/opportunity_engine.py` — career compounding opportunity proposal engine.
+- `tools/self-upgrade/capability_marketplace.py` — capability gap detection + skill proposal generation.
+- `tools/email/inbox_to_execution.py` — email commitment extraction and execution pipeline.
+- `tools/immune_scan.sh` — expanded with flap detection, quarantine hooks, and path verification.
 
 ---
 
