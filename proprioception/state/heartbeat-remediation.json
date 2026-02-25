@@ -1,8 +1,10 @@
 {
   "jobs": {
     "__state_file__": {
-      "attempts": [],
-      "last_attempt": 0
+      "attempts": [
+        1772006066
+      ],
+      "last_attempt": 1772006066
     }
   }
 }
