@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+  <dict>
+    <key>Label</key>
+    <string>com.cortana.atomic-fact-extraction</string>
+
+    <key>ProgramArguments</key>
+    <array>
+      <string>/usr/bin/env</string>
+      <string>python3</string>
+      <string>/Users/hd/clawd/tools/memory/extract_facts.py</string>
+      <string>extract</string>
+      <string>--from-dir</string>
+      <string>/Users/hd/clawd/memory</string>
+      <string>--since-days</string>
+      <string>2</string>
+    </array>
+
+    <key>StartCalendarInterval</key>
+    <dict>
+      <key>Hour</key>
+      <integer>3</integer>
+      <key>Minute</key>
+      <integer>0</integer>
+    </dict>
+
+    <key>WorkingDirectory</key>
+    <string>/Users/hd/clawd</string>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+      <key>PATH</key>
+      <string>/opt/homebrew/bin:/opt/homebrew/opt/postgresql@17/bin:/usr/local/bin:/usr/bin:/bin</string>
+    </dict>
+
+    <key>RunAtLoad</key>
+    <false/>
+
+    <key>StandardOutPath</key>
+    <string>/Users/hd/clawd/tmp/atomic-fact-extraction.stdout.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/hd/clawd/tmp/atomic-fact-extraction.stderr.log</string>
+  </dict>
+</plist>
