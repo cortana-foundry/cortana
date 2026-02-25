@@ -8,6 +8,7 @@ Usage:
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -16,6 +17,7 @@ from typing import Any
 WORKSPACE_ROOT = Path("/Users/hd/clawd")
 REGISTRY_PATH = WORKSPACE_ROOT / "agents" / "identities" / "registry.json"
 HANDSHAKE_VALIDATOR = WORKSPACE_ROOT / "tools" / "covenant" / "validate_spawn_handshake.py"
+FEEDBACK_COMPILER = WORKSPACE_ROOT / "tools" / "covenant" / "feedback_compiler.py"
 
 IDENTITY_PROMPT_TEMPLATES = {
     "agent.monitor.v1": "Focus on signal quality, anomaly detection, and actionable triage paths.",
@@ -24,6 +26,9 @@ IDENTITY_PROMPT_TEMPLATES = {
     "agent.oracle.v1": "Focus on strategic forecasts, risk tradeoffs, and recommendation logic grounded in evidence.",
     "agent.librarian.v1": "Focus on clear documentation structure, durable references, and organized knowledge artifacts.",
 }
+
+PSQL_BIN = "/opt/homebrew/opt/postgresql@17/bin/psql"
+DEFAULT_DB = "cortana"
 
 
 def fail(msg: str) -> None:
@@ -44,7 +49,117 @@ def _format_bullets(values: list[str]) -> str:
     return "\n".join(f"- {v}" for v in values)
 
 
-def build_prompt(payload: dict[str, Any], contract: dict[str, Any]) -> str:
+def _agent_role_from_identity(identity_id: str, contract: dict[str, Any]) -> str:
+    # Prefer explicit contract role name when it maps clearly; fallback to identity id token.
+    role_text = str(contract.get("role", "")).lower()
+    for known in ("huragok", "researcher", "librarian", "oracle", "monitor"):
+        if known in role_text:
+            return known
+
+    parts = identity_id.split(".")
+    if len(parts) >= 2:
+        return parts[1].lower()
+    return "all"
+
+
+def _feedback_injection_block(agent_role: str, limit: int = 5) -> str:
+    if not FEEDBACK_COMPILER.exists():
+        return ""
+
+    cmd = ["python3", str(FEEDBACK_COMPILER), "inject", agent_role, "--limit", str(limit)]
+    result = subprocess.run(cmd, capture_output=True, text=True)
+    if result.returncode != 0:
+        return ""
+
+    out = result.stdout.strip()
+    return out
+
+
+def _sql_quote(value: str) -> str:
+    return value.replace("'", "''")
+
+
+def _extract_chain_id(payload: dict[str, Any]) -> str | None:
+    direct = payload.get("chain_id")
+    if isinstance(direct, str) and direct.strip():
+        return direct.strip()
+
+    metadata = payload.get("metadata")
+    if isinstance(metadata, dict):
+        chain_id = metadata.get("chain_id")
+        if isinstance(chain_id, str) and chain_id.strip():
+            return chain_id.strip()
+
+    return None
+
+
+def _fetch_handoff_artifacts(chain_id: str, to_agent: str) -> list[dict[str, Any]]:
+    sql = (
+        "SELECT COALESCE(json_agg(row_to_json(t) ORDER BY t.created_at ASC), '[]'::json)::text "
+        "FROM ("
+        "SELECT id, chain_id, from_agent, to_agent, artifact_type, payload, created_by, created_at "
+        "FROM cortana_handoff_artifacts "
+        f"WHERE chain_id = '{_sql_quote(chain_id)}'::uuid "
+        "AND consumed_at IS NULL "
+        f"AND (to_agent IS NULL OR to_agent = '{_sql_quote(to_agent)}') "
+        "ORDER BY created_at ASC"
+        ") t;"
+    )
+
+    env = os.environ.copy()
+    env["PATH"] = "/opt/homebrew/opt/postgresql@17/bin:" + env.get("PATH", "")
+
+    proc = subprocess.run(
+        [PSQL_BIN, DEFAULT_DB, "-X", "-q", "-At", "-c", sql],
+        capture_output=True,
+        text=True,
+        env=env,
+    )
+    if proc.returncode != 0:
+        return []
+
+    try:
+        parsed = json.loads((proc.stdout or "").strip() or "[]")
+    except json.JSONDecodeError:
+        return []
+
+    return parsed if isinstance(parsed, list) else []
+
+
+def _handoff_artifact_block(payload: dict[str, Any], agent_role: str) -> str:
+    chain_id = _extract_chain_id(payload)
+    if not chain_id or not agent_role:
+        return ""
+
+    artifacts = _fetch_handoff_artifacts(chain_id, agent_role)
+    if not artifacts:
+        return ""
+
+    compact = [
+        {
+            "id": a.get("id"),
+            "from_agent": a.get("from_agent"),
+            "to_agent": a.get("to_agent"),
+            "artifact_type": a.get("artifact_type"),
+            "created_at": a.get("created_at"),
+            "payload": a.get("payload"),
+        }
+        for a in artifacts
+    ]
+
+    return (
+        "## Handoff Artifacts (HAB)\n"
+        "Use these Cortana-curated upstream artifacts as chain context.\n"
+        f"- chain_id: {chain_id}\n"
+        f"- recipient_agent: {agent_role}\n"
+        f"- artifact_count: {len(compact)}\n\n"
+        "```json\n"
+        f"{json.dumps(compact, indent=2)}\n"
+        "```"
+    )
+
+
+def build_prompt(payload: dict[str, Any], contract: dict[str, Any], feedback_block: str = "", handoff_block: str = "") -> str:
     success_criteria = payload["success_criteria"]
     output_format = payload["output_format"]
     timeout_retry = payload["timeout_retry_policy"]
@@ -74,6 +189,10 @@ def build_prompt(payload: dict[str, Any], contract: dict[str, Any]) -> str:
 
 ### Escalation Triggers (immediate escalation to Cortana)
 {_format_bullets(escalation_triggers)}
+
+{feedback_block if feedback_block else '## Agent Feedback Lessons\n- No role-specific lessons injected for this spawn.'}
+
+{handoff_block if handoff_block else '## Handoff Artifacts (HAB)\n- No unconsumed artifacts injected for this spawn.'}
 
 ## Mission Objective
 {payload['objective']}
@@ -171,7 +290,11 @@ def main() -> None:
     if not isinstance(contract, dict):
         fail(f"identity contract not found for {identity_id}")
 
-    prompt = build_prompt(payload, contract)
+    agent_role = _agent_role_from_identity(identity_id, contract)
+    feedback_block = _feedback_injection_block(agent_role, limit=5)
+    handoff_block = _handoff_artifact_block(payload, agent_role)
+
+    prompt = build_prompt(payload, contract, feedback_block=feedback_block, handoff_block=handoff_block)
 
     if output_path:
         output_path.write_text(prompt)
