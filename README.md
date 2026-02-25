@@ -16,7 +16,7 @@ graph LR
     W[🧠 Working Memory<br/>LLM Context] --> S[📜 Session Memory<br/>JSONL Logs]
     S --> L[🗄️ Long-Term Memory<br/>PostgreSQL + pgvector]
 
-    E[🏭 Local Embedding Factory<br/>fastembed (on-device)] --> L
+    E[🏭 Local Embedding Factory<br/>fastembed · on-device] --> L
     L --> C[🧬 Semantic Compression Engine<br/>Daily Distillation]
     C --> L
 
