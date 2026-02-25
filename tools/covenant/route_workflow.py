@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Route Covenant operational workflows with Planner-Critic-Executor (v2).
+"""Route Covenant operational workflows with Roland-Arbiter-Executor (v2).
 
 Usage:
   python3 tools/covenant/route_workflow.py --plan <routing-request.json>

@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://clawd.local/tools/covenant/protocol_schema.json",
-  "title": "Covenant Planner-Critic-Executor Protocol v2",
+  "title": "Covenant Roland-Arbiter-Executor Protocol v2",
   "type": "object",
   "additionalProperties": false,
   "properties": {

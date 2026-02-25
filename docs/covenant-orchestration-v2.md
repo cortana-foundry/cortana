@@ -1,4 +1,4 @@
-# Covenant Orchestration v2: Planner → Critic → Executor
+# Covenant Orchestration v2: Roland → Arbiter → Executor
 
 ## Why v2
 The previous Covenant routing logic selected an agent (or handoff chain) but did not enforce a structured orchestration lifecycle. v2 introduces:
@@ -10,10 +10,10 @@ The previous Covenant routing logic selected an agent (or handoff chain) but did
 
 ## Architecture
 
-### 1) Planner (`tools/covenant/planner.py`)
+### 1) Roland (`tools/covenant/planner.py`)
 Inputs: routing request (`objective`, `intents`, optional `handoff_pattern`, optional budget hints).
 
-Planner responsibilities:
+Roland responsibilities:
 - Classify request by token signals and explicit pattern overrides.
 - Produce `steps[]` with:
   - `step_id`
@@ -24,13 +24,13 @@ Planner responsibilities:
   - step `quality_gate`
   - step `handoff` contract
 - Emit top-level `quality_gates`:
-  - `pre_execution`: critic approval + structural checks
+  - `pre_execution`: Arbiter approval + structural checks
   - `pre_completion`: all steps + all gates + final confidence
 
-### 2) Critic (`tools/covenant/critic.py`)
-Inputs: planner output + optional request budget.
+### 2) Arbiter (`tools/covenant/critic.py`)
+Inputs: Roland output + optional request budget.
 
-Critic responsibilities:
+Arbiter responsibilities:
 - Validate plan integrity:
   - known agent identities,
   - dependency references,
@@ -53,7 +53,7 @@ Policy: any step below confidence threshold blocks approval and requires re-plan
 Inputs: plan + critique + optional completion/failure events.
 
 Executor responsibilities:
-- Halt execution when critic rejects plan.
+- Halt execution when Arbiter rejects plan.
 - Select next dependency-ready step.
 - Apply retry/escalation logic on failures:
   - hard failures (`auth_failure`, `permission_denied`, `requirements_ambiguous`) => immediate escalate,
@@ -67,8 +67,8 @@ Executor responsibilities:
 
 ## Router Integration
 `tools/covenant/route_workflow.py` now orchestrates PCE:
-1. Planner creates the execution plan.
-2. Critic validates and budgets it.
+1. Roland creates the execution plan.
+2. Arbiter validates and budgets it.
 3. Executor produces dispatch-ready next action.
 
 For `--plan`, router emits one envelope:
@@ -90,7 +90,7 @@ This standardizes inter-agent communication and prevents free-form handoff drift
 
 ## Confidence Thresholds + Quality Gates
 - Every step carries `confidence` and `confidence_threshold`.
-- Critic rejects plans where confidence < threshold.
+- Arbiter rejects plans where confidence < threshold.
 - Step-level quality gates enforce output contract, boundary compliance, and confidence checks.
 - Global gates enforce phase transitions:
   - plan → execute: structural and budget readiness,

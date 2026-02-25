@@ -29,7 +29,7 @@ Scored each initiative on:
 - **Priority:** **1**
 
 ### 3) End-to-End Trace IDs + OpenTelemetry-Lite
-- **What to build now:** Generate a trace_id per user request and propagate through planner/critic/executor, DB writes, tool calls, and final output. Persist spans to Postgres now; optional OTLP export later.
+- **What to build now:** Generate a trace_id per user request and propagate through Roland/Arbiter/executor, DB writes, tool calls, and final output. Persist spans to Postgres now; optional OTLP export later.
 - **Daily impact:** High. Makes failures diagnosable in minutes instead of guesswork.
 - **Cortex prototype value:** Very high. Bridges to full OpenTelemetry + Langfuse.
 - **Feasibility:** High (incremental instrumentation).
@@ -43,7 +43,7 @@ Scored each initiative on:
 - **Priority:** **1**
 
 ### 5) Token Economics Layer (Cost Ledger + Prompt Cache Hit-Rate)
-- **What to build now:** Per-request token ledger by stage (planner/critic/executor/tools), cache keying for repetitive system/context blocks, and weekly waste report.
+- **What to build now:** Per-request token ledger by stage (Roland/Arbiter/executor/tools), cache keying for repetitive system/context blocks, and weekly waste report.
 - **Daily impact:** High. Immediate cost reduction and lower latency.
 - **Cortex prototype value:** High. Informs platform-wide budget policy and routing.
 - **Feasibility:** High.

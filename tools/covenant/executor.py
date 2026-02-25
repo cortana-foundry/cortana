@@ -148,7 +148,7 @@ def build_execution_state(
             "retry_decision": {
                 "action": "none",
                 "route_to": None,
-                "reason": "Critic rejected plan; execution halted before dispatch.",
+                "reason": "Arbiter rejected plan; execution halted before dispatch.",
             },
         }
 

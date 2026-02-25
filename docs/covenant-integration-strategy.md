@@ -155,11 +155,11 @@ Next step should refuse to run if required artifacts from prior step are missing
    - `tools/covenant/route_workflow.py` (`ALLOWED_AGENTS`)
    - `tools/covenant/critic.py` (`ALLOWED_AGENTS`)
    - `tools/covenant/executor.py` route suggestions as needed
-2. Update planner constants and keyword maps:
+2. Update Roland constants and keyword maps:
    - create `AGENT_RESEARCHER`
    - move research keywords from Oracle to Researcher
    - constrain Oracle to forecast/risk/strategy terms
-3. Add new handoff patterns in `planner.py`:
+3. Add new handoff patterns in `planner.py` for Roland:
    - `researcher_oracle_huragok`
    - `researcher_librarian`
    - `researcher_librarian_huragok`

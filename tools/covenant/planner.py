@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Planner module for Covenant orchestration v2."""
+"""Roland module for Covenant orchestration v2."""
 
 from __future__ import annotations
 
@@ -374,7 +374,7 @@ def build_plan(payload: dict[str, Any]) -> dict[str, Any]:
         "steps": steps,
         "quality_gates": {
             "pre_execution": {
-                "name": "plan_approved_by_critic",
+                "name": "plan_approved_by_arbiter",
                 "required": True,
                 "checks": ["dependencies_acyclic", "budget_within_limits", "agent_selection_valid"],
             },
@@ -390,7 +390,7 @@ def build_plan(payload: dict[str, Any]) -> dict[str, Any]:
 def main() -> None:
     import argparse
 
-    parser = argparse.ArgumentParser(description="Build Covenant planner output")
+    parser = argparse.ArgumentParser(description="Build Covenant Roland output")
     parser.add_argument("payload", help="Path to routing/planning request JSON")
     args = parser.parse_args()
 

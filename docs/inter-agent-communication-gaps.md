@@ -30,7 +30,7 @@ Right now, this operates as **hub-and-spoke orchestration** (Cortana-centered), 
 ## Current Capability Snapshot (What exists today)
 
 ## Strong
-1. **Role routing + chain planning** (Planner → Critic → Executor) is deterministic and structured.
+1. **Role routing + chain planning** (Roland → Arbiter → Executor) is deterministic and structured.
 2. **Handoff contracts exist** (`input_contract`, `output_contract`, `deliver_to_step_id`).
 3. **Completion callbacks work** (subagents finish and auto-announce up).
 4. **Event bus exists** (Postgres durable table + LISTEN/NOTIFY transport).
@@ -62,7 +62,7 @@ Right now, this operates as **hub-and-spoke orchestration** (Cortana-centered), 
 ## 2) Shared context/memory between agents
 **Finding:** Partial and manual.
 
-- Planner defines `handoff.output_contract`, but that is schema intent, not a persisted transport layer.
+- Roland defines `handoff.output_contract`, but that is schema intent, not a persisted transport layer.
 - No mandatory “publish handoff artifact” step in executor runtime.
 - Memory boundaries explicitly block broad long-term writes from subagents (`validate_memory_boundary.py`).
 
@@ -140,7 +140,7 @@ This is good for control, but costs throughput and increases cognitive relay ove
 ## Requires custom build / integration work
 1. **Guaranteed subagent-to-subagent direct messaging** in Covenant runtime paths.
 2. **Standard handoff artifact bus** (contract + storage + retrieval helpers).
-3. **Parallel plan execution semantics** (fan-out/fan-in in executor + critic support).
+3. **Parallel plan execution semantics** (fan-out/fan-in in executor + Arbiter support).
 4. **Identity-scoped persistent memory retrieval/injection for each spawn.**
 5. **Agent-specific feedback compiler** (corrections -> per-agent policy updates).
 
@@ -277,7 +277,7 @@ So: **not pure mesh**, not pure hub-and-spoke — a controlled hybrid.
 2. Build AFC job from `cortana_feedback` into agent-specific deltas.
 
 ## Phase 3
-1. Add parallel fan-out/fan-in semantics to planner/executor/schema.
+1. Add parallel fan-out/fan-in semantics to Roland/executor/schema.
 2. Pilot controlled A2A channel if session tools bindings are confirmed stable in subagents.
 
 ---

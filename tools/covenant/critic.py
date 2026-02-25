@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Critic module for Covenant orchestration v2."""
+"""Arbiter module for Covenant orchestration v2."""
 
 from __future__ import annotations
 
@@ -120,7 +120,7 @@ def review_plan(plan: dict[str, Any], request: dict[str, Any] | None = None) -> 
 def main() -> None:
     import argparse
 
-    parser = argparse.ArgumentParser(description="Critic review for Covenant plan")
+    parser = argparse.ArgumentParser(description="Arbiter review for Covenant plan")
     parser.add_argument("plan", help="Path to plan JSON")
     parser.add_argument("--request", help="Path to request JSON", default=None)
     args = parser.parse_args()

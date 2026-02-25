@@ -11,7 +11,7 @@ Covenant now supports **parallel step groups** with barrier synchronization:
 
 ---
 
-## Planner changes (`tools/covenant/planner.py`)
+## Roland changes (`tools/covenant/planner.py`)
 
 ### New step field
 
@@ -26,7 +26,7 @@ Added `parallel_research` pattern:
 - Fan-out: multiple `agent.researcher.v1` steps run in parallel.
 - Fan-in: `agent.oracle.v1` synthesis step runs after barrier clears.
 
-Planner supports optional request field:
+Roland supports optional request field:
 
 - `parallel_research_angles: string[]` (defaults to 3 angles)
 
