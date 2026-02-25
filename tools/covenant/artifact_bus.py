@@ -8,6 +8,7 @@ import json
 import os
 import subprocess
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -15,6 +16,7 @@ PSQL_BIN = "/opt/homebrew/opt/postgresql@17/bin/psql"
 DEFAULT_DB = "cortana"
 DEFAULT_CREATED_BY = "cortana"
 ALLOWED_CREATED_BY = {"cortana"}
+TRACE_CLI = Path("/Users/hd/clawd/tools/covenant/trace.py")
 
 
 class HabError(Exception):
@@ -38,6 +40,43 @@ def run_psql(db: str, sql: str) -> str:
     if proc.returncode != 0:
         raise HabError(proc.stderr.strip() or "psql command failed")
     return proc.stdout.strip()
+
+
+def _now_iso() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+def log_trace_span(
+    db: str,
+    trace_id: str | None,
+    span_name: str,
+    from_agent: str,
+    chain_id: str,
+    metadata: dict[str, Any] | None = None,
+) -> None:
+    if not trace_id or not TRACE_CLI.exists():
+        return
+
+    cmd = [
+        "python3",
+        str(TRACE_CLI),
+        "--db",
+        db,
+        "log",
+        trace_id,
+        span_name,
+        "--agent",
+        from_agent,
+        "--chain-id",
+        chain_id,
+        "--start",
+        _now_iso(),
+        "--end",
+        _now_iso(),
+        "--metadata",
+        json.dumps(metadata or {}, ensure_ascii=False),
+    ]
+    subprocess.run(cmd, capture_output=True, text=True)
 
 
 def publish_event(db: str, event_type: str, payload: dict[str, Any]) -> None:
@@ -98,6 +137,7 @@ def cmd_write(args: argparse.Namespace) -> int:
         {
             "artifact_id": row.get("id"),
             "chain_id": row.get("chain_id"),
+            "trace_id": args.trace_id,
             "from_agent": row.get("from_agent"),
             "to_agent": row.get("to_agent"),
             "artifact_type": row.get("artifact_type"),
@@ -105,7 +145,20 @@ def cmd_write(args: argparse.Namespace) -> int:
         },
     )
 
-    print(json.dumps({"ok": True, "artifact": row}, ensure_ascii=False))
+    log_trace_span(
+        args.db,
+        args.trace_id,
+        "artifact_write",
+        args.from_agent,
+        args.chain_id,
+        {
+            "artifact_id": row.get("id"),
+            "to_agent": row.get("to_agent"),
+            "artifact_type": row.get("artifact_type"),
+        },
+    )
+
+    print(json.dumps({"ok": True, "artifact": row, "trace_id": args.trace_id}, ensure_ascii=False))
     return 0
 
 
@@ -184,14 +237,28 @@ def cmd_consume(args: argparse.Namespace) -> int:
             {
                 "artifact_id": item.get("id"),
                 "chain_id": item.get("chain_id"),
+                "trace_id": args.trace_id,
                 "from_agent": item.get("from_agent"),
                 "to_agent": item.get("to_agent"),
                 "artifact_type": item.get("artifact_type"),
                 "consumed_at": item.get("consumed_at"),
             },
         )
+        log_trace_span(
+            args.db,
+            args.trace_id,
+            "artifact_consume",
+            item.get("from_agent") or "unknown",
+            args.chain_id,
+            {
+                "artifact_id": item.get("id"),
+                "to_agent": item.get("to_agent"),
+                "artifact_type": item.get("artifact_type"),
+                "consumed_at": item.get("consumed_at"),
+            },
+        )
 
-    print(json.dumps({"ok": True, "consumed": consumed, "count": len(consumed)}, ensure_ascii=False))
+    print(json.dumps({"ok": True, "consumed": consumed, "count": len(consumed), "trace_id": args.trace_id}, ensure_ascii=False))
     return 0
 
 
@@ -222,6 +289,7 @@ def build_parser() -> argparse.ArgumentParser:
     w.add_argument("--payload")
     w.add_argument("--payload-file")
     w.add_argument("--created-by", default=DEFAULT_CREATED_BY)
+    w.add_argument("--trace-id", help="Correlation trace id (UUID)")
     w.set_defaults(func=cmd_write)
 
     r = sub.add_parser("read", help="Read artifacts")
@@ -234,6 +302,7 @@ def build_parser() -> argparse.ArgumentParser:
     c.add_argument("--chain-id", required=True)
     c.add_argument("--to-agent", help="Consume artifacts for this agent or broadcast (NULL)")
     c.add_argument("--ids", nargs="*", help="Specific artifact IDs to consume")
+    c.add_argument("--trace-id", help="Correlation trace id (UUID)")
     c.set_defaults(func=cmd_consume)
 
     l = sub.add_parser("list", help="List all artifacts for chain")

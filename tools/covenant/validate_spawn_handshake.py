@@ -44,7 +44,7 @@ REQUIRED_OUTPUT_FORMAT_FIELDS = {"type", "sections"}
 ALLOWED_TIMEOUT_FIELDS = {"timeout_seconds", "max_retries", "retry_on", "escalate_on"}
 REQUIRED_TIMEOUT_FIELDS = {"timeout_seconds", "max_retries", "retry_on", "escalate_on"}
 ALLOWED_CONSTRAINT_FIELDS = {"workspace_root", "allowed_paths", "forbidden_actions"}
-ALLOWED_METADATA_FIELDS = {"chain_id"}
+ALLOWED_METADATA_FIELDS = {"chain_id", "trace_id"}
 
 
 def fail(msg: str) -> None:
@@ -174,6 +174,8 @@ def validate(payload: dict[str, Any]) -> None:
             fail(f"metadata contains unsupported field(s): {', '.join(extra_metadata)}")
         if "chain_id" in metadata:
             _expect_non_empty_string(metadata["chain_id"], "metadata.chain_id")
+        if "trace_id" in metadata:
+            _expect_non_empty_string(metadata["trace_id"], "metadata.trace_id")
 
 
 

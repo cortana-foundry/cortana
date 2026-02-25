@@ -118,6 +118,20 @@ def _extract_chain_id(payload: dict[str, Any]) -> str | None:
     return None
 
 
+def _extract_trace_id(payload: dict[str, Any]) -> str | None:
+    direct = payload.get("trace_id")
+    if isinstance(direct, str) and direct.strip():
+        return direct.strip()
+
+    metadata = payload.get("metadata")
+    if isinstance(metadata, dict):
+        trace_id = metadata.get("trace_id")
+        if isinstance(trace_id, str) and trace_id.strip():
+            return trace_id.strip()
+
+    return None
+
+
 def _fetch_handoff_artifacts(chain_id: str, to_agent: str) -> list[dict[str, Any]]:
     sql = (
         "SELECT COALESCE(json_agg(row_to_json(t) ORDER BY t.created_at ASC), '[]'::json)::text "
@@ -196,6 +210,7 @@ def build_prompt(
     timeout_retry = payload["timeout_retry_policy"]
     callback = payload["callback"]
     constraints = payload.get("constraints", {})
+    trace_id = _extract_trace_id(payload)
 
     sections = output_format["sections"]
     allowed_tools = contract["tool_permissions"]
@@ -226,6 +241,10 @@ def build_prompt(
 {memory_block if memory_block else '## Identity-Scoped Memory Context\n- No role-scoped memories injected for this spawn.'}
 
 {handoff_block if handoff_block else '## Handoff Artifacts (HAB)\n- No unconsumed artifacts injected for this spawn.'}
+
+## Spawn Correlation Metadata
+- trace_id: {trace_id if trace_id else 'not provided'}
+- chain_id: {_extract_chain_id(payload) if _extract_chain_id(payload) else 'not provided'}
 
 ## Mission Objective
 {payload['objective']}
