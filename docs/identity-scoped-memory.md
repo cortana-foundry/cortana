@@ -26,10 +26,11 @@ This keeps each agent focused and reduces irrelevant prompt baggage.
 1. Filters to `active = TRUE`
 2. Filters by recency window (`since_hours`, default 168h)
 3. Filters to role keyword matches in tags/source/body fields
-4. Computes score:
-   - relevance hits (keyword matches)
-   - recency decay boost (newer = higher)
-   - native episodic recency weight (`recency_weight`) is respected
+4. Computes score (decay-aware):
+   - similarity from role keyword hit ratio
+   - recency via memory-type half-life decay
+   - utility via `log10(access_count + 1)` for semantic memories
+   - formula: `0.5*similarity + 0.3*recency + 0.2*utility`
 5. Sorts by score desc, then recency
 6. Truncates by:
    - `limit` item cap (default 5)
