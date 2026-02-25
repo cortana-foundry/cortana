@@ -24,6 +24,13 @@ Track last check times in `memory/heartbeat-state.json`.
   - Stats: `curl -s http://localhost:3033/alpaca/stats`
 - Skip weekends and after-hours
 
+### Market Intelligence (1-2x daily, market hours only)
+- Run `~/clawd/tools/market-intel/market-intel.sh --pulse` for broad market mood
+- Only during market hours (9:30 AM - 4 PM ET weekdays)
+- Skip weekends and holidays
+- If any held position has >60% bearish sentiment, alert immediately
+- Skip if checked within last 6 hours
+
 ### Fitness Check-in (1x daily, morning)
 - Whoop recovery score
 - Workout scheduled?
