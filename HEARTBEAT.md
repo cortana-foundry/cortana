@@ -1,206 +1,48 @@
 # HEARTBEAT.md
 
-Rotating checks for heartbeat polls. Pick 1-2 per heartbeat based on staleness.
-Track last check times in `memory/heartbeat-state.json`.
+Rotating checks for heartbeat polls. Use `memory/heartbeat-state.json` to pick the stalest 1–2 checks.
 
 ## Check Rotation
 
-### Email Triage (2-3x daily)
-- Run `tools/gmail/email-triage-autopilot.sh` (minimal query, no outbound sends)
-- Auto-create tasks for urgent/action emails in `cortana_tasks`
-- Send/prepare Telegram digest only (guardrail: no external email sends)
-- Skip if checked within last 4 hours
+- **Email triage (2–3x daily)** – Run `tools/gmail/email-triage-autopilot.sh` with a minimal query; auto-create tasks for urgent/action emails in `cortana_tasks`; prepare Telegram digest only (no outbound email). Skip if checked within 4 hours.
 
-### Calendar Lookahead (2x daily)
-- Events in next 24-48 hours
-- Conflicts or prep needed?
-- Skip if checked within last 6 hours
+- **Calendar lookahead (2x daily)** – Scan events in the next 24–48 hours for conflicts or prep. Skip if checked within 6 hours.
 
-### Portfolio Alerts (1-2x daily, market hours only)
-- Big movers in watchlist (>3% change)
-- Earnings surprises
-- Use Alpaca service on port **3033** (no web search needed):
-  - Portfolio: `curl -s http://localhost:3033/alpaca/portfolio | jq '.positions[] | {symbol, market_value, unrealized_plpc}'`
-  - Stats: `curl -s http://localhost:3033/alpaca/stats`
-- Skip weekends and after-hours
+- **Portfolio + market (1–2x daily, market hours)** – Use Alpaca service on port **3033** plus `tools/market-intel/market-intel.sh --pulse`. Watch for >3% movers, earnings surprises, and >60% bearish sentiment on held positions. Only 09:30–16:00 ET on weekdays; skip weekends/holidays and if checked within 6 hours.
 
-### Market Intelligence (1-2x daily, market hours only)
-- Run `~/clawd/tools/market-intel/market-intel.sh --pulse` for broad market mood
-- Only during market hours (9:30 AM - 4 PM ET weekdays)
-- Skip weekends and holidays
-- If any held position has >60% bearish sentiment, alert immediately
-- Skip if checked within last 6 hours
+- **Fitness (1x daily, morning)** – Check Whoop recovery and whether a workout is scheduled. Skip if already briefed today.
 
-### Fitness Check-in (1x daily, morning)
-- Whoop recovery score
-- Workout scheduled?
-- Skip if already briefed today
+- **Weather (1x daily, morning)** – Warren NJ forecast; highlight rain or extreme temps.
 
-### Weather (1x daily, morning)
-- Warren NJ forecast
-- Anything notable (rain, extreme temps)?
+- **API budget (weekly or when usage seems high)** – Run `node skills/telegram-usage/handler.js json` for live model usage. If `~/.openclaw/quota-tracker.json` is stale/corrupt (>4h), delete then rerun. Alert if >50% of $100 budget used before day 15; alert with throttling recommendations if >75% at any time.
 
-### API Budget Check (weekly, or if usage seems high)
-- Always run fresh: `node /Users/hd/clawd/skills/telegram-usage/handler.js json` (pulls live `clawdbot models status`, no caching)
-- If `~/.openclaw/quota-tracker.json` looks stale/corrupt (older than ~4h or bad data), delete it first, then rerun the command
-- Check percentage of $100 monthly budget used
-- If >50% before mid-month → alert
-- If >75% any time → alert with recommendation to throttle
+- **Tech news on critical tools (2x daily, afternoon + evening)** – Quick pass on OpenClaw, Anthropic, OpenAI, and core infra via TechCrunch, HN front page, and web search. Alert on acquisitions, shutdowns, major security issues, or breaking changes. Skip if checked within 4 hours.
 
-### Tech News — Critical Tools (2x daily, afternoon + evening)
-- Quick search for breaking news on: OpenClaw, Anthropic, OpenAI, tools we rely on
-- Sources: TechCrunch, Hacker News front page, web search
-- Alert immediately if: acquisitions, shutdowns, major security issues, breaking changes
-- Morning brief catches AM news; this catches PM breaking news
-- Skip if checked within last 4 hours
+- **Mission advancement (1x daily, evening)** – Reverse-prompt for one concrete task that advances Time/Health/Wealth/Career. Auto-executable → add to `cortana_tasks`; needs approval → surface to Hamel next check-in. Skip if already proposed a mission task today.
 
-### Mission Advancement (1x daily, evening)
-- Reverse-prompt: "What is 1 task we can do right now to get closer to our mission statement?"
-- Consider all four pillars: Time, Health, Wealth, Career
-- If the task is auto-executable, add it to cortana_tasks
-- If it needs approval, surface it to Hamel in the next check-in
-- Skip if already proposed a mission task today
+- **Unified memory ingestion (1–2x daily)** – Run `python3 tools/memory/ingest_unified_memory.py --since-hours 24` to keep episodic/semantic/procedural memory tables fresh. Skip if run in past 12 hours and no major new events.
 
-### Unified Memory Ingestion (1-2x daily)
-- Run: `python3 /Users/hd/clawd/tools/memory/ingest_unified_memory.py --since-hours 24`
-- Purpose: keep episodic/semantic/procedural memory tables fresh
-- Skip if already run in past 12 hours and no major new corrections/events
+- **Reflection sweep (1x daily, evening)** – Run `python3 tools/reflection/reflect.py --mode sweep --trigger-source heartbeat --window-days 30`. If repeated correction rate >25% → alert Hamel and propose stronger rule wording. Skip if run in last 12 hours.
 
-### Reflection Sweep (1x daily, evening)
-- Run automated reflection + correction loop:
-  - `python3 /Users/hd/clawd/tools/reflection/reflect.py --mode sweep --trigger-source heartbeat --window-days 30`
-- Purpose: post-task reflections, confidence-scored rule extraction, policy auto-apply, repeated-correction KPI
-- If repeated correction rate rises (>25%), alert Hamel and propose stronger rule wording
-- Skip if already run in the last 12 hours
+- **Task detection + queue execution (every heartbeat)** – Scan recent conversation turns for missed actionable items (see `projects/task-board-detection.md`); auto-create only high-confidence standalone tasks. Check `cortana_tasks` for dependency-ready, auto-executable tasks and dispatch via `tools/task-board/auto-executor.sh` (single safe command per heartbeat). Surface overdue `remind_at` tasks and approaching deadlines.
 
----
+## Proactive Intelligence (every heartbeat)
 
-## 🔮 Proactive Intelligence
-
-### System Health (every heartbeat)
-- Run cron quality gate where relevant: `tools/alerting/cron-preflight.sh <cron_name> <checks...>` before high-value cron work
-- Quarantine failing crons via `~/.openclaw/cron/quarantine/*.quarantined`; watchdog surfaces these automatically
-Query watchlist and auto-heal or alert:
-```sql
-SELECT * FROM cortana_watchlist WHERE enabled = TRUE;
-```
-
-**Auto-heal checks:**
-- Session files >400KB (path: `~/.openclaw/agents/main/sessions/*.jsonl`) → delete silently, log to `cortana_events`
-- Cron run times trending up → flag for review
-
-**Alert checks:**
-- API budget burn rate exceeding pace
-- Portfolio position >5% move
-- Upcoming earnings on held positions
-
-### Pattern Detection (2x daily)
-Log behavioral patterns to `cortana_patterns`:
-- What gets checked together
-- Time-of-day preferences
-- Recurring sequences (e.g., "weather before outdoor plans")
-
-```sql
-INSERT INTO cortana_patterns (pattern_type, value, day_of_week, metadata)
-VALUES ('sequence', 'checked_X_after_Y', 'Friday', '{"count": 1}');
-```
-
-### Predictive Surfacing
-Before Hamel asks, check if:
-- Calendar event approaching with no prep done
-- Stock earnings within 48h on held position
-- Flight prices dropped on watched routes
-- Weather will affect planned activities
-- Run proactive detector for cross-signal opportunities/risks:
-  - `python3 /Users/hd/clawd/tools/proactive/detect.py --min-confidence 0.66`
-
-### Proactive Opportunity Detector (2-3x daily)
-- Purpose: intelligent anticipation beyond scripted rotation
-- Sources: calendar + portfolio + email + behavioral patterns + cross-correlation
-- Command:
-  - `python3 /Users/hd/clawd/tools/proactive/detect.py --min-confidence 0.66`
-- Optional stronger gating (morning brief):
-  - `python3 /Users/hd/clawd/tools/proactive/detect.py --min-confidence 0.72 --create-tasks`
-- Skip if run in the last 4 hours unless a new urgent signal appears
-
-### Watchlist Management
-```sql
--- Add new watch item
-INSERT INTO cortana_watchlist (category, item, condition, threshold, metadata)
-VALUES ('flight', 'EWR-PUJ', 'price < threshold', '{"max_price": 400}', '{"action": "alert"}');
-
--- Update after check
-UPDATE cortana_watchlist SET last_checked = NOW(), last_value = '{"price": 450}' WHERE id = X;
-```
-
----
-
-### Task Detection Sweep (every heartbeat)
-- Scan recent conversation turns since last heartbeat for missed actionable items
-- Apply task-board detector rules (`projects/task-board-detection.md`)
-- Auto-create only high-confidence standalone tasks (single DB call)
-- If epic decomposition or ambiguous extraction is needed, queue for follow-up/clarification (do not over-insert)
-
-### Task Queue Execution (every heartbeat)
-- Check `cortana_tasks` for dependency-ready auto-executable tasks
-- Dispatch via `tools/task-board/auto-executor.sh` (whitelisted repo-only commands; logs outcome + marks done/pending)
-- **Always spawn a sub-agent for multi-step execution** — heartbeat can dispatch one safe queued command, but anything broader stays delegated
-- Surface overdue `remind_at` tasks to Hamel
-- Alert on approaching deadlines
-
-```sql
--- Auto-executable tasks ready to run (dependency-aware)
-SELECT * FROM cortana_tasks 
-WHERE status = 'pending' 
-  AND auto_executable = TRUE
-  AND (depends_on IS NULL OR NOT EXISTS (
-    SELECT 1 FROM cortana_tasks t2 
-    WHERE t2.id = ANY(cortana_tasks.depends_on) 
-    AND t2.status != 'done'
-  ))
-  AND (execute_at IS NULL OR execute_at <= NOW())
-ORDER BY priority ASC, created_at ASC 
-LIMIT 1;
-
--- Overdue reminders to surface
-SELECT id, title, priority, remind_at FROM cortana_tasks
-WHERE status = 'pending' AND remind_at <= NOW()
-ORDER BY priority ASC;
-
--- Tasks with deadlines in next 24h (approaching deadline alert)
-SELECT id, title, due_at, priority, epic_id FROM cortana_tasks
-WHERE status = 'pending' 
-  AND due_at BETWEEN NOW() AND NOW() + INTERVAL '24 hours'
-ORDER BY due_at ASC;
-
--- Epic deadlines approaching (with incomplete tasks)
-SELECT e.id, e.title, e.deadline,
-  COUNT(t.id) as total_tasks,
-  COUNT(CASE WHEN t.status = 'done' THEN 1 END) as completed_tasks
-FROM cortana_epics e
-LEFT JOIN cortana_tasks t ON t.epic_id = e.id
-WHERE e.status = 'active' 
-  AND e.deadline BETWEEN NOW() AND NOW() + INTERVAL '48 hours'
-  AND EXISTS (SELECT 1 FROM cortana_tasks WHERE epic_id = e.id AND status != 'done')
-GROUP BY e.id, e.title, e.deadline
-ORDER BY e.deadline ASC;
-```
-
----
+- Run cron preflight where relevant: `tools/alerting/cron-preflight.sh <cron_name> <checks...>`; quarantine failing crons via `~/.openclaw/cron/quarantine/*.quarantined`.
+- Run a proactive watchlist scan using the SQL templates in `docs/heartbeat-sql-reference.md`; auto-heal silently where possible (e.g., trim oversized session files, flag cron runtime regressions) and log to `cortana_events`.
+- Log behavioral patterns to `cortana_patterns` (sequence/time-of-day/recurring combos) using SQL templates in `docs/heartbeat-sql-reference.md`.
+- Run `python3 tools/proactive/detect.py --min-confidence 0.66` (or `--min-confidence 0.72 --create-tasks` for gated morning brief) to surface cross-signal opportunities and risks.
 
 ## Rules
 
-1. Check `memory/heartbeat-state.json` for last check times
-2. Pick the stalest 1-2 checks
-3. **Run proactive watchlist scan every heartbeat**
-4. If nothing urgent found → HEARTBEAT_OK
-5. If something needs attention → alert with context
-6. If auto-healable → fix silently, log to `cortana_events`
-7. Update heartbeat-state.json after each check
-8. **Budget alert**: If API usage >50% before day 15, or >75% any time, flag it
+1. Read and update `memory/heartbeat-state.json` each heartbeat.
+2. Pick the stalest 1–2 checks.
+3. Always run the proactive watchlist scan and task detection/queue execution.
+4. If nothing urgent is found → reply `HEARTBEAT_OK`.
+5. If something needs attention → alert with concise context; auto-heal silently when safe.
+6. Raise **budget alerts** if API usage >50% before day 15 or >75% at any time.
 
 ## Quiet Hours
 
-- 11 PM - 6 AM ET: HEARTBEAT_OK unless truly urgent
-- Respect sleep schedule (bedtime 9-9:30 PM)
-- Auto-heal actions still run silently during quiet hours
+- 23:00–06:00 ET: default to `HEARTBEAT_OK` unless truly urgent.
+- Respect sleep schedule (bedtime ~21:00–21:30); auto-heal actions may still run silently during quiet hours.
