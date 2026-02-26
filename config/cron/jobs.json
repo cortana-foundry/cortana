@@ -1301,6 +1301,33 @@
         "to": "8171372724",
         "bestEffort": true
       }
+    },
+    {
+      "id": "d1a8b3f4-8f8f-4cfe-ab20-b25077fe5578",
+      "agentId": "main",
+      "name": "Meta-monitor health rotation",
+      "enabled": true,
+      "createdAtMs": 1772123433300,
+      "updatedAtMs": 1772123433300,
+      "schedule": {
+        "kind": "cron",
+        "expr": "0 */6 * * *",
+        "tz": "America/New_York"
+      },
+      "sessionTarget": "isolated",
+      "wakeMode": "now",
+      "payload": {
+        "kind": "agentTurn",
+        "message": "Run /Users/hd/clawd/tools/meta-monitor/meta-monitor.sh --json and handle output.\n\nRules:\n1) If overall is 'ok', output NOTHING.\n2) If overall is not 'ok', output a concise alert summary including:\n   - number of cron alerts\n   - number of tool alerts\n   - whether meta-monitor is stale\n   - top 3 alerts by severity\n3) Keep output <= 12 lines.",
+        "model": "openai-codex/gpt-5.1"
+      },
+      "state": {},
+      "delivery": {
+        "mode": "announce",
+        "channel": "telegram",
+        "to": "8171372724",
+        "bestEffort": true
+      }
     }
   ]
 }
