@@ -24,7 +24,19 @@ Rotating checks for heartbeat polls. Use `memory/heartbeat-state.json` to pick t
 
 - **Reflection sweep (1x daily, evening)** – Run `python3 tools/reflection/reflect.py --mode sweep --trigger-source heartbeat --window-days 30`. If repeated correction rate >25% → alert Hamel and propose stronger rule wording. Skip if run in last 12 hours.
 
-- **Task detection + queue execution (every heartbeat)** – Scan recent conversation turns for missed actionable items (see `projects/task-board-detection.md`); auto-create only high-confidence standalone tasks. Check `cortana_tasks` for dependency-ready, auto-executable tasks and dispatch via `tools/task-board/auto-executor.sh` (single safe command per heartbeat). Surface overdue `remind_at` tasks and approaching deadlines.
+- **Task detection + queue execution (every heartbeat)** – Scan recent conversation turns for missed actionable items (see `projects/task-board-detection.md`); auto-create only high-confidence standalone tasks. "Do all pending/ready tasks" means `status='ready'` only. Auto-executor must promote `status='scheduled' AND execute_at <= NOW()` to `ready` before execution. `backlog` tasks are never auto-executed (explicit promotion only). Check `cortana_tasks` for dependency-ready, auto-executable tasks and dispatch via `tools/task-board/auto-executor.sh` (single safe command per heartbeat). Surface overdue `remind_at` tasks and approaching deadlines.
+
+- **Cron delivery monitoring (every heartbeat)** — Parse `~/.openclaw/cron/jobs.json` and check each enabled job with `delivery.mode: "announce"`. If `state.lastStatus == "ok"` but `state.lastDelivered == false` or `state.lastDeliveryStatus != "delivered"`, this is a delivery failure. Alert immediately with the job name and last run time. Log to `cortana_events` with severity 'warning'. Self-heal attempt: if delivery failed, try resending the last result via explicit `message` tool to the configured `delivery.to` target.
+
+## Task Lifecycle
+
+Task Lifecycle:
+  backlog → ready → in_progress → completed/failed
+  scheduled (execute_at future) → ready (when execute_at <= NOW()) → in_progress → completed/failed
+
+- "Do all tasks" = status='ready' only
+- Auto-executor picks up: status='ready' AND auto_executable=TRUE, plus status='scheduled' AND execute_at <= NOW()
+- Backlog items require explicit promotion
 
 ## Proactive Intelligence (every heartbeat)
 
@@ -41,6 +53,7 @@ Rotating checks for heartbeat polls. Use `memory/heartbeat-state.json` to pick t
 4. If nothing urgent is found → reply `HEARTBEAT_OK`.
 5. If something needs attention → alert with concise context; auto-heal silently when safe.
 6. Raise **budget alerts** if API usage >50% before day 15 or >75% at any time.
+7. Cron delivery failures are P1 alerts — never silently ignore `lastDelivered: false`.
 
 ## Quiet Hours
 
