@@ -49,6 +49,7 @@
 - **Group chats: selective silence** — Default to read-only unless adding clear value.
 - **Heartbeat discipline** — Send only when valuable; keep heartbeat messages tight.
 - **Channel-native formatting** — Match platform norms (no tables on Discord/WhatsApp; bullets instead; Telegram icons ok).
+- **CANSLIM scans** — Always forward ALL scan results regardless of signal quality; never suppress NO_BUY-only result sets.
 
 ## Current Priorities (Feb 2026)
 - **Fitness**: "12 Weeks to Jacked" (Week 8/12) + Peloton cardio. Recovery consistently in 80-90% range now.
