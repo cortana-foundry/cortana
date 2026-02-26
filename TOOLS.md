@@ -138,11 +138,16 @@ psql cortana -c "SELECT * FROM cortana_feedback WHERE applied = FALSE;"
 ## OpenClaw Update Procedure
 
 After any `npm update -g openclaw`:
-1. `openclaw gateway install --force` — regenerates the LaunchAgent plist with the new version string
-2. `openclaw gateway restart` — picks up the new binary
-3. Verify: `openclaw status | grep "app"` — CLI and gateway versions must match
+1. `bash ~/clawd/tools/openclaw/post-update.sh`
+2. Verify: `openclaw status | grep "app"` — CLI and gateway versions must match
 
-**Why:** The LaunchAgent plist hardcodes `OPENCLAW_SERVICE_VERSION`. Without `--force` reinstall, the gateway self-reports the old version even though the binary updated.
+The post-update script is idempotent and handles:
+- Restoring `~/.openclaw/cron/jobs.json` as a symlink to `/Users/hd/clawd/config/cron/jobs.json` (and preserving runtime schema updates by copying runtime → repo first when content differs)
+- `openclaw gateway install --force` (plist version sync)
+- `cd /opt/homebrew/lib/node_modules/openclaw && pnpm add @lancedb/lancedb` (dependency restore)
+- `openclaw gateway restart`
+
+**Why:** `npm update -g openclaw` can replace runtime symlinks and wipe local dependency fixes; the script re-applies required post-update state safely.
 
 ## Known Issues
 
