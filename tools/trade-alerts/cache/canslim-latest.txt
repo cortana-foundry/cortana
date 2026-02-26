@@ -1,0 +1,15 @@
+📈 Trading Advisor - CANSLIM Scan
+Run: 2026-02-26 03:25 PM ET
+Market: uptrend_under_pressure | Position Sizing: 75%
+Status: 4 distribution days. Be cautious.
+
+Summary: 3 candidates | BUY 0 | WATCH 0 | NO_BUY 3
+
+• CFLT (6/12) → NO_BUY
+  Score too low (6/12). Need >= 7.
+• GE (6/12) → NO_BUY
+  Score too low (6/12). Need >= 7.
+• HWM (6/12) → NO_BUY
+  Score too low (6/12). Need >= 7.
+
+⚠️ Signals are decision support only (not financial advice).
