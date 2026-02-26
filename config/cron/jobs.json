@@ -1301,6 +1301,31 @@
         "to": "8171372724",
         "bestEffort": true
       }
+    },
+    {
+      "id": "069d85a5-1d69-48b7-beaf-15452974ee48",
+      "agentId": "main",
+      "name": "Earnings calendar alerts (held positions)",
+      "enabled": true,
+      "schedule": {
+        "kind": "cron",
+        "expr": "0 9,15 * * 1-5",
+        "tz": "America/New_York"
+      },
+      "sessionTarget": "isolated",
+      "wakeMode": "now",
+      "payload": {
+        "kind": "agentTurn",
+        "message": "Run earnings calendar alert check and output JSON only.\n\nCommand:\n~/clawd/tools/earnings-alert/earnings-alert.sh",
+        "model": "openai-codex/gpt-5.1"
+      },
+      "delivery": {
+        "mode": "announce",
+        "channel": "telegram",
+        "to": "8171372724",
+        "bestEffort": true
+      },
+      "state": {}
     }
   ]
 }
