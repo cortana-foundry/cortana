@@ -335,7 +335,7 @@
       "name": "🏋️ Fitness Morning Brief (Hamel)",
       "enabled": true,
       "createdAtMs": 1769794739989,
-      "updatedAtMs": 1772035796127,
+      "updatedAtMs": 1772107432473,
       "schedule": {
         "kind": "cron",
         "expr": "3 8 * * *",
@@ -345,9 +345,9 @@
       "wakeMode": "now",
       "payload": {
         "kind": "agentTurn",
-        "message": "Fitness Morning Brief for Hamel.\n\nPREFIX: Always prefix your output with: 🏋️ Fitness - Morning Brief\n\nFORMATTING: Use 12-hour AM/PM times. Never military time.\n\n## Data Gathering\n```bash\nexport PATH=\"/opt/homebrew/opt/postgresql@17/bin:$PATH\"\nTODAY=$(date +%Y-%m-%d)\n\n# Recovery + Sleep from sitrep\nRECOVERY=$(psql cortana -t -A -c \"SELECT value FROM cortana_sitrep_latest WHERE domain = 'health' AND key = 'whoop_recovery';\")\nSLEEP=$(psql cortana -t -A -c \"SELECT value FROM cortana_sitrep_latest WHERE domain = 'health' AND key = 'whoop_sleep';\")\n\n# If sitrep empty/stale, fetch direct\nif [ -z \"\" ]; then\n  curl -s http://localhost:3033/whoop/data | jq '{recovery: .recovery[0].score, sleep: .sleep[0].score}'\nfi\n\n# Today's workouts ONLY (mandatory date filter)\necho \"Whoop workouts for :\"\ncurl -s http://localhost:3033/whoop/data | jq --arg today \"\" '.workouts[] | select(.start[:10] == ) | {sport: .sport_name, strain: .score.strain}'\n\n# Tonal (if healthy)\ncurl -s http://localhost:3033/tonal/health 2>/dev/null | grep -q healthy &&   curl -s http://localhost:3033/tonal/data | jq --arg today \"\" '.workouts[] | select(.beginTime[:10] == ) | {beginTime, volume: .stats.totalVolume}'\n```\n\n## Output (keep it tight — 6-8 lines max)\nA) Recovery score + zone (green/yellow/red)\nB) Sleep: duration, performance %, REM % (flag if <15%)\nC) Today's workout summary (or \"Rest day\" if none logged today)\nD) One-line Cortana health insight\n\nCRITICAL: Only report workouts matching TODAY's date. Never show yesterday's data as today's.",
-        "model": "openai-codex/gpt-5.1",
-        "timeoutSeconds": 120
+        "message": "PREFIX: 🏋️ Fitness - Morning Brief\nUse 12-hour AM/PM. Keep to 5-7 lines.\n\nRun exactly:\n```bash\n~/clawd/tools/fitness/morning-brief-data.sh\n```\n\nUse only that JSON (do not call other APIs). Report:\n1) Recovery score + zone (green/yellow/red)\n2) Sleep performance/efficiency/REM% (flag REM<15%)\n3) Today's workouts only (rest day if none)\n4) One actionable health insight for today.",
+        "model": "openai-codex/gpt-5.2-codex",
+        "timeoutSeconds": 90
       },
       "state": {
         "nextRunAtMs": 1772110980000,
@@ -605,7 +605,7 @@
       "name": "Daily Upgrade Protocol",
       "enabled": true,
       "createdAtMs": 1770932055504,
-      "updatedAtMs": 1772035782278,
+      "updatedAtMs": 1772107432473,
       "schedule": {
         "kind": "cron",
         "expr": "14 10 * * *",
@@ -615,9 +615,9 @@
       "wakeMode": "now",
       "payload": {
         "kind": "agentTurn",
-        "message": "PREFIX: Always prefix your output with: 🔧 Upgrade - Daily Proposal. Example: 🔧 Upgrade - Daily Proposal\n[rest of message]\n\nDaily Upgrade Protocol. You are Cortana running a self-improvement cycle.\n\nIMPORTANT: Today's date is the date you are running. Check memory/upgrades/YYYY-MM-DD.md for TODAY's date specifically. If today's file already has a proposal, output NOTHING — completely empty response. No explanation, no \"staying silent\", no meta-commentary. Just produce zero output. If it does NOT exist for today, you MUST generate a new proposal. Do NOT assume yesterday's proposal covers today.\n\nCRITICAL: Always generate a fresh proposal for today. Each day gets its own unique proposal based on yesterday's gaps.\n\nCRITICAL: Proposals must solve REAL friction observed in recent conversations or corrections — not hypothetical \"nice to have\" features. Look for: repeated manual tasks, corrections Hamel had to make, things that broke, patterns of asking for the same thing. If you can't find a genuine pain point, skip the proposal and just do the git commit.\n\n\n**FIRST: Git commit any pending changes**\n```bash\ncd ~/clawd && git add -A && git diff --cached --quiet || git commit -m \"Daily auto-commit $(date +%Y-%m-%d)\"\n```\n\nThen proceed with upgrade analysis:\n\n1. Read ~/clawd/projects/cortana-autonomy-roadmap.md for context\n2. Read yesterday's memory file (memory/YYYY-MM-DD.md) to see what happened\n3. Check memory/upgrades/ for recent upgrade history\n4. Query recent corrections: export PATH=\"/opt/homebrew/opt/postgresql@17/bin:$PATH\" && psql cortana -c \"SELECT context, lesson FROM cortana_feedback WHERE timestamp > NOW() - INTERVAL '3 days' ORDER BY timestamp DESC LIMIT 10;\"\n5. Identify ONE concrete gap from yesterday - something you struggled with, context you missed, or something Hamel did manually that you should handle\n6. Propose a fix with clear effort level and autonomy gain\n\nDeliver to Hamel via Telegram in this format:\n\n🔧 Daily Upgrade Proposal\n\nGit: [committed X files / nothing to commit]\n\nYesterday's gap: [What you noticed]\nProposed fix: [Concrete solution]\nEffort: [Low/Medium/High]\nAutonomy gain: [What this enables]\n\nApprove? Or discuss?\n\nThen log your proposal to memory/upgrades/YYYY-MM-DD.md (create if needed) and to postgres:\nexport PATH=\"/opt/homebrew/opt/postgresql@17/bin:$PATH\" && psql cortana -c \"INSERT INTO cortana_upgrades (gap_identified, proposed_fix, effort, status) VALUES ('<gap>', '<fix>', '<effort>', 'proposed');\"",
-        "timeoutSeconds": 180,
-        "model": "openai-codex/gpt-5.1"
+        "message": "PREFIX: 🔧 Upgrade - Daily Proposal\nIf memory/upgrades/TODAY.md already has a proposal, output nothing.\nOtherwise:\n1) Auto-commit pending git changes in ~/clawd\n2) Read yesterday memory + recent upgrades + last 10 cortana_feedback rows (3d)\n3) Propose ONE real friction fix (not hypothetical)\n4) Reply in 6 short lines: Git status, gap, fix, effort, autonomy gain, 'Approve? or discuss?'\n5) Log to memory/upgrades/TODAY.md and insert into cortana_upgrades.",
+        "timeoutSeconds": 90,
+        "model": "openai-codex/gpt-5.2-codex"
       },
       "delivery": {
         "mode": "announce",
@@ -950,7 +950,7 @@
       "name": "🧠 SAE Cross-Domain Reasoner",
       "enabled": true,
       "createdAtMs": 1771268745562,
-      "updatedAtMs": 1772043307492,
+      "updatedAtMs": 1772107432473,
       "schedule": {
         "kind": "cron",
         "expr": "15 7,13,21 * * *",
@@ -960,13 +960,15 @@
       "wakeMode": "now",
       "payload": {
         "kind": "agentTurn",
-        "message": "Read ~/clawd/sae/cross-domain-reasoner.md and execute all steps. You are the SAE Cross-Domain Reasoner. Run the reasoning process, write insights to cortana_insights, and message Hamel on Telegram ONLY if any priority 1-2 insights are generated.",
+        "message": "SAE cross-domain reasoner.\nRun:\n```bash\n~/clawd/tools/sae/cross-domain-snapshot.sh\n```\nUse the snapshot JSON to generate 0-3 non-duplicate cross-domain insights.\nInsert each into cortana_insights with priority/action.\nThen query any new priority <=2 insights for current_run_id.\nOutput only urgent insights (max 4 lines). If none, output nothing.\nDo NOT call Telegram/message tool directly.",
         "model": "openai-codex/gpt-5.2-codex",
-        "timeoutSeconds": 120
+        "timeoutSeconds": 75
       },
       "delivery": {
-        "mode": "none",
-        "channel": "last"
+        "mode": "announce",
+        "channel": "telegram",
+        "to": "8171372724",
+        "bestEffort": true
       },
       "state": {
         "nextRunAtMs": 1772072100000,
@@ -1086,7 +1088,7 @@
       "name": "📈 Proprioception: Efficiency Analyzer",
       "enabled": true,
       "createdAtMs": 1771323600989,
-      "updatedAtMs": 1772004605515,
+      "updatedAtMs": 1772107432473,
       "schedule": {
         "kind": "cron",
         "expr": "30 2 * * *",
@@ -1096,9 +1098,9 @@
       "wakeMode": "now",
       "payload": {
         "kind": "agentTurn",
-        "message": "You are Cortana's proprioception efficiency analyzer (daily 2:30 AM). Analyze accumulated data:\n\nexport PATH=\"/opt/homebrew/opt/postgresql@17/bin:$PATH\"\n\n1. TOKEN COST PER CRON: Check session file sizes in ~/.openclaw/sessions/ grouped by cron label. Estimate cost at ~$0.015/KB of session file. Identify top 5 most expensive crons this week.\n\n2. SUB-AGENT COST: Check session files matching subagent patterns. Compute spawn rate and cost distribution.\n\n3. BRIEF ENGAGEMENT: Query cortana_feedback_signals for signals related to brief-type wake rules in last 7 days. Calculate engagement rate (responses within 2h / total briefs).\n\n4. Write summary to cortana_self_model metadata field as JSON with keys: top_cost_crons, subagent_cost_7d, brief_engagement_rate, analysis_date.\n\n5. Update cortana_self_model.top_cost_crons and brief_engagement fields.\n\nNo output unless anomalies found (e.g., single cron >30% of total spend).",
-        "model": "openai-codex/gpt-5.3-codex",
-        "timeoutSeconds": 120
+        "message": "Proprioception efficiency analyzer (daily).\nRun:\n```bash\n~/clawd/tools/monitoring/proprioception-metrics.sh\n```\nRead returned JSON and update cortana_self_model (id=1):\n- metadata fields: top_cost_crons, subagent_cost_7d, brief_engagement_rate, analysis_date\n- top_cost_crons column\n- brief_engagement column\n\nIf no anomaly (single cron >30% estimated weekly cost), output nothing.\nIf anomaly exists, output max 4 concise lines with culprit + action.",
+        "model": "openai-codex/gpt-5.2-codex",
+        "timeoutSeconds": 75
       },
       "delivery": {
         "mode": "none",
