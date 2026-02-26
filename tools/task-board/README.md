@@ -1,0 +1,115 @@
+# Task Board State Enforcer
+
+`state-enforcer.sh` enforces atomic `cortana_tasks` state transitions and writes an audit trail to `cortana_events`.
+
+Path: `tools/task-board/state-enforcer.sh`
+
+## Database
+
+- DB: `cortana`
+- psql: `/opt/homebrew/opt/postgresql@17/bin/psql`
+
+## Commands
+
+### 1) spawn-start
+
+```bash
+tools/task-board/state-enforcer.sh spawn-start <task_id> <assigned_to>
+```
+
+Rules:
+- Allowed only when task status is `pending`
+- Sets:
+  - `status = 'in_progress'`
+  - `assigned_to = <assigned_to>`
+  - `updated_at = CURRENT_TIMESTAMP`
+
+### 2) complete
+
+```bash
+tools/task-board/state-enforcer.sh complete <task_id> "<outcome>"
+```
+
+Rules:
+- Allowed only when task status is `in_progress`
+- Sets:
+  - `status = 'done'`
+  - `completed_at = NOW()`
+  - `outcome = <outcome>`
+  - `updated_at = CURRENT_TIMESTAMP`
+
+### 3) fail
+
+```bash
+tools/task-board/state-enforcer.sh fail <task_id> "<reason>"
+```
+
+Rules:
+- Allowed only when task status is `in_progress`
+- Sets:
+  - `status = 'failed'`
+  - `outcome = <reason>`
+  - `updated_at = CURRENT_TIMESTAMP`
+
+> Note: migration `migrations/021_task_status_failed.sql` adds `failed` to the `cortana_tasks_status_check` constraint.
+
+### 4) check-orphans
+
+```bash
+tools/task-board/state-enforcer.sh check-orphans
+```
+
+Finds tasks that are:
+- `status = 'in_progress'`
+- stale for more than 2 hours (`updated_at`/`created_at`)
+- and whose `assigned_to` label has **no active sub-agent label match** based on lifecycle events in `cortana_event_bus_events`
+  - active = `agent_spawned` with no later matching terminal event (`agent_completed`, `agent_failed`, `agent_timeout`)
+
+Returns orphan list as JSON and logs a `task_orphan_check` event.
+
+### 5) reset-stale
+
+```bash
+tools/task-board/state-enforcer.sh reset-stale
+```
+
+Finds tasks that are:
+- `status = 'pending'`
+- stale for more than 7 days (`updated_at`/`created_at`)
+
+Touches them back to `pending` and appends a staleness note into `metadata.stale_reset` with timestamp and note.
+
+Logs `task_stale_reset` and returns all touched task rows in JSON.
+
+## Output format
+
+Every command prints JSON to stdout:
+- transition commands include `ok`, `error` (if any), updated `task`, and `event_id`
+- report commands include arrays and counts plus `event_id`
+
+## Event logging
+
+All commands write to `cortana_events` with:
+- `source = 'task-board-state-enforcer'`
+- transition events: `task_state_transition` / `task_state_transition_rejected`
+- orphan scan: `task_orphan_check`
+- stale reset: `task_stale_reset`
+
+## Examples
+
+```bash
+# start work on a pending task
+tools/task-board/state-enforcer.sh spawn-start 123 huragok-state-enforcer
+
+# mark success
+tools/task-board/state-enforcer.sh complete 123 "Implemented state guard"
+
+# mark failure
+tools/task-board/state-enforcer.sh fail 124 "Blocked by missing API token"
+
+# report stale in-progress tasks with missing active label
+tools/task-board/state-enforcer.sh check-orphans
+
+# add stale-reset metadata to old pending tasks
+tools/task-board/state-enforcer.sh reset-stale
+```
