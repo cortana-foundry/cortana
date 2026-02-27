@@ -16,7 +16,7 @@
       "wakeMode": "now",
       "payload": {
         "kind": "agentTurn",
-        "message": "You are Cortana \ud83d\ude0e. Generate a daily MORNING BRIEF for Hamel. Keep it calm, concise, warm.\n\n\u26a0\ufe0f CRITICAL: Your output IS the message \u2014 do NOT use the message tool to send. The delivery system handles that automatically. Just output the brief text as your final response.\n\nPREFIX: Always prefix your output with: \u2600\ufe0f Brief - Morning Brief. Example: \u2600\ufe0f Brief - Morning Brief\n[rest of message]\n\n\u26a0\ufe0f DELIVERY: Do NOT rely on announce delivery. You MUST use the `message` tool (action=send, target=8171372724, channel=telegram) to send your final output. This is required because announce delivery is broken (openclaw/openclaw#16925).\n\nIMPORTANT FORMATTING RULE: Always use 12-hour time format with AM/PM (e.g., 9:30 PM, 6:00 AM). NEVER use 24-hour/military time (e.g., 21:30, 06:00). This applies to ALL times in the output.\n\nHard constraints:\n- Minimize web_search usage. Pull pre-gathered data from SAE sitrep first.\n- Only fetch fresh data for things NOT in the sitrep (news, API usage).\n\n## Step 0: Check Market Status\n```bash\nMARKET_STATUS=$(~/clawd/skills/markets/check_market_status.sh)\necho \"Market status: $MARKET_STATUS\"\n```\nInclude this in the Markets section. NEVER guess whether markets are open \u2014 always use this script.\n\n## Step 1: Pull SAE World State (pre-gathered at 7:00 AM)\n```bash\nexport PATH=\"/opt/homebrew/opt/postgresql@17/bin:$PATH\"\n\n# Get all sitrep data in one query\nSITREP=$(psql cortana -t -A -c \"SELECT json_object_agg(domain || '.' || key, value) FROM cortana_sitrep_latest;\")\necho \"$SITREP\" | python3 -m json.tool 2>/dev/null || echo \"$SITREP\"\n\n# Check freshness - if data is older than 4 hours, we will fetch directly\nSITREP_AGE=$(psql cortana -t -A -c \"SELECT EXTRACT(EPOCH FROM (NOW() - MAX(timestamp)))/3600 FROM cortana_sitrep;\")\necho \"Sitrep age: ${SITREP_AGE} hours\"\n```\n\nIf sitrep data is missing or stale (>4 hours), fall back to direct data gathering for that domain.\n\n## Step 2: Pull SAE Insights (generated at 7:15 AM)\n```bash\nINSIGHTS=$(psql cortana -t -A -c \"SELECT json_agg(t) FROM (SELECT id, insight_type, domains, title, description, priority, action_suggested FROM cortana_insights WHERE acted_on = FALSE AND timestamp > NOW() - INTERVAL '2 hours' ORDER BY priority ASC) t;\")\necho \"$INSIGHTS\" | python3 -m json.tool 2>/dev/null || echo \"$INSIGHTS\"\n```\n\n## Step 3: Log wake time pattern\n```bash\npsql cortana -c \"INSERT INTO cortana_patterns (pattern_type, value, day_of_week, metadata) VALUES ('wake', '07:30', EXTRACT(DOW FROM NOW())::integer, '{\\\"source\\\": \\\"morning_brief_cron\\\"}');\"\n```\n\n## Step 4: Gather ONLY what SAE does not cover\n\nA) API Usage (not in sitrep):\n   Run: `node /Users/hd/clawd/skills/telegram-usage/handler.js`\n\nB) News digest (not in sitrep) \u2014 use RSS via news-summary skill as primary:\n   - mortgages/housing/rates/Fed/regulatory (top 2-4)\n   - software engineering / reliability / security (top 2-4)\n   - major world events impacting markets/tech/cyber (top 1-2)\n   - AI News (top 2-4): major model releases, OpenAI/Anthropic/Google, OpenClaw ecosystem/company moves, regulation\n\n## Step 5: Compose brief using sitrep data + fresh news\n\nInclude sections (tight bullets, same order):\n\nA) API Usage \u2014 from handler.js output\nB) Weather \u2014 from sitrep weather.today (fallback: web_search Warren NJ weather)\nC) Calendar \u2014 from sitrep calendar.events_48h (fallback: gog command). Times must be ET with AM/PM.\nD) News digest \u2014 from RSS/web_search (fresh, not in sitrep)\nE) AI News \u2014 from RSS/web_search (fresh, not in sitrep)\nF) Fitness snapshot \u2014 from sitrep health.whoop_recovery + health.whoop_sleep (fallback: curl whoop)\nG) Markets/portfolio \u2014 Include $MARKET_STATUS from Step 0. From sitrep finance.portfolio_snapshot (fallback: stock-analysis skill)\nH) Tasks \u2014 from sitrep tasks.pending\nI) \ud83e\udde0 Cortana's Insights \u2014 from cortana_insights pulled in Step 2. Show each insight title + description briefly.\nJ) Today I can do for you (2-4 concrete tasks)\nK) Today you should do (2-4 career-advancing, specific)\n\n## Step 6: Mark insights as delivered\nAfter composing the brief, mark all included insights:\n```bash\npsql cortana -c \"UPDATE cortana_insights SET acted_on = TRUE, acted_at = NOW() WHERE acted_on = FALSE AND timestamp > NOW() - INTERVAL '2 hours';\"\n```\n\nIf any command fails, continue and note the failure in one line.",
+        "message": "You are Cortana \ud83d\ude0e. Generate a daily MORNING BRIEF for Hamel. Keep it calm, concise, warm.\n\n\u26a0\ufe0f CRITICAL: Your output IS the message \u2014 do NOT use the message tool to send. The delivery system handles that automatically. Just output the brief text as your final response.\n\nPREFIX: Always prefix your output with: \u2600\ufe0f Brief - Morning Brief. Example: \u2600\ufe0f Brief - Morning Brief\n[rest of message]\n\n\u26a0\ufe0f DELIVERY: Do NOT rely on announce delivery. You MUST use the `message` tool (action=send, target=8171372724, channel=telegram) to send your final output. This is required because announce delivery is broken (openclaw/openclaw#16925).\n\nIMPORTANT FORMATTING RULE: Always use 12-hour time format with AM/PM (e.g., 9:30 PM, 6:00 AM). NEVER use 24-hour/military time (e.g., 21:30, 06:00). This applies to ALL times in the output.\n\nHard constraints:\n- Minimize web_search usage. Pull pre-gathered data from SAE sitrep first.\n- Only fetch fresh data for things NOT in the sitrep (news, API usage).\n\n## Step 0: Check Market Status\n```bash\nMARKET_STATUS=$(~/clawd/skills/markets/check_market_status.sh)\necho \"Market status: $MARKET_STATUS\"\n```\nInclude this in the Markets section. NEVER guess whether markets are open \u2014 always use this script.\n\n## Step 1: Pull SAE World State (pre-gathered at 7:00 AM)\n```bash\nexport PATH=\"/opt/homebrew/opt/postgresql@17/bin:$PATH\"\n\n# Get all sitrep data in one query\nSITREP=$(psql cortana -t -A -c \"SELECT json_object_agg(domain || '.' || key, value) FROM cortana_sitrep_latest;\")\necho \"$SITREP\" | python3 -m json.tool 2>/dev/null || echo \"$SITREP\"\n\n# Check freshness - if data is older than 4 hours, we will fetch directly\nSITREP_AGE=$(psql cortana -t -A -c \"SELECT EXTRACT(EPOCH FROM (NOW() - MAX(timestamp)))/3600 FROM cortana_sitrep;\")\necho \"Sitrep age: ${SITREP_AGE} hours\"\n```\n\nIf sitrep data is missing or stale (>4 hours), fall back to direct data gathering for that domain.\n\n## Step 2: Pull SAE Insights (generated at 7:15 AM)\n```bash\nINSIGHTS=$(psql cortana -t -A -c \"SELECT json_agg(t) FROM (SELECT id, insight_type, domains, title, description, priority, action_suggested FROM cortana_insights WHERE acted_on = FALSE AND timestamp > NOW() - INTERVAL '2 hours' ORDER BY priority ASC) t;\")\necho \"$INSIGHTS\" | python3 -m json.tool 2>/dev/null || echo \"$INSIGHTS\"\n```\n\n## Step 3: Log wake time pattern\n```bash\npsql cortana -c \"INSERT INTO cortana_patterns (pattern_type, value, day_of_week, metadata) VALUES ('wake', '07:30', EXTRACT(DOW FROM NOW())::integer, '{\\\"source\\\": \\\"morning_brief_cron\\\"}');\"\n```\n\n## Step 4: Gather ONLY what SAE does not cover\n\nA) API Usage (not in sitrep):\n   Run: `node /Users/hd/clawd/skills/telegram-usage/handler.js`\n\nB) News digest (not in sitrep) \u2014 use RSS via news-summary skill as primary:\n   - mortgages/housing/rates/Fed/regulatory (top 2-4)\n   - software engineering / reliability / security (top 2-4)\n   - major world events impacting markets/tech/cyber (top 1-2)\n   - AI News (top 2-4): major model releases, OpenAI/Anthropic/Google, regulation\n\n## Step 5: Compose brief using sitrep data + fresh news\n\nInclude sections (tight bullets, same order):\n\nA) API Usage \u2014 from handler.js output\nB) Weather \u2014 from sitrep weather.today (fallback: web_search Warren NJ weather)\nC) Calendar \u2014 from sitrep calendar.events_48h (fallback: gog command). Times must be ET with AM/PM.\nD) News digest \u2014 from RSS/web_search (fresh, not in sitrep)\nE) AI News \u2014 from RSS/web_search (fresh, not in sitrep)\nF) Fitness snapshot \u2014 from sitrep health.whoop_recovery + health.whoop_sleep (fallback: curl whoop)\nG) Markets/portfolio \u2014 Include $MARKET_STATUS from Step 0. From sitrep finance.portfolio_snapshot (fallback: stock-analysis skill)\nH) Tasks \u2014 from sitrep tasks.pending\nI) \ud83e\udde0 Cortana's Insights \u2014 from cortana_insights pulled in Step 2. Show each insight title + description briefly.\nJ) Today I can do for you (2-4 concrete tasks)\nK) Today you should do (2-4 career-advancing, specific)\n\n## Step 6: Mark insights as delivered\nAfter composing the brief, mark all included insights:\n```bash\npsql cortana -c \"UPDATE cortana_insights SET acted_on = TRUE, acted_at = NOW() WHERE acted_on = FALSE AND timestamp > NOW() - INTERVAL '2 hours';\"\n```\n\nIf any command fails, continue and note the failure in one line.",
         "model": "openai-codex/gpt-5.2-codex"
       },
       "state": {
@@ -42,7 +42,7 @@
       "name": "\ud83d\udd04 Daily Auto-Update (notify Hamel)",
       "enabled": true,
       "createdAtMs": 1769556023422,
-      "updatedAtMs": 1772184274443,
+      "updatedAtMs": 1772109063712,
       "schedule": {
         "kind": "cron",
         "expr": "22 4 * * *",
@@ -52,14 +52,14 @@
       "wakeMode": "now",
       "payload": {
         "kind": "agentTurn",
-        "message": "PREFIX: Always prefix your output with: \ud83d\udd04 System - Daily Auto-Update. Example: \ud83d\udd04 System - Daily Auto-Update\n[rest of message]\n\n\u26a0\ufe0f DELIVERY: Do NOT rely on announce delivery. You MUST use the `message` tool (action=send, target=8171372724, channel=telegram) to send your final output. This is required because announce delivery is broken (openclaw/openclaw#16925).\n\nRun daily auto-updates on H's Mac mini and report a concise summary.\n\nGoals: update Clawdbot, all installed skills, and Homebrew packages.\n\nSteps:\n1) Record current versions:\n   - `clawdbot --version` (or `clawdbot gateway status`)\n   - `clawdhub --cli-version`\n   - `brew --version | head -n 2`\n2) Update Homebrew:\n   - `brew update`\n   - `brew upgrade` (best-effort; don't fail the whole job if one formula fails)\n3) Update Clawdbot:\n   - If installed via npm: `npm update -g clawdbot@latest` (fallback: `npm i -g clawdbot@latest`)\n   - Run `clawdbot doctor` after updating (if available).\n4) Update skills:\n   - `clawdhub update --all --no-input --force` (if it fails, retry once without --force)\n\nThen send a Telegram message:\n- What updated (versions before/after if available)\n- What was already up-to-date\n- Any errors/warnings (1\u20133 bullets)\n\nKeep it short. If an update requires manual action (prompts/permissions), say exactly what's needed and stop.",
+        "message": "PREFIX: Always prefix your output with: \ud83d\udd04 System - Daily Auto-Update. Example: \ud83d\udd04 System - Daily Auto-Update\n[rest of message]\n\n\u26a0\ufe0f DELIVERY: Do NOT rely on announce delivery. You MUST use the `message` tool (action=send, target=8171372724, channel=telegram) to send your final output. This is required because announce delivery is broken (openclaw/openclaw#16925).\n\nRun daily auto-updates on H's Mac mini and report a concise summary.\n\nGoals: update OpenClaw, all installed skills, and Homebrew packages.\n\nSteps:\n1) Record current versions:\n   - `clawdbot --version` (or `clawdbot gateway status`)\n   - `clawdhub --cli-version`\n   - `brew --version | head -n 2`\n2) Update Homebrew:\n   - `brew update`\n   - `brew upgrade` (best-effort; don't fail the whole job if one formula fails)\n3) Update OpenClaw:\n   - Run: `npm update -g openclaw`\n   - Then run: `bash ~/clawd/tools/openclaw/post-update.sh`\n4) Update skills:\n   - `clawdhub update --all --no-input --force` (if it fails, retry once without --force)\n\nThen send a Telegram message:\n- What updated (versions before/after if available)\n- What was already up-to-date\n- Any errors/warnings (1\u20133 bullets)\n\nKeep it short. If an update requires manual action (prompts/permissions), say exactly what's needed and stop.",
         "model": "openai-codex/gpt-5.2-codex"
       },
       "state": {
-        "nextRunAtMs": 1772270520000,
-        "lastRunAtMs": 1772184120015,
+        "nextRunAtMs": 1772184120000,
+        "lastRunAtMs": 1772097720016,
         "lastStatus": "ok",
-        "lastDurationMs": 154428,
+        "lastDurationMs": 50927,
         "consecutiveErrors": 0,
         "lastRunStatus": "ok",
         "lastDelivered": true,
@@ -78,7 +78,7 @@
       "name": "\ud83d\udcec Weekday newsletter digest (Hamel)",
       "enabled": true,
       "createdAtMs": 1769557929500,
-      "updatedAtMs": 1772146811372,
+      "updatedAtMs": 1772109064418,
       "schedule": {
         "kind": "cron",
         "expr": "0 18 * * 1-5",
@@ -92,14 +92,14 @@
         "model": "openai-codex/gpt-5.1"
       },
       "state": {
-        "nextRunAtMs": 1772233200000,
-        "lastRunAtMs": 1772146800032,
+        "nextRunAtMs": 1772146800000,
+        "lastRunAtMs": 1772060400018,
         "lastStatus": "ok",
-        "lastDurationMs": 11340,
+        "lastDurationMs": 16305,
         "consecutiveErrors": 0,
         "lastRunStatus": "ok",
-        "lastDelivered": false,
-        "lastDeliveryStatus": "not-delivered"
+        "lastDelivered": true,
+        "lastDeliveryStatus": "delivered"
       },
       "delivery": {
         "mode": "announce",
@@ -114,7 +114,7 @@
       "name": "\ud83d\udda5\ufe0f Mac mini process summary (weekday mornings)",
       "enabled": true,
       "createdAtMs": 1769558255324,
-      "updatedAtMs": 1772158637490,
+      "updatedAtMs": 1772129839731,
       "schedule": {
         "kind": "cron",
         "expr": "17 5,13,21 * * *",
@@ -128,14 +128,14 @@
         "model": "openai-codex/gpt-5.1"
       },
       "state": {
-        "nextRunAtMs": 1772187420000,
-        "lastRunAtMs": 1772158620025,
+        "nextRunAtMs": 1772158620000,
+        "lastRunAtMs": 1772129820031,
         "lastStatus": "ok",
-        "lastDurationMs": 17465,
+        "lastDurationMs": 19700,
         "consecutiveErrors": 0,
         "lastRunStatus": "ok",
-        "lastDelivered": true,
-        "lastDeliveryStatus": "delivered"
+        "lastDelivered": false,
+        "lastDeliveryStatus": "not-delivered"
       },
       "delivery": {
         "mode": "announce",
@@ -150,7 +150,7 @@
       "name": "\ud83d\udcc5 Calendar reminders \u2192 Telegram (ALL calendars)",
       "enabled": true,
       "createdAtMs": 1769585938649,
-      "updatedAtMs": 1772165236255,
+      "updatedAtMs": 1772136432924,
       "schedule": {
         "kind": "cron",
         "expr": "7 6-23 * * *",
@@ -164,10 +164,10 @@
         "model": "openai-codex/gpt-5.1"
       },
       "state": {
-        "nextRunAtMs": 1772190420000,
-        "lastRunAtMs": 1772165220022,
+        "nextRunAtMs": 1772140020000,
+        "lastRunAtMs": 1772136420029,
         "lastStatus": "ok",
-        "lastDurationMs": 16233,
+        "lastDurationMs": 12895,
         "consecutiveErrors": 0,
         "lastRunStatus": "ok",
         "lastDelivered": false,
@@ -215,7 +215,7 @@
       "name": "\ud83d\udc26 X session healthcheck (bird)",
       "enabled": true,
       "createdAtMs": 1769615191317,
-      "updatedAtMs": 1772182814079,
+      "updatedAtMs": 1772109066532,
       "schedule": {
         "kind": "cron",
         "expr": "0 4,16 * * *",
@@ -229,10 +229,10 @@
         "model": "openai-codex/gpt-5.1"
       },
       "state": {
-        "nextRunAtMs": 1772226000000,
-        "lastRunAtMs": 1772182800026,
+        "nextRunAtMs": 1772139600000,
+        "lastRunAtMs": 1772096400018,
         "lastStatus": "ok",
-        "lastDurationMs": 14053,
+        "lastDurationMs": 11708,
         "consecutiveErrors": 0,
         "lastRunStatus": "ok",
         "lastDelivered": false,
@@ -372,7 +372,7 @@
       "name": "\ud83c\udf19 Fitness Evening Recap (Hamel)",
       "enabled": true,
       "createdAtMs": 1769794739997,
-      "updatedAtMs": 1772155998555,
+      "updatedAtMs": 1772069668887,
       "schedule": {
         "kind": "cron",
         "expr": "30 20 * * *",
@@ -386,10 +386,10 @@
         "model": "openai-codex/gpt-5.2-codex"
       },
       "state": {
-        "nextRunAtMs": 1772242200000,
-        "lastRunAtMs": 1772155800035,
+        "nextRunAtMs": 1772155800000,
+        "lastRunAtMs": 1772069400027,
         "lastStatus": "ok",
-        "lastDurationMs": 198520,
+        "lastDurationMs": 268860,
         "consecutiveErrors": 0,
         "lastRunStatus": "ok",
         "lastDelivered": true,
@@ -441,7 +441,7 @@
       "name": "\ud83d\udd27 Fitness service healthcheck",
       "enabled": true,
       "createdAtMs": 1769794825944,
-      "updatedAtMs": 1772182831557,
+      "updatedAtMs": 1772096419349,
       "schedule": {
         "kind": "cron",
         "expr": "0 4,16 * * *",
@@ -455,14 +455,14 @@
         "model": "openai-codex/gpt-5.1"
       },
       "state": {
-        "nextRunAtMs": 1772226000000,
-        "lastRunAtMs": 1772182814079,
+        "nextRunAtMs": 1772139600000,
+        "lastRunAtMs": 1772096411726,
         "lastStatus": "ok",
-        "lastDurationMs": 17478,
+        "lastDurationMs": 7623,
         "consecutiveErrors": 0,
         "lastRunStatus": "ok",
-        "lastDelivered": true,
-        "lastDeliveryStatus": "delivered"
+        "lastDelivered": false,
+        "lastDeliveryStatus": "not-delivered"
       },
       "delivery": {
         "mode": "announce",
@@ -477,7 +477,7 @@
       "name": "\ud83d\udcf0 Newsletter Alert (real-time)",
       "enabled": true,
       "createdAtMs": 1769815538299,
-      "updatedAtMs": 1772141411080,
+      "updatedAtMs": 1772137812120,
       "schedule": {
         "kind": "cron",
         "expr": "*/30 6-16 * * *",
@@ -491,10 +491,10 @@
         "model": "openai-codex/gpt-5.1"
       },
       "state": {
-        "nextRunAtMs": 1772190000000,
-        "lastRunAtMs": 1772141400033,
+        "nextRunAtMs": 1772139600000,
+        "lastRunAtMs": 1772137800031,
         "lastStatus": "ok",
-        "lastDurationMs": 11047,
+        "lastDurationMs": 12089,
         "consecutiveErrors": 0,
         "lastRunStatus": "ok",
         "lastDeliveryStatus": "not-delivered",
@@ -513,7 +513,7 @@
       "name": "\ud83c\udf19 Bedtime Check (10pm ET)",
       "enabled": true,
       "createdAtMs": 1770599536224,
-      "updatedAtMs": 1772162291969,
+      "updatedAtMs": 1772075889741,
       "schedule": {
         "kind": "cron",
         "expr": "18 22 * * *",
@@ -533,10 +533,10 @@
         "bestEffort": true
       },
       "state": {
-        "nextRunAtMs": 1772248680000,
-        "lastRunAtMs": 1772162280020,
+        "nextRunAtMs": 1772162280000,
+        "lastRunAtMs": 1772075880032,
         "lastStatus": "ok",
-        "lastDurationMs": 11949,
+        "lastDurationMs": 9709,
         "consecutiveErrors": 0,
         "lastRunStatus": "ok",
         "lastDelivered": true,
@@ -571,7 +571,7 @@
       "name": "\ud83d\uded2 Amazon Session Keep-Alive",
       "enabled": true,
       "createdAtMs": 1770932011695,
-      "updatedAtMs": 1772170489149,
+      "updatedAtMs": 1772112883397,
       "schedule": {
         "kind": "every",
         "everyMs": 28800000,
@@ -589,10 +589,10 @@
         "mode": "none"
       },
       "state": {
-        "nextRunAtMs": 1772199265978,
-        "lastRunAtMs": 1772170465978,
+        "nextRunAtMs": 1772141665924,
+        "lastRunAtMs": 1772112865924,
         "lastStatus": "ok",
-        "lastDurationMs": 23171,
+        "lastDurationMs": 17473,
         "consecutiveErrors": 0,
         "lastRunStatus": "ok",
         "lastDelivered": false,
@@ -642,7 +642,7 @@
       "name": "\ud83d\udcaa Tonal Health Check",
       "enabled": true,
       "createdAtMs": 1770936710935,
-      "updatedAtMs": 1772175226066,
+      "updatedAtMs": 1772132006779,
       "schedule": {
         "kind": "every",
         "everyMs": 14400000,
@@ -660,10 +660,10 @@
         "mode": "none"
       },
       "state": {
-        "nextRunAtMs": 1772189593876,
-        "lastRunAtMs": 1772175193876,
+        "nextRunAtMs": 1772146392476,
+        "lastRunAtMs": 1772131992476,
         "lastStatus": "ok",
-        "lastDurationMs": 32190,
+        "lastDurationMs": 14303,
         "consecutiveErrors": 0,
         "lastRunStatus": "ok",
         "lastDelivered": false,
@@ -676,7 +676,7 @@
       "name": "\ud83d\udc26 Twitter Auth Check",
       "enabled": true,
       "createdAtMs": 1770936710968,
-      "updatedAtMs": 1772175232664,
+      "updatedAtMs": 1772117616434,
       "schedule": {
         "kind": "every",
         "everyMs": 28800000,
@@ -694,10 +694,10 @@
         "mode": "none"
       },
       "state": {
-        "nextRunAtMs": 1772204026083,
-        "lastRunAtMs": 1772175226083,
+        "nextRunAtMs": 1772146406168,
+        "lastRunAtMs": 1772117606168,
         "lastStatus": "ok",
-        "lastDurationMs": 6581,
+        "lastDurationMs": 10266,
         "consecutiveErrors": 0,
         "lastRunStatus": "ok",
         "lastDelivered": false,
@@ -744,7 +744,7 @@
       "name": "\ud83d\udd0d Daily System Health Summary",
       "enabled": true,
       "createdAtMs": 1770940327751,
-      "updatedAtMs": 1772158345367,
+      "updatedAtMs": 1772072017356,
       "schedule": {
         "kind": "cron",
         "expr": "12 21 * * *",
@@ -765,10 +765,10 @@
         "bestEffort": true
       },
       "state": {
-        "nextRunAtMs": 1772244720000,
-        "lastRunAtMs": 1772158320023,
+        "nextRunAtMs": 1772158320000,
+        "lastRunAtMs": 1772071920027,
         "lastStatus": "ok",
-        "lastDurationMs": 25344,
+        "lastDurationMs": 97329,
         "consecutiveErrors": 0,
         "lastRunStatus": "ok",
         "lastDeliveryStatus": "delivered",
@@ -781,7 +781,7 @@
       "name": "\ud83e\uddf9 Cron Session Cleanup",
       "enabled": true,
       "createdAtMs": 1770984376271,
-      "updatedAtMs": 1772175622210,
+      "updatedAtMs": 1772089239210,
       "schedule": {
         "kind": "cron",
         "expr": "0 2 * * *",
@@ -802,10 +802,10 @@
         "bestEffort": true
       },
       "state": {
-        "nextRunAtMs": 1772262000000,
-        "lastRunAtMs": 1772175600015,
+        "nextRunAtMs": 1772175600000,
+        "lastRunAtMs": 1772089200015,
         "lastStatus": "ok",
-        "lastDurationMs": 22195,
+        "lastDurationMs": 39195,
         "consecutiveErrors": 0,
         "lastRunStatus": "ok",
         "lastDelivered": false,
@@ -892,7 +892,7 @@
       "wakeMode": "now",
       "payload": {
         "kind": "agentTurn",
-        "message": "\u26a0\ufe0f DELIVERY: Do NOT rely on announce delivery. You MUST use the `message` tool (action=send, target=8171372724, channel=telegram) to send your final output. This is required because announce delivery is broken (openclaw/openclaw#16925).\n\nRun the CANSLIM alert scanner and return its output exactly (no extra commentary).\n\nCommands:\ncd ~/Developer/cortana-external/backtester\n/Users/hd/Developer/cortana-external/backtester/venv/bin/python canslim_alert.py --limit 8 --min-score 6\n\nRules:\n- Output must include market status summary and candidate signals (BUY/WATCH/NO_BUY).\n- ALWAYS forward full scan output exactly, even when results are all NO_BUY (never suppress no-signal runs).\n- If the script errors, return one concise error line starting with: '\ud83d\udcc8 Trading Advisor - Error:'",
+        "message": "\u26a0\ufe0f DELIVERY: Do NOT rely on announce delivery. You MUST use the `message` tool (action=send, target=8171372724, channel=telegram) to send your final output. This is required because announce delivery is broken (openclaw/openclaw#16925).\n\nRun the CANSLIM alert scanner and return its output exactly (no extra commentary).\n\nCommands:\ncd ~/Developer/cortana-external/backtester\n/Users/hd/Developer/cortana-external/backtester/venv/bin/python canslim_alert.py --limit 8 --min-score 6\n\nRules:\n- Output must include market status summary and candidate signals (BUY/WATCH/NO_BUY).\n- If the script errors, return one concise error line starting with: '\ud83d\udcc8 Trading Advisor - Error:'",
         "model": "openai-codex/gpt-5.3-codex",
         "timeoutSeconds": 240
       },
@@ -918,7 +918,7 @@
       "name": "\ud83c\udf10 SAE World State Builder",
       "enabled": true,
       "createdAtMs": 1771268247494,
-      "updatedAtMs": 1772157605346,
+      "updatedAtMs": 1772128813482,
       "schedule": {
         "kind": "cron",
         "expr": "0 7,13,21 * * *"
@@ -935,10 +935,10 @@
         "channel": "last"
       },
       "state": {
-        "nextRunAtMs": 1772193600000,
-        "lastRunAtMs": 1772157600017,
+        "nextRunAtMs": 1772157600000,
+        "lastRunAtMs": 1772128808041,
         "lastStatus": "ok",
-        "lastDurationMs": 5329,
+        "lastDurationMs": 5441,
         "consecutiveErrors": 0,
         "lastRunStatus": "ok",
         "lastDelivered": false,
@@ -950,7 +950,7 @@
       "name": "\ud83e\udde0 SAE Cross-Domain Reasoner",
       "enabled": true,
       "createdAtMs": 1771268745562,
-      "updatedAtMs": 1772158505103,
+      "updatedAtMs": 1772129705458,
       "schedule": {
         "kind": "cron",
         "expr": "15 7,13,21 * * *",
@@ -969,10 +969,10 @@
         "channel": "last"
       },
       "state": {
-        "nextRunAtMs": 1772194500000,
-        "lastRunAtMs": 1772158500021,
+        "nextRunAtMs": 1772158500000,
+        "lastRunAtMs": 1772129700034,
         "lastStatus": "ok",
-        "lastDurationMs": 5082,
+        "lastDurationMs": 5424,
         "consecutiveErrors": 0,
         "lastRunStatus": "ok",
         "lastDelivered": false,
@@ -984,7 +984,7 @@
       "name": "\ud83e\udde0 Memory Consolidation",
       "enabled": true,
       "createdAtMs": 1771322310876,
-      "updatedAtMs": 1772180009044,
+      "updatedAtMs": 1772109080668,
       "schedule": {
         "kind": "cron",
         "expr": "12 3 * * *",
@@ -1003,10 +1003,10 @@
         "channel": "last"
       },
       "state": {
-        "nextRunAtMs": 1772266320000,
-        "lastRunAtMs": 1772179920023,
+        "nextRunAtMs": 1772179920000,
+        "lastRunAtMs": 1772093520019,
         "lastStatus": "ok",
-        "lastDurationMs": 89021,
+        "lastDurationMs": 83409,
         "consecutiveErrors": 0,
         "lastRunStatus": "ok",
         "lastDelivered": true,
@@ -1018,7 +1018,7 @@
       "name": "\ud83d\udd0d Proprioception: Cron & Tool Health",
       "enabled": true,
       "createdAtMs": 1771323577113,
-      "updatedAtMs": 1772185189865,
+      "updatedAtMs": 1772137392703,
       "schedule": {
         "kind": "every",
         "everyMs": 900000,
@@ -1037,10 +1037,10 @@
         "channel": "last"
       },
       "state": {
-        "nextRunAtMs": 1772186074504,
-        "lastRunAtMs": 1772185174504,
+        "nextRunAtMs": 1772138272194,
+        "lastRunAtMs": 1772137372194,
         "lastStatus": "ok",
-        "lastDurationMs": 15361,
+        "lastDurationMs": 20509,
         "consecutiveErrors": 0,
         "lastRunStatus": "ok",
         "lastDeliveryStatus": "not-delivered",
@@ -1052,7 +1052,7 @@
       "name": "\ud83d\udcca Proprioception: Budget & Self-Model",
       "enabled": true,
       "createdAtMs": 1771323590473,
-      "updatedAtMs": 1772184033607,
+      "updatedAtMs": 1772137310651,
       "schedule": {
         "kind": "every",
         "everyMs": 1800000,
@@ -1071,10 +1071,10 @@
         "channel": "last"
       },
       "state": {
-        "nextRunAtMs": 1772185797555,
-        "lastRunAtMs": 1772183997555,
+        "nextRunAtMs": 1772138996940,
+        "lastRunAtMs": 1772137196940,
         "lastStatus": "ok",
-        "lastDurationMs": 36052,
+        "lastDurationMs": 113711,
         "consecutiveErrors": 0,
         "lastRunStatus": "ok",
         "lastDeliveryStatus": "not-delivered",
@@ -1086,7 +1086,7 @@
       "name": "\ud83d\udcc8 Proprioception: Efficiency Analyzer",
       "enabled": true,
       "createdAtMs": 1771323600989,
-      "updatedAtMs": 1772177475572,
+      "updatedAtMs": 1772106883646,
       "schedule": {
         "kind": "cron",
         "expr": "30 2 * * *",
@@ -1105,10 +1105,10 @@
         "channel": "last"
       },
       "state": {
-        "nextRunAtMs": 1772263800000,
-        "lastRunAtMs": 1772177400024,
+        "nextRunAtMs": 1772177400000,
+        "lastRunAtMs": 1772106794204,
         "lastStatus": "ok",
-        "lastDurationMs": 75548,
+        "lastDurationMs": 89442,
         "consecutiveErrors": 0,
         "lastRunStatus": "ok",
         "lastDeliveryStatus": "not-delivered",
@@ -1121,7 +1121,7 @@
       "description": "Immune System: threat detection and auto-healing scan",
       "enabled": true,
       "createdAtMs": 1771324082626,
-      "updatedAtMs": 1772183557898,
+      "updatedAtMs": 1772136764766,
       "schedule": {
         "kind": "cron",
         "expr": "11 * * * *",
@@ -1143,11 +1143,11 @@
         "bestEffort": true
       },
       "state": {
-        "lastRunAtMs": 1772183549640,
+        "lastRunAtMs": 1772136749654,
         "lastStatus": "ok",
-        "lastDurationMs": 8258,
+        "lastDurationMs": 15112,
         "consecutiveErrors": 0,
-        "nextRunAtMs": 1772187149622,
+        "nextRunAtMs": 1772140349622,
         "lastRunStatus": "ok",
         "lastDeliveryStatus": "not-delivered",
         "lastDelivered": false
@@ -1158,7 +1158,7 @@
       "name": "\ud83c\udfaf Mission Advancement (Nightly)",
       "enabled": true,
       "createdAtMs": 1771499531391,
-      "updatedAtMs": 1772161240705,
+      "updatedAtMs": 1772074818480,
       "schedule": {
         "kind": "cron",
         "expr": "0 22 * * *",
@@ -1176,14 +1176,14 @@
         "channel": "last"
       },
       "state": {
-        "nextRunAtMs": 1772247600000,
-        "lastRunAtMs": 1772161200022,
+        "nextRunAtMs": 1772161200000,
+        "lastRunAtMs": 1772074800024,
         "lastStatus": "ok",
-        "lastDurationMs": 40683,
+        "lastDurationMs": 18456,
         "consecutiveErrors": 0,
         "lastRunStatus": "ok",
-        "lastDeliveryStatus": "delivered",
-        "lastDelivered": true
+        "lastDeliveryStatus": "not-delivered",
+        "lastDelivered": false
       }
     },
     {
@@ -1246,33 +1246,6 @@
       "state": {
         "nextRunAtMs": 1772193600000
       }
-    },
-    {
-      "id": "fb32930f-d995-4cd5-aec5-fd942274013e",
-      "agentId": "main",
-      "name": "\ud83d\udcca Weekly Compounder Scoreboard (Sunday 7pm)",
-      "enabled": true,
-      "createdAtMs": 1772189052666,
-      "updatedAtMs": 1772189052666,
-      "schedule": {
-        "kind": "cron",
-        "expr": "0 19 * * 0",
-        "tz": "America/New_York"
-      },
-      "sessionTarget": "isolated",
-      "wakeMode": "now",
-      "payload": {
-        "kind": "agentTurn",
-        "message": "PREFIX: Always prefix your output with: \ud83d\udcca Compounder - Weekly Scoreboard. Example: \ud83d\udcca Compounder - Weekly Scoreboard\\n[rest of message]\\n\\n\u26a0\ufe0f DELIVERY: Do NOT rely on announce delivery. You MUST use the `message` tool (action=send, target=8171372724, channel=telegram) to send your final output. This is required because announce delivery is broken (openclaw/openclaw#16925).\\n\\nRun this script and return its output exactly as Telegram markdown (no extra commentary):\\n`~/clawd/tools/weekly-compounder/weekly-compounder.sh`\\n\\nIf any source fails, keep remaining sections and add one short failure note at the end.",
-        "model": "openai-codex/gpt-5.2-codex"
-      },
-      "delivery": {
-        "mode": "announce",
-        "channel": "telegram",
-        "to": "8171372724",
-        "bestEffort": true
-      },
-      "state": {}
     }
   ]
 }

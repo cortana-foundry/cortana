@@ -29,6 +29,12 @@ When the reflection sweep finds corrections in cortana_feedback that haven't bee
 python3 ~/clawd/tools/feedback/sync-feedback.py
 ```
 
+- **Feedback triage (every heartbeat)** – Run the lightweight feedback-to-task bridge:
+```bash
+~/clawd/tools/feedback/feedback-to-tasks.sh
+```
+This keeps verified/new corrections flowing into `cortana_tasks` automatically.
+
 When processing a new correction from the user during conversation, immediately log it:
 ```bash
 ~/clawd/tools/feedback/log-feedback.sh "correction" "<severity>" "<summary>" '{"context":"...","lesson":"..."}' "<agent_id>"
@@ -47,6 +53,15 @@ After logging feedback, if the fix is known, immediately add a remediation actio
 - **Task detection + queue execution (every heartbeat)** – Scan recent conversation turns for missed actionable items (see `projects/task-board-detection.md`); auto-create only high-confidence standalone tasks. "Do all pending/ready tasks" means `status='ready'` only. Auto-executor must promote `status='scheduled' AND execute_at <= NOW()` to `ready` before execution. `backlog` tasks are never auto-executed (explicit promotion only). Check `cortana_tasks` for dependency-ready, auto-executable tasks and dispatch via `tools/task-board/auto-executor.sh` (single safe command per heartbeat). Surface overdue `remind_at` tasks and approaching deadlines.
 
 - **Cron delivery monitoring (every heartbeat)** — Parse `~/.openclaw/cron/jobs.json` and check each enabled job with `delivery.mode: "announce"`. If `state.lastStatus == "ok"` but `state.lastDelivered == false` or `state.lastDeliveryStatus != "delivered"`, this is a delivery failure. Alert immediately with the job name and last run time. Log to `cortana_events` with severity 'warning'. Self-heal attempt: if delivery failed, try resending the last result via explicit `message` tool to the configured `delivery.to` target.
+
+- **Sub-agent health monitoring (every heartbeat)** — Run:
+  ```bash
+  ~/clawd/tools/subagent-watchdog/check-subagents.sh
+  ```
+  This emits structured JSON and logs failures to `cortana_events` (`event_type='subagent_failure'`, severity `warning`) with metadata (session key, label, runtime, failure reason). If failures/timeouts are found:
+  1. Retry retriable tasks once (timeouts/transient runtime overruns).
+  2. If the same session/reason persists across heartbeats, alert Hamel as persistent failure.
+  3. Sync affected task-board items (mark blocked/failed or reschedule retry) so delegated work stays accurate.
 
 ## Task Lifecycle
 

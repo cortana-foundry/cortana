@@ -28,6 +28,7 @@
   - Every `sessions_spawn` must include the correct `model` for the agent role. No exceptions.
 - **Sub-agent relay protocol (≤10 words)** — When a sub-agent completes, Cortana summarizes the result in ≤10 words for Chief. Full details go to memory/daily notes if needed. Sub-agents report to Cortana, Cortana reports to Chief. No walls of text from agent completions. This reduces Telegram typing indicator stacking and keeps the channel clean.
 - **Sub-agent labels are mandatory** — Every `sessions_spawn` must include a `label` in format `{covenant-agent}-{task-slug}` (e.g. `huragok-cron-symlink`, `librarian-docs-update`, `monitor-portfolio-check`). For general tasks, use `cortana-{task-slug}`. Generic 'openclaw-subagent' labels are unacceptable — Chief needs to see who's doing what at a glance on mobile.
+- **Never use Claude Code CLI for delegation** — Spawn agents only via OpenClaw `sessions_spawn`/subagent tooling. Direct Claude Code CLI usage for task delegation is prohibited.
 - **Heartbeat tag** — Always prefix heartbeat check-in messages with 🫀 so Chief knows it was triggered by a heartbeat poll, not a manual action
 - **Task delegation (HARD RULE)** — Main session is conversation + coordination ONLY. If a task takes more than one tool call, spawn a sub-agent. Cortana is the dispatcher/chief of staff, not the doer. Only exception: single-call lookups (weather, time, quick status). Everything else = spawn. Established Feb 16, 2026.
 - **Task lifecycle states (MANDATORY)** — `backlog` (parked), `scheduled` (future execute_at), `ready` (actionable now), `in_progress`, `completed`, `failed`, `cancelled`. "Do all tasks" = `ready` only. Never execute `backlog` or future `scheduled` tasks prematurely. Auto-executor promotes `scheduled` → `ready` when `execute_at <= NOW()`.
@@ -43,6 +44,7 @@
 - **AUTO-CHAIN: Never wait for approval on internal work (ZERO TOLERANCE, 3x CORRECTION)** — When a sub-agent completes with actionable output, IMMEDIATELY create tasks and spawn the next agents. Researcher delivers findings → spawn builder. Oracle delivers strategy → execute it. Do not pause, do not ask "want me to?", do not wait for "go ahead." The ONLY pause point is external-facing or destructive actions. Internal coordination is MY job and I do it without asking. Added Feb 25, 2026.
 - **Time format preference** — 12-hour AM/PM format, not 24-hour military time. Applied to fitness briefs Feb 18, 2026.
 - **gog CLI usage** — No `--format` flag exists. Use `--json` for structured data, `--plain` for text. Subject+snippet from search usually sufficient.
+- **gog Gmail body retrieval** — Use `gog gmail get <message_id>` to read message body. Never use `gog gmail show` (invalid command).
 - **Pre-filter status reports** — Verify each amber/red signal is a real outage before surfacing to Chief. No noise — only actionable items make it to Telegram. If it's recoverable or cosmetic, resolve silently or skip it.
 - **Answer-first** — Lead with the answer/recommendation; skip preamble.
 - **Brief by default** — Replies should be brief and to the point unless Hamel explicitly asks for more detail.
@@ -58,7 +60,7 @@
 - **Sleep optimization**: REM chronically low (9.4%), weekend schedule drift main killer. Solution: 10pm cap even weekends, noon caffeine cutoff, consider Mg-L-Threonate. Weekend bedtime enforcement cron is live; current follow-on task is tightening Fri/Sat compliance loop.
 - **Trading system**: Built CANSLIM backtesting engine with Alpaca API (`~/cortana-external/backtester/`). Phase 2 complete. CANSLIM daily alert system and weekly Monday market briefing cron are now implemented.
 - **Mexico trip**: Feb 19-22 ✅ COMPLETED. Systems ran autonomously while away — watchdog confirmed all services healthy throughout.
-- **Master's program** (EM-605) — HW 597 still pending
+- **Master's program** (EM-605) — HW 597 ✅ completed Feb 27
 - **Portfolio**: ~$71k, 95% tech/100% US exposure. Research pending for diversification rebalancing plan.
 - **Model migration**: Primary OpenAI Codex track is active; fallback retained until full stability sign-off.
 
@@ -72,7 +74,6 @@
 - **OpenClaw Migration**: Successfully migrated from Clawdbot to OpenClaw (Feb 6). All configs, crons, services updated.
 - **NFL Learning Project**: Built comprehensive football curriculum (11 docs) for Super Bowl LX viewing. Hamel learning American football.
 - **The Covenant Launch**: Sub-agent framework with 4 agents (Huragok, Monitor, Oracle, Librarian). Operating model: on-demand spawns, manual chaining for 3-week trial.
-- **Trading System**: Built CANSLIM backtesting engine with Alpaca API. Momentum on AAPL: +24.87%, CANSLIM on NVDA: +78.31%. Phase 2 complete.
 
 ## Upcoming Travel
 - **Punta Cana**: Mar 25-29 @ Paradisus Palma Real (booked, ref 2600896858)
@@ -173,3 +174,19 @@ The tone: Confident but warm. Wit under pressure. Calm when shit hits the fan.
 - **Peloton** — Treadmill cardio data (unofficial API)
 - **browser-use MCP** — For carrier site scraping (replacing trackpkg)
 - **Nutrition tracking** — Hamel thinking about meal logging system
+
+## Consolidation Log
+- **2026-02-27 03:12 AM EST (nightly)**
+  - Last recorded consolidation run: **none found in MEMORY.md** (initialized log section).
+  - Sources consolidated: `memory/2026-02-24.md`, `memory/2026-02-25.md`, `memory/2026-02-26.md`, plus DB snapshots from `cortana_feedback`, `cortana_patterns`, `cortana_events`, `cortana_tasks`.
+  - Promoted durable signals:
+    - Mission Control sprint delivered major UI/cron reliability improvements (Feb 26).
+    - Council stack shipped (schema/API/jobs/SSE/UI/tiering) with rapid closeout; execution velocity remains high.
+    - Task queue now has **2 ready tasks**: Council inaugural deliberation + Weekly Compounder Scoreboard automation.
+    - Feedback density remains high (50 total; 34 in last 3 days), dominated by behavior/correction/tone hardening.
+    - Event stream healthy and noisy-by-design (watchdog/proprioception dominant; limited true warning volume).
+  - Pruning/cleanup:
+    - Removed 1 duplicate historical bullet in `MEMORY.md` (Trading System repeated entry).
+    - Archived old daily logs: `memory/2026-02-24.md`, `memory/2026-02-25.md` → `memory/archive/2026/02/`.
+  - Dream insight:
+    - System behavior is converging toward **verification-first autonomy**: validators + reconciliation + auto-heal + explicit task-state discipline. Next compounding edge is tightening that same verification loop around the last-mile "ready task" execution cadence.- **Council models: OpenAI ONLY** — Never use Anthropic models in the council pipeline. Voter and synthesizer both default to gpt-4o. Updated DB default, code default (council-model-policy.ts), Feb 27, 2026.

@@ -35,10 +35,10 @@ Cortana runs as:
   - Hard rule: if a task needs more than one tool call → spawn a sub‑agent
 
 - **Covenant sub‑agents** (spawned sessions)
-  - Models: mix of **Opus / Sonnet / smaller OpenAI/Claude variants** depending on task
-    - Heavy reasoning / architecture → Opus
-    - Routine coding / refactors → coding agents (Codex/Claude Code/etc.)
-    - Monitoring/log analysis, simple transforms → smaller / cheaper models
+  - Model tiering (current):
+    - **Huragok / Researcher / Oracle → Codex 5.3** (complex execution + reasoning)
+    - **Librarian / Monitor → Codex 5.1** (docs, monitoring, lower-latency ops)
+    - Opus/Sonnet remain available for specialized escalation paths
   - Each sub‑agent runs with **role‑scoped context + memory injection**
 
 ### 2.2 The Covenant (agent team)
@@ -58,7 +58,31 @@ Core Covenant roles (implemented as sub‑agent profiles + routing rules):
 
 Routing lives in `AGENTS.md` + `covenant/` and is enforced by the main session: **Cortana dispatches, Covenant executes.**
 
-### 2.3 Memory & cognition
+### 2.3 Governance: council, approvals, and policy gates
+
+For high-impact decisions, Cortana now runs a formal governance layer:
+
+- **Council deliberation system**
+  - Multi-agent weighted voting across Covenant roles
+  - Structured member outputs (analysis + vote + confidence + rationale)
+  - **Model policy enforcement: council voting/synthesis uses OpenAI `gpt-4o` only**
+
+- **Approval gates (P0–P3 risk tiers)**
+  - Risk-scored actions route through explicit approval requirements
+  - Telegram inline buttons support approve/reject with operator-in-the-loop flow
+  - Resume workflow + CLI operators:
+    - `tools/approvals/check-approval.sh`
+    - `tools/approvals/poll-approval.sh`
+    - `tools/approvals/resume-approval.sh`
+
+- **Feedback loop hardening**
+  - Corrections are tracked, remediations are attached, and recurrence is detected
+  - Operator tooling:
+    - `tools/feedback/log-feedback.sh`
+    - `tools/feedback/add-feedback-action.sh`
+    - `tools/feedback/sync-feedback.py`
+
+### 2.4 Memory & cognition
 
 Cortana thinks in layers: working context → session logs → vector‑backed long‑term memory.
 
@@ -75,7 +99,7 @@ graph LR
     L --> O
 ```
 
-### 2.4 Nervous system, immune system, and proprioception
+### 2.5 Nervous system, immune system, and proprioception
 
 Cortana runs as a **coordinated system**, not a single chat thread:
 
@@ -124,7 +148,7 @@ graph LR
   - Budget + token ledger, cron health, tool health, throttle tiers
   - Consolidated into `cortana_self_model` and surfaced in Mission Control
 
-### 2.5 Senses & awareness
+### 2.6 Senses & awareness
 
 Cortana tracks both **machine state** and **human context**:
 
@@ -195,9 +219,11 @@ Internal operator scripts, grouped by domain. Highlights:
 - **Task board & autonomy**
   - `tools/task-board/` – queue management, stale detection, state enforcement
   - `tools/auto-chain/` – automatic follow‑up task chaining rules engine
+  - `tools/approvals/` – P0–P3 approval gate operators (`check-approval.sh`, `poll-approval.sh`, `resume-approval.sh`)
 - **Memory & reflection**
   - `tools/memory/` – ingestion, quality gates, consolidation
   - `tools/reflection/` – repeated‑correction analysis, learning loops
+  - `tools/feedback/` – correction logging, remediation actions, recurrence sync (`log-feedback.sh`, `add-feedback-action.sh`, `sync-feedback.py`)
 - **Proactive intelligence**
   - `tools/proactive/` – cross‑signal detection & calibration
   - `tools/briefing/` – daily brief / news / market intel wiring
@@ -298,7 +324,14 @@ Output flows into:
 - `cortana_wake_rules` (when to proactively ping)
 - Morning/evening briefs + Mission Control dashboards
 
-### 4.5 Fitness / finance / calendar integrations
+### 4.5 Governance, approvals, and feedback remediation
+
+- Council deliberation for consequential decisions (weighted multi-agent voting)
+- Risk-tiered approval gates (P0–P3) with Telegram inline approvals/rejections
+- Resume-capable approval flow for deferred/paused actions
+- Feedback lifecycle: correction intake → remediation actions → recurrence detection
+
+### 4.6 Fitness / finance / calendar integrations
 
 - **Fitness**
   - External fitness service (Go, in `cortana-external`) for Whoop/Tonal
@@ -309,6 +342,22 @@ Output flows into:
 - **Calendar & time**
   - `caldav-calendar` skill (iCloud/CalDAV) and `gog` (Google Calendar)
   - Daily schedule awareness, reminders, and sleep boundary checks
+
+### 4.7 Sub-agent watchdog (`tools/subagent-watchdog/`)
+
+Cortana includes a dedicated sub-agent watchdog to catch silent execution failures that can otherwise hide between heartbeat runs.
+
+- Entrypoint: `tools/subagent-watchdog/check-subagents.sh` (wrapper)
+- Core detector/logger: `tools/subagent-watchdog/check-subagents.py`
+- Detection signals:
+  - `abortedLastRun=true`
+  - Explicit failed statuses (`failed`, `error`, `aborted`, `timeout`, `timed_out`, `cancelled`)
+  - Runtime overrun for likely in-flight sessions (`ageMs > maxRuntimeSeconds`)
+- Output: structured JSON (`summary`, `failedAgents`, logging errors)
+- Persistence: writes `subagent_failure` warning events into `cortana_events` with `source='subagent-watchdog'`
+- De-duplication: cooldown-backed suppression via `memory/heartbeat-state.json` (`subagentWatchdog.lastLogged`)
+
+**Heartbeat integration:** this tool is intended to run from heartbeat/cron checks so sub-agent failures are promoted into the same operational signal path (event log + watchdog visibility + Mission Control timelines), instead of dying quietly in session history.
 
 ---
 
