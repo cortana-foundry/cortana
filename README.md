@@ -297,6 +297,7 @@ Task system lives primarily in the `cortana` Postgres DB, wired via tools in thi
   - Epic/subtask hierarchy, priorities, deadlines
   - Auto‑executor for safe, auto‑executable tasks
   - Integrity audits + stale detection + cleanup
+  - Mandatory heartbeat task board hygiene sweep every heartbeat (ghost/stale task detection, zero tolerance for dashboard ghosts; see `HEARTBEAT.md`)
   - State‑transition enforcement (single source of truth)
 
 ### 4.3 Memory consolidation & semantic recall
@@ -458,9 +459,15 @@ Rules:
 
 ---
 
-## 8. Recent major additions (pre‑Feb 2026)
+## 8. Recent major additions
 
 Representative highlights that are already live:
+
+- **[Feb 2026] Task board hygiene enforcement** – mandatory heartbeat sweep for ghost/stale tasks (zero tolerance for dashboard ghosts; see `HEARTBEAT.md`).
+- **[Feb 2026] Fitness Service Hybrid Migration epic completed** – Mission Control fitness dashboard + alerting, backed by typed client packages.
+- **[Feb 2026] Council deliberation system shipped** – multi-agent weighted voting with OpenAI `gpt-4o` as the policy model for deliberation + synthesis.
+- **[Feb 2026] Whoop OAuth redirect_uri fix** – standardized `http` vs `https` redirect URIs for consistent token exchange and refresh.
+
 
 - **Auto‑chain rules engine** (`tools/auto-chain/`) for automatic follow‑up task chaining
 - **Cost breaker** (`tools/alerting/cost-breaker`) runaway‑session circuit breaker
@@ -509,3 +516,5 @@ This repo is a **personal Cortana setup for one human on one machine**. It assum
 - Local skills configured via OpenClaw (see `skills/`)
 
 It is **not** a generic framework or turnkey product. You can read it for ideas, but expect to adapt heavily if you try to replicate it elsewhere.
+
+Last refreshed: **2026-02-27**
