@@ -6,6 +6,10 @@ secrets/**
 # dependencies
 node_modules/
 
+# Backup files
+*.bak
+*.bak.*
+
 # OS files
 .DS_Store
 
