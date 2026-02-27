@@ -37,7 +37,7 @@ curl -s http://localhost:3033/tonal/data
 **If Tonal unhealthy:** Auto-heal first, then retry:
 ```bash
 # Self-heal: delete tokens to force re-auth
-rm -f ~/Desktop/services/tonal_tokens.json
+rm -f ~/Developer/cortana-external/tonal_tokens.json
 
 # Log the self-heal
 export PATH="/opt/homebrew/opt/postgresql@17/bin:$PATH"
@@ -169,7 +169,7 @@ These are already set up:
 
 ## Service Details
 
-**Location:** `~/Desktop/services/`
+**Location:** `~/Developer/cortana-external/`
 
 **Endpoints:**
 - `http://localhost:3033/whoop/data` — All Whoop data (30 days cached)
@@ -182,8 +182,8 @@ These are already set up:
 - Tonal: No documented limits, service has 500ms delay between requests
 
 **Token Files:**
-- Whoop: `~/Desktop/services/whoop_tokens.json` (auto-refreshes)
-- Tonal: `~/Desktop/services/tonal_tokens.json` (auto-refreshes)
+- Whoop: `~/Developer/cortana-external/whoop_tokens.json` (auto-refreshes)
+- Tonal: `~/Developer/cortana-external/tonal_tokens.json` (auto-refreshes)
 
 **Data Files:**
 - Daily snapshots: `~/clawd/memory/fitness/YYYY-MM-DD.json`
@@ -207,17 +207,17 @@ The agent should auto-delete tokens and retry before skipping Tonal data.
 Manual fix (if auto-heal fails):
 ```bash
 # Delete tokens to force re-auth
-rm ~/Desktop/services/tonal_tokens.json
+rm ~/Developer/cortana-external/tonal_tokens.json
 # Restart service
-cd ~/Desktop/services && source .env && go run main.go &
+launchctl kickstart -k gui/$(id -u)/com.cortana.fitness-service
 ```
 
 **Whoop data stale:**
-Tokens auto-refresh. If issues, check `~/Desktop/services/whoop_tokens.json`.
+Tokens auto-refresh. If issues, check `~/Developer/cortana-external/whoop_tokens.json`.
 
 **Service not running:**
 ```bash
-pgrep -f "go run main.go" || (cd ~/Desktop/services && source .env && nohup go run main.go > /tmp/services.log 2>&1 &)
+curl -s http://localhost:3033/tonal/health >/dev/null || launchctl kickstart -k gui/$(id -u)/com.cortana.fitness-service
 ```
 
 **Check logs:**

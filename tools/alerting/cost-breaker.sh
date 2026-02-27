@@ -23,6 +23,8 @@ SESSIONS_FILE="${OPENCLAW_SESSIONS_FILE:-$HOME/.openclaw/agents/main/sessions/se
 FLAG_FILE="${COST_ALERT_FLAG_FILE:-$HOME/.openclaw/cost-alert.flag}"
 MONTHLY_BUDGET_USD="${COST_BREAKER_MONTHLY_BUDGET_USD:-200}"
 RUNAWAY_TOKEN_LIMIT="${RUNAWAY_TOKEN_LIMIT:-200000}"
+TELEGRAM_GUARD="${TELEGRAM_GUARD:-/Users/hd/clawd/tools/notifications/telegram-delivery-guard.sh}"
+TELEGRAM_CHAT_ID="${TELEGRAM_CHAT_ID:-8171372724}"
 
 KILL_SESSION_KEY=""
 
@@ -73,6 +75,15 @@ log_event() {
   esc_msg="$(sql_escape "$msg")"
   esc_meta="$(sql_escape "$meta")"
   psql "$DB" -c "INSERT INTO cortana_events (event_type, source, severity, message, metadata) VALUES ('cost_breaker', 'cost-breaker.sh', '${sev}', '${esc_msg}', '${esc_meta}');" >/dev/null 2>&1 || true
+}
+
+send_telegram_alert() {
+  local msg="$1"
+  if [[ -x "$TELEGRAM_GUARD" ]]; then
+    "$TELEGRAM_GUARD" "$msg" "$TELEGRAM_CHAT_ID" >/dev/null 2>&1 || true
+  else
+    log_event "warning" "Telegram guard missing; alert not sent" "$(jq -n --arg guard "$TELEGRAM_GUARD" '{guard:$guard}')"
+  fi
 }
 
 kill_runaway_session() {
@@ -214,6 +225,8 @@ if [[ "$critical" == "true" ]]; then
     --argjson runaway "$runaway_sessions" \
     --argjson breaches "$breaches" \
     '{model:$model,provider:$provider,pctBudgetUsed:($pct|tonumber),currentSpend:($spend|tonumber),projectedMonthly:($proj|tonumber),runawaySessions:$runaway,breaches:$breaches}')"
+
+  send_telegram_alert "🚨 Cost breaker tripped: ${pct_budget}% of monthly budget used (\$${current_spend} so far, projected \$${projected_monthly}). Breaches: $(echo "$breaches" | jq -r 'map(.id) | join(", ")')."
 else
   rm -f "$FLAG_FILE" >/dev/null 2>&1 || true
 fi
