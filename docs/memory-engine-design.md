@@ -35,7 +35,7 @@
 - `cortana_memory_archive`: compacted cold memory snapshots
 
 ## Ingestion pipeline
-Script: `tools/memory/ingest_unified_memory.py`
+Script: `tools/memory/ingest_unified_memory.ts`
 
 Current ingestion hooks:
 1. Recent `memory/*.md` files -> episodic entries
@@ -49,7 +49,7 @@ Current ingestion hooks:
 
 Heartbeat-callable command:
 ```bash
-python3 /Users/hd/openclaw/tools/memory/ingest_unified_memory.py --since-hours 24
+npx tsx /Users/hd/openclaw/tools/memory/ingest_unified_memory.ts --since-hours 24
 ```
 
 ## Retrieval policy

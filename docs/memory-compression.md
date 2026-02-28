@@ -1,7 +1,7 @@
 # Semantic Compression Engine: Daily Memory Distillation
 
 ## Overview
-`tools/memory/compress.py` distills recent episodic memories (`cortana_memory_episodic`) into compact semantic records (`cortana_memory_semantic`) while preserving:
+`tools/memory/compress.ts` distills recent episodic memories (`cortana_memory_episodic`) into compact semantic records (`cortana_memory_semantic`) while preserving:
 - key facts
 - explicit decisions
 - action items
@@ -42,12 +42,12 @@ fidelity_score IS NULL OR (fidelity_score >= 0 AND fidelity_score <= 1)
 
 ## Run manually
 ```bash
-python3 /Users/hd/openclaw/tools/memory/compress.py --since-hours 36
+npx tsx /Users/hd/openclaw/tools/memory/compress.ts --since-hours 36
 ```
 
 Dry run:
 ```bash
-python3 /Users/hd/openclaw/tools/memory/compress.py --since-hours 36 --dry-run
+npx tsx /Users/hd/openclaw/tools/memory/compress.ts --since-hours 36 --dry-run
 ```
 
 ## Scheduling (launchd @ 2:00 AM)

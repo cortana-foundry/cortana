@@ -2,7 +2,7 @@
 
 ## What this gives you
 
-`tools/economics/token_ledger.py` tracks token usage and estimated spend across main session, sub-agents, and cron-driven runs.
+`tools/economics/token_ledger.ts` tracks token usage and estimated spend across main session, sub-agents, and cron-driven runs.
 
 You can answer:
 - Where are tokens going?
@@ -46,7 +46,7 @@ You can override per-event via `--cost-estimate`.
 ### 1) Log usage
 
 ```bash
-python3 tools/economics/token_ledger.py log-usage \
+npx tsx tools/economics/token_ledger.ts log-usage \
   --agent-role huragok \
   --task-id 135 \
   --trace-id run_abc123 \
@@ -59,9 +59,9 @@ python3 tools/economics/token_ledger.py log-usage \
 ### 2) Summary by period
 
 ```bash
-python3 tools/economics/token_ledger.py summary --period 24h
-python3 tools/economics/token_ledger.py summary --period 7d
-python3 tools/economics/token_ledger.py summary --period 30d
+npx tsx tools/economics/token_ledger.ts summary --period 24h
+npx tsx tools/economics/token_ledger.ts summary --period 7d
+npx tsx tools/economics/token_ledger.ts summary --period 30d
 ```
 
 Outputs:
@@ -73,7 +73,7 @@ Outputs:
 ### 3) Top spenders
 
 ```bash
-python3 tools/economics/token_ledger.py top-spenders --limit 10
+npx tsx tools/economics/token_ledger.ts top-spenders --limit 10
 ```
 
 Returns highest estimated-cost operations first.
@@ -81,8 +81,8 @@ Returns highest estimated-cost operations first.
 ### 4) Budget check
 
 ```bash
-python3 tools/economics/token_ledger.py budget-check
-python3 tools/economics/token_ledger.py budget-check --budget 200
+npx tsx tools/economics/token_ledger.ts budget-check
+npx tsx tools/economics/token_ledger.ts budget-check --budget 200
 ```
 
 Calculates for current month:

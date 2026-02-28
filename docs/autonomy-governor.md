@@ -27,7 +27,7 @@ Decision behavior:
 
 ### 2) Governor module
 
-Created: `~/openclaw/tools/governor/risk_score.py`
+Created: `~/openclaw/tools/governor/risk_score.ts`
 
 Responsibilities:
 - Load governor policy config
@@ -39,7 +39,7 @@ Responsibilities:
 CLI usage example:
 
 ```bash
-python3 ~/openclaw/tools/governor/risk_score.py \
+npx tsx ~/openclaw/tools/governor/risk_score.ts \
   --db cortana \
   --task-json '{"id":123,"execution_plan":"cat README.md","metadata":{}}' \
   --actor auto-executor \
@@ -82,7 +82,7 @@ Updated: `~/openclaw/tools/task-board/auto-executor.sh`
 
 Flow now:
 1. Select next dependency-ready `auto_executable` task.
-2. Call governor (`risk_score.py`) before execution.
+2. Call governor (`risk_score.ts`) before execution.
 3. If `approved` → proceed to existing safelist/whitelist and run command.
 4. If `escalated` or `denied` → do not execute; task is queued/blocked and logged.
 
@@ -98,7 +98,7 @@ This enforces risk gating at the exact execution boundary.
 
 ## Files touched
 
-- `tools/governor/risk_score.py` (new)
+- `tools/governor/risk_score.ts` (new)
 - `tools/governor/policy.json` (new)
 - `tools/task-board/auto-executor.sh` (updated)
 - `migrations/012_autonomy_governor_v2.sql` (new)

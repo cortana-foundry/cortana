@@ -4,7 +4,7 @@
 Prevent duplicate concurrent sub-agent launches for the same logical task, and reduce ghost runs.
 
 ## Implementation
-File: `tools/covenant/spawn_guard.py`
+File: `tools/covenant/spawn_guard.ts`
 
 ### Key computation
 Dedupe key format:
@@ -37,7 +37,7 @@ Example:
 ## CLI usage
 ### Claim
 ```bash
-python3 tools/covenant/spawn_guard.py claim \
+npx tsx tools/covenant/spawn_guard.ts claim \
   --label "Huragok migration hygiene" \
   --task-id 4242 \
   --run-id run-abc
@@ -45,7 +45,7 @@ python3 tools/covenant/spawn_guard.py claim \
 
 ### Release
 ```bash
-python3 tools/covenant/spawn_guard.py release \
+npx tsx tools/covenant/spawn_guard.ts release \
   --label "Huragok migration hygiene" \
   --task-id 4242 \
   --run-id run-abc
@@ -53,5 +53,5 @@ python3 tools/covenant/spawn_guard.py release \
 
 ### Demo (simulated duplicate prevention)
 ```bash
-python3 tools/covenant/spawn_guard.py demo
+npx tsx tools/covenant/spawn_guard.ts demo
 ```

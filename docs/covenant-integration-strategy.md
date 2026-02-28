@@ -1,15 +1,15 @@
 # Covenant Integration Strategy: Route-First Sub-Agent Spawning
 
 ## Executive Summary
-Cortana currently bypasses Covenant routing at dispatch time, so agent choice is often manual and inconsistent. The fix is simple and strict: **every spawn must pass through a pre-spawn routing gate** that calls `route_workflow.py --plan` and converts the returned plan/chain into one or more actual sub-agent spawns.
+Cortana currently bypasses Covenant routing at dispatch time, so agent choice is often manual and inconsistent. The fix is simple and strict: **every spawn must pass through a pre-spawn routing gate** that calls `route_workflow.ts --plan` and converts the returned plan/chain into one or more actual sub-agent spawns.
 
 The biggest modeling gap is that current routing has no `Researcher` identity and overloads `Oracle` with research/analysis keywords. With the current code, research tasks are structurally misrouted.
 
 ---
 
-## 1) Current Routing Gaps (from `route_workflow.py` + `planner.py`)
+## 1) Current Routing Gaps (from `route_workflow.ts` + `planner.ts`)
 
-## 1.1 `route_workflow.py` gaps
+## 1.1 `route_workflow.ts` gaps
 - `ALLOWED_AGENTS` only includes:
   - `agent.monitor.v1`
   - `agent.huragok.v1`
@@ -19,7 +19,7 @@ The biggest modeling gap is that current routing has no `Researcher` identity an
 - Orchestration itself is fine (`build_plan` → `review_plan` → `build_execution_state`), but it is only useful if Cortana actually invokes it before spawn.
 - Failure playbook validation (`plan_failure`) also cannot accept `agent.researcher.v1`, so even retry/escalation logic cannot represent the desired roster.
 
-## 1.2 `planner.py` gaps
+## 1.2 `planner.ts` gaps
 - Agent constants do not define `Researcher`; `Oracle` is currently used as research/decision support.
 - `KEYWORDS` map research-intent terms (`research`, `compare`, `investigate`, `evaluate`) to `AGENT_ORACLE`.
 - `HANDOFF_PATTERNS` include:
@@ -56,14 +56,14 @@ Use routing as a required control point, not optional guidance.
      - `workflow_type` (optional)
      - `constraints`, `resource_budget`, `max_steps`
 2. **Mandatory router call**
-   - `python3 /Users/hd/openclaw/tools/covenant/route_workflow.py --plan <routing-request.json>`
+   - `npx tsx /Users/hd/openclaw/tools/covenant/route_workflow.ts --plan <routing-request.json>`
 3. **Critique gate**
    - If `critique.approved=false` or `execution.state=blocked`, do not spawn; trigger replan/human clarification.
 4. **Spawn plan execution**
    - For single-agent plan: spawn that identity.
    - For chain plan: spawn step 1, then subsequent steps only after previous completion+quality gate.
 5. **Failure routing loop**
-   - On step failure: call `route_workflow.py --failure <failure-event.json>`.
+   - On step failure: call `route_workflow.ts --failure <failure-event.json>`.
    - Apply returned action (`retry_same_agent`, `escalate_*`).
 
 ## Enforcement points
@@ -152,14 +152,14 @@ Next step should refuse to run if required artifacts from prior step are missing
 ## Phase 1: Identity and router parity
 1. Add `agent.researcher.v1` to:
    - `agents/identities/registry.json`
-   - `tools/covenant/route_workflow.py` (`ALLOWED_AGENTS`)
-   - `tools/covenant/critic.py` (`ALLOWED_AGENTS`)
-   - `tools/covenant/executor.py` route suggestions as needed
+   - `tools/covenant/route_workflow.ts` (`ALLOWED_AGENTS`)
+   - `tools/covenant/critic.ts` (`ALLOWED_AGENTS`)
+   - `tools/covenant/executor.ts` route suggestions as needed
 2. Update Roland constants and keyword maps:
    - create `AGENT_RESEARCHER`
    - move research keywords from Oracle to Researcher
    - constrain Oracle to forecast/risk/strategy terms
-3. Add new handoff patterns in `planner.py` for Roland:
+3. Add new handoff patterns in `planner.ts` for Roland:
    - `researcher_oracle_huragok`
    - `researcher_librarian`
    - `researcher_librarian_huragok`

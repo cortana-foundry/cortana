@@ -80,7 +80,7 @@ For high-impact decisions, Cortana now runs a formal governance layer:
   - Operator tooling:
     - `tools/feedback/log-feedback.sh`
     - `tools/feedback/add-feedback-action.sh`
-    - `tools/feedback/sync-feedback.py`
+    - `tools/feedback/sync-feedback.ts`
 
 ### 2.4 Memory & cognition
 
@@ -147,7 +147,7 @@ graph LR
 - **Proprioception** – Cortana’s sense of her own health/budget
   - Budget + token ledger, cron health, tool health, throttle tiers
   - Consolidated into `cortana_self_model` and surfaced in Mission Control
-  - Efficiency precompute pipeline (`proprioception/efficiency_precompute.py`) now pre-computes token costs, sub-agent spend, and brief engagement before LLM analysis
+  - Efficiency precompute pipeline (`proprioception/efficiency_precompute.ts`) now pre-computes token costs, sub-agent spend, and brief engagement before LLM analysis
   - Efficiency Analyzer cron calls the precompute script and uses the LLM only for self-model updates + anomaly reporting
   - Runtime dropped to sub-second (<1s), replacing prior 120s+ timeout-prone runs
 
@@ -229,10 +229,10 @@ Internal operator scripts, grouped by domain. Highlights:
   - `tools/approvals/` – P0–P3 approval gate operators (`check-approval.sh`, `poll-approval.sh`, `resume-approval.sh`)
 - **Memory & reflection**
   - `tools/memory/` – ingestion, quality gates, consolidation
-  - `tools/memory/vector-health-gate.py` + `tools/memory/safe-memory-search.py` – safety gates for semantic recall quality
+  - `tools/memory/vector-health-gate.ts` + `tools/memory/safe-memory-search.ts` – safety gates for semantic recall quality
   - `tools/memory/compact-memory.sh` – controlled memory compaction workflow
   - `tools/reflection/` – repeated‑correction analysis, learning loops
-  - `tools/feedback/` – correction logging, remediation actions, recurrence sync (`log-feedback.sh`, `add-feedback-action.sh`, `sync-feedback.py`)
+  - `tools/feedback/` – correction logging, remediation actions, recurrence sync (`log-feedback.sh`, `add-feedback-action.sh`, `sync-feedback.ts`)
   - `tools/feedback/pipeline-reconciliation.sh` – feedback pipeline consistency check/reconcile
 - **Proactive intelligence**
   - `tools/proactive/` – cross‑signal detection & calibration
@@ -287,7 +287,7 @@ Defines the Covenant roles, responsibilities, and routing contracts used by the 
 ### 3.7 `tests/`
 
 - `tests/` contains lightweight regression coverage for hardening-critical scripts.
-- Current suite includes vector memory health-gate coverage (`tests/test_vector_health_gate.py`).
+- Current suite includes vector memory health-gate coverage (`tests/test_vector_health_gate.ts`).
 
 ---
 
@@ -368,7 +368,7 @@ Output flows into:
 Cortana includes a dedicated sub-agent watchdog to catch silent execution failures that can otherwise hide between heartbeat runs.
 
 - Entrypoint: `tools/subagent-watchdog/check-subagents.sh` (wrapper)
-- Core detector/logger: `tools/subagent-watchdog/check-subagents.py`
+- Core detector/logger: `tools/subagent-watchdog/check-subagents.ts`
 - Detection signals:
   - `abortedLastRun=true`
   - Explicit failed statuses (`failed`, `error`, `aborted`, `timeout`, `timed_out`, `cancelled`)

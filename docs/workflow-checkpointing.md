@@ -6,7 +6,7 @@ Goal: if a multi-step workflow crashes mid-run, we can resume from the latest ch
 
 ## Scope
 
-Implemented in `tools/covenant/checkpoint.py` with five core operations:
+Implemented in `tools/covenant/checkpoint.ts` with five core operations:
 
 - `save(workflow_id, step_id, state, metadata)`
 - `load(workflow_id)`
@@ -46,26 +46,26 @@ Indexes:
 
 ```bash
 # Save checkpoint
-python3 tools/covenant/checkpoint.py save \
+npx tsx tools/covenant/checkpoint.ts save \
   11111111-1111-1111-1111-111111111111 \
   planner \
   running \
   --metadata '{"agent_role":"huragok","task_id":140,"trace_id":"abc-123"}'
 
 # Load latest checkpoint
-python3 tools/covenant/checkpoint.py load 11111111-1111-1111-1111-111111111111
+npx tsx tools/covenant/checkpoint.ts load 11111111-1111-1111-1111-111111111111
 
 # Compute resume decision
-python3 tools/covenant/checkpoint.py resume 11111111-1111-1111-1111-111111111111
+npx tsx tools/covenant/checkpoint.ts resume 11111111-1111-1111-1111-111111111111
 
 # List latest checkpoint per workflow (all)
-python3 tools/covenant/checkpoint.py list
+npx tsx tools/covenant/checkpoint.ts list
 
 # List in-flight workflows only
-python3 tools/covenant/checkpoint.py list --active
+npx tsx tools/covenant/checkpoint.ts list --active
 
 # Cleanup stale rows
-python3 tools/covenant/checkpoint.py cleanup --older-than 7d
+npx tsx tools/covenant/checkpoint.ts cleanup --older-than 7d
 ```
 
 ## Resume Semantics (Prototype)

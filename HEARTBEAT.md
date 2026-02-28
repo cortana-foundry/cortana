@@ -44,7 +44,7 @@ Use `memory/heartbeat-state.json` to pick the stalest 1–2 checks per heartbeat
   - Skip if already proposed a mission task today.
 
 - **Unified memory ingestion (1–2× daily)**
-  - Run `python3 tools/memory/ingest_unified_memory.py --since-hours 24`.
+  - Run `npx tsx tools/memory/ingest_unified_memory.ts --since-hours 24`.
   - Skip if run in last **12h** and no major new events.
 
 - **Memory compaction (1× daily)**
@@ -53,12 +53,12 @@ Use `memory/heartbeat-state.json` to pick the stalest 1–2 checks per heartbeat
   - Skip if run in last **24h**.
 
 - **Reflection sweep (1× daily, evening)**
-  - Run `python3 tools/reflection/reflect.py --mode sweep --trigger-source heartbeat --window-days 30`.
+  - Run `npx tsx tools/reflection/reflect.ts --mode sweep --trigger-source heartbeat --window-days 30`.
   - If repeated correction rate >25% → alert Hamel and propose stronger rules.
   - Skip if run in last **12h**.
   - If `cortana_feedback` corrections not synced to `mc_feedback_items`, run:
     ```bash
-    python3 ~/openclaw/tools/feedback/sync-feedback.py
+    npx tsx ~/openclaw/tools/feedback/sync-feedback.ts
     ```
 
 - **Feedback triage (every heartbeat)**
@@ -149,11 +149,11 @@ States: `backlog` → `ready` → `in_progress` → `completed`/`failed`/`cancel
 - Log behavioral patterns to `cortana_patterns` using templates in `docs/heartbeat-sql-reference.md`.
 - Run:
   ```bash
-  python3 tools/proactive/detect.py --min-confidence 0.66
+  npx tsx tools/proactive/detect.ts --min-confidence 0.66
   ```
   or
   ```bash
-  python3 tools/proactive/detect.py --min-confidence 0.72 --create-tasks
+  npx tsx tools/proactive/detect.ts --min-confidence 0.72 --create-tasks
   ```
   for gated morning brief task creation.
 
@@ -167,7 +167,7 @@ After each check, log a decision trace so Mission Control reflects what ran and 
   ```
 - Under the hood:
   ```bash
-  python3 ~/openclaw/tools/tracing/log_decision.py \
+  npx tsx ~/openclaw/tools/tracing/log_decision.ts \
     --trigger heartbeat \
     --action-type <check_type> \
     --action-name <specific_check> \

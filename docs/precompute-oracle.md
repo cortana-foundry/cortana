@@ -39,12 +39,12 @@ Based on both sources, precompute now targets:
 ## Implementation
 
 ### Script
-- Path: `~/openclaw/tools/oracle/precompute.py`
+- Path: `~/openclaw/tools/oracle/precompute.ts`
 - Command modes:
-  - `python3 ~/openclaw/tools/oracle/precompute.py run`
-  - `python3 ~/openclaw/tools/oracle/precompute.py status`
-  - `python3 ~/openclaw/tools/oracle/precompute.py read`
-  - `python3 ~/openclaw/tools/oracle/precompute.py read <weather|calendar|portfolio|recovery|email>`
+  - `npx tsx ~/openclaw/tools/oracle/precompute.ts run`
+  - `npx tsx ~/openclaw/tools/oracle/precompute.ts status`
+  - `npx tsx ~/openclaw/tools/oracle/precompute.ts read`
+  - `npx tsx ~/openclaw/tools/oracle/precompute.ts read <weather|calendar|portfolio|recovery|email>`
 
 ### Cache
 - Path: `~/openclaw/tmp/oracle-cache.json`
@@ -79,7 +79,7 @@ Based on both sources, precompute now targets:
 
 ### Schedule
 - `StartCalendarInterval`: Hour `5`, Minute `30`
-- Runs: `python3 /Users/hd/openclaw/tools/oracle/precompute.py run`
+- Runs: `npx tsx /Users/hd/openclaw/tools/oracle/precompute.ts run`
 
 ### Load / reload commands
 ```bash
@@ -90,9 +90,9 @@ launchctl enable gui/$(id -u)/com.cortana.oracle-precompute
 
 ### Verify
 ```bash
-python3 ~/openclaw/tools/oracle/precompute.py run
-python3 ~/openclaw/tools/oracle/precompute.py status
-python3 ~/openclaw/tools/oracle/precompute.py read weather
+npx tsx ~/openclaw/tools/oracle/precompute.ts run
+npx tsx ~/openclaw/tools/oracle/precompute.ts status
+npx tsx ~/openclaw/tools/oracle/precompute.ts read weather
 ```
 
 ---
@@ -102,9 +102,9 @@ python3 ~/openclaw/tools/oracle/precompute.py read weather
 The brief can read the cache directly and avoid live API/tool latency:
 
 ```bash
-python3 ~/openclaw/tools/oracle/precompute.py read --allow-stale
-python3 ~/openclaw/tools/oracle/precompute.py read weather
-python3 ~/openclaw/tools/oracle/precompute.py read calendar
+npx tsx ~/openclaw/tools/oracle/precompute.ts read --allow-stale
+npx tsx ~/openclaw/tools/oracle/precompute.ts read weather
+npx tsx ~/openclaw/tools/oracle/precompute.ts read calendar
 ```
 
 Use `--allow-stale` only if fallback display is preferred over hard failure.

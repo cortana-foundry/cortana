@@ -3,12 +3,12 @@
 ## Overview
 This implementation provides **fully local text embeddings** on the Mac mini (Apple Silicon) with no API dependency after initial model download.
 
-- Runtime: Python venv at `~/openclaw/tools/embeddings/.venv`
+- Runtime: Node.js + `tsx` in `~/openclaw/tools/embeddings`
 - Engine: `fastembed` (ONNX Runtime)
 - Default model: `BAAI/bge-small-en-v1.5` (384-dim vectors)
 - Entry points:
   - CLI wrapper: `~/openclaw/tools/embeddings/embed`
-  - Python script: `~/openclaw/tools/embeddings/embed.py`
+  - TypeScript script: `~/openclaw/tools/embeddings/embed.ts`
   - Optional local HTTP service: `embed serve`
 
 ## Why this stack
@@ -24,16 +24,14 @@ I evaluated practical local options for Apple Silicon:
 Given the host environment, **fastembed is the fastest path to production-ready local embeddings**.
 
 ## Installed files
-- `~/openclaw/tools/embeddings/embed.py` — embedding CLI + benchmark + HTTP server
-- `~/openclaw/tools/embeddings/embed` — wrapper script that uses local venv Python
+- `~/openclaw/tools/embeddings/embed.ts` — embedding CLI + benchmark + HTTP server
+- `~/openclaw/tools/embeddings/embed` — wrapper script for local embedding commands
 
 ## Setup
 ```bash
 cd ~/openclaw/tools/embeddings
-python3 -m venv .venv
-.venv/bin/pip install --upgrade pip
-.venv/bin/pip install fastembed
-chmod +x embed.py embed
+npm install
+chmod +x embed.ts embed
 ```
 
 ## Usage

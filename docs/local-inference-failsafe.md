@@ -26,7 +26,7 @@ Compared three viable stacks for Apple Silicon M-series:
 - Local model pulled: `phi3:mini` (small and capable for emergency Q&A/triage)
 
 ## Failsafe script
-Path: `~/openclaw/tools/failsafe/local-inference.py`
+Path: `~/openclaw/tools/failsafe/local-inference.ts`
 
 ### Capabilities
 - Detects remote API outage by probing:
@@ -53,19 +53,19 @@ On fallback failure:
 ## Usage
 ```bash
 # Force local path (testing)
-python3 ~/openclaw/tools/failsafe/local-inference.py qa \
+npx tsx ~/openclaw/tools/failsafe/local-inference.ts qa \
   --prompt "Say local failsafe online" \
   --force-local
 
 # Automatic failover path (checks remote APIs first)
-python3 ~/openclaw/tools/failsafe/local-inference.py qa \
+npx tsx ~/openclaw/tools/failsafe/local-inference.ts qa \
   --prompt "What should we do if gateway is down?"
 
 # Task queue mode
-python3 ~/openclaw/tools/failsafe/local-inference.py task_queue --limit 10
+npx tsx ~/openclaw/tools/failsafe/local-inference.ts task_queue --limit 10
 
 # Alert mode
-python3 ~/openclaw/tools/failsafe/local-inference.py alert \
+npx tsx ~/openclaw/tools/failsafe/local-inference.ts alert \
   --prompt "Watchdog reports PostgreSQL restart loop"
 ```
 

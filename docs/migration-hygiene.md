@@ -8,7 +8,7 @@ We **do not rename existing migrations**.
 
 Instead we enforce deterministic ordering and future uniqueness with:
 1. `migrations/manifest.json` as the canonical execution order for all existing files.
-2. `tools/covenant/migration_hygiene.py` to validate:
+2. `tools/covenant/migration_hygiene.ts` to validate:
    - every `.sql` migration is represented in the manifest
    - every manifest entry exists on disk
    - filename format `NNN_slug.sql`
@@ -18,13 +18,13 @@ Instead we enforce deterministic ordering and future uniqueness with:
 ## How to add a new migration
 1. Get the next legal prefix:
    ```bash
-   python3 tools/covenant/migration_hygiene.py --next-prefix
+   npx tsx tools/covenant/migration_hygiene.ts --next-prefix
    ```
 2. Create file using `NNN_description.sql`.
 3. Append it to `migrations/manifest.json` `order` list.
 4. Run check:
    ```bash
-   python3 tools/covenant/migration_hygiene.py
+   npx tsx tools/covenant/migration_hygiene.ts
    ```
 
 ## Why this approach
