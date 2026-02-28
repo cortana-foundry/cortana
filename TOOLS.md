@@ -92,7 +92,6 @@ After `npm update -g openclaw`:
 Post-update script handles:
 - Syncing `~/.openclaw/cron/jobs.json` ↔ `/Users/hd/openclaw/config/cron/jobs.json` (copy runtime → repo when content differs, then restore symlink)
 - `openclaw gateway install --force`
-- `cd /opt/homebrew/lib/node_modules/openclaw && pnpm add @lancedb/lancedb`
 - `openclaw gateway restart`
 
 ## Symlinks (Repo → Runtime)

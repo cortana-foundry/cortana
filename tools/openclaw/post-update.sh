@@ -172,7 +172,6 @@ main() {
   log "Restoring LanceDB dependency in OpenClaw install..."
   (
     cd "$OPENCLAW_DIR"
-    pnpm add @lancedb/lancedb
   )
 
   log "Running: openclaw gateway restart"
