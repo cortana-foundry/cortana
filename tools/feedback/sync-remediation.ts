@@ -1,16 +1,24 @@
-#!/usr/bin/env bash
-set -euo pipefail
+#!/usr/bin/env npx tsx
 
-export PATH="/opt/homebrew/opt/postgresql@17/bin:$PATH"
-DB_NAME="${DB_NAME:-cortana}"
-MODE="${1:---install}"
+import { spawnSync } from "node:child_process";
+import { withPostgresPath } from "../lib/db.js";
+import { PSQL_BIN } from "../lib/paths.js";
 
-psql_cmd() {
-  psql "$DB_NAME" -v ON_ERROR_STOP=1 "$@"
+function run(db: string, sql: string): number {
+  const r = spawnSync(PSQL_BIN, [db, "-v", "ON_ERROR_STOP=1"], {
+    input: sql,
+    encoding: "utf8",
+    stdio: ["pipe", "inherit", "inherit"],
+    env: withPostgresPath(process.env),
+  });
+  return r.status ?? 1;
 }
 
-install_trigger() {
-  psql_cmd <<'EOSQL'
+async function main(): Promise<void> {
+  const db = process.env.DB_NAME || "cortana";
+  const mode = process.argv[2] ?? "--install";
+
+  const installSql = `
 CREATE OR REPLACE FUNCTION sync_feedback_remediation_from_task()
 RETURNS trigger AS $$
 DECLARE
@@ -47,11 +55,9 @@ AFTER UPDATE OF status ON cortana_tasks
 FOR EACH ROW
 WHEN (OLD.status IS DISTINCT FROM NEW.status)
 EXECUTE FUNCTION sync_feedback_remediation_from_task();
-EOSQL
-}
+`;
 
-run_once_sync() {
-  psql_cmd -c "
+  const syncSql = `
 WITH linked AS (
   SELECT id, status, metadata->>'feedback_id' AS feedback_id
   FROM cortana_tasks
@@ -81,23 +87,29 @@ resolved AS (
 SELECT
   (SELECT COUNT(*) FROM inprog) AS set_in_progress,
   (SELECT COUNT(*) FROM resolved) AS set_resolved;
-"
+`;
+
+  switch (mode) {
+    case "--install": {
+      const code = run(db, installSql);
+      if (code !== 0) process.exit(code);
+      console.log("Installed cortana_tasks -> mc_feedback_items remediation trigger");
+      return;
+    }
+    case "--sync-now": {
+      const code = run(db, syncSql);
+      process.exit(code);
+    }
+    case "--install-and-sync": {
+      let code = run(db, installSql);
+      if (code !== 0) process.exit(code);
+      code = run(db, syncSql);
+      process.exit(code);
+    }
+    default:
+      console.log(`Usage: ${process.argv[1] ?? "sync-remediation.ts"} [--install|--sync-now|--install-and-sync]`);
+      process.exit(1);
+  }
 }
 
-case "$MODE" in
-  --install)
-    install_trigger
-    echo "Installed cortana_tasks -> mc_feedback_items remediation trigger"
-    ;;
-  --sync-now)
-    run_once_sync
-    ;;
-  --install-and-sync)
-    install_trigger
-    run_once_sync
-    ;;
-  *)
-    echo "Usage: $0 [--install|--sync-now|--install-and-sync]"
-    exit 1
-    ;;
-esac
+main();

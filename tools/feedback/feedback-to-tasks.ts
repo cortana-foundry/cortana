@@ -1,23 +1,10 @@
-#!/usr/bin/env bash
-set -euo pipefail
+#!/usr/bin/env npx tsx
 
-export PATH="/opt/homebrew/opt/postgresql@17/bin:$PATH"
-DB_NAME="${DB_NAME:-cortana}"
+import { spawnSync } from "node:child_process";
+import { withPostgresPath } from "../lib/db.js";
+import { PSQL_BIN } from "../lib/paths.js";
 
-psql_cmd() {
-  psql "$DB_NAME" -v ON_ERROR_STOP=1 "$@"
-}
-
-# Creates cortana_tasks from open/new+verified feedback items.
-# Severity mapping:
-#   high/critical -> priority 1, ready
-#   medium        -> priority 2, ready
-#   low           -> priority 3, backlog
-# Recurrence escalation:
-#   recurrence_key seen 2+ times -> force high/priority 1/ready + HARD RULE title prefix
-
-SQL=$(cat <<'EOSQL'
-WITH candidates AS (
+const SQL = `WITH candidates AS (
   SELECT
     f.id,
     f.severity,
@@ -79,8 +66,8 @@ inserted AS (
       'severity_effective', n.effective_severity,
       'hard_rule', n.hard_rule,
       'rule_change_candidate', (
-        lower(COALESCE(n.summary,'')) ~ '(memory\.md|agents\.md|soul\.md|heartbeat\.md|system prompt|prompt)'
-        OR lower(COALESCE(n.details->>'lesson','')) ~ '(memory\.md|agents\.md|soul\.md|heartbeat\.md|system prompt|prompt)'
+        lower(COALESCE(n.summary,'')) ~ '(memory\\.md|agents\\.md|soul\\.md|heartbeat\\.md|system prompt|prompt)'
+        OR lower(COALESCE(n.details->>'lesson','')) ~ '(memory\\.md|agents\\.md|soul\\.md|heartbeat\\.md|system prompt|prompt)'
       )
     )
   FROM normalized n
@@ -97,17 +84,34 @@ triaged AS (
 )
 SELECT
   (SELECT COUNT(*) FROM inserted) AS tasks_created,
-  (SELECT COUNT(*) FROM triaged) AS feedback_triaged;
-EOSQL
-)
+  (SELECT COUNT(*) FROM triaged) AS feedback_triaged;`;
 
-psql_cmd -c "$SQL"
+async function main(): Promise<void> {
+  const env = withPostgresPath(process.env);
 
-# Human-readable created task report (for task 241 backfill output)
-psql_cmd -c "
-SELECT t.id, t.priority, t.status, t.title, t.metadata->>'feedback_id' AS feedback_id
+  const first = spawnSync(PSQL_BIN, [process.env.DB_NAME || "cortana", "-v", "ON_ERROR_STOP=1", "-c", SQL], {
+    encoding: "utf8",
+    stdio: "inherit",
+    env,
+  });
+  if ((first.status ?? 1) !== 0) process.exit(first.status ?? 1);
+
+  const second = spawnSync(
+    PSQL_BIN,
+    [
+      process.env.DB_NAME || "cortana",
+      "-v",
+      "ON_ERROR_STOP=1",
+      "-c",
+      `SELECT t.id, t.priority, t.status, t.title, t.metadata->>'feedback_id' AS feedback_id
 FROM cortana_tasks t
 WHERE t.source = 'feedback_loop'
 ORDER BY t.id DESC
-LIMIT 50;
-"
+LIMIT 50;`,
+    ],
+    { encoding: "utf8", stdio: "inherit", env }
+  );
+  if ((second.status ?? 1) !== 0) process.exit(second.status ?? 1);
+}
+
+main();
