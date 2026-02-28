@@ -7,7 +7,7 @@
       "name": "☀️ Morning brief (Hamel)",
       "enabled": true,
       "createdAtMs": 1769550483487,
-      "updatedAtMs": 1772109063006,
+      "updatedAtMs": 1772287945731,
       "schedule": {
         "kind": "cron",
         "expr": "30 7 * * *"
@@ -20,19 +20,20 @@
         "model": "openai-codex/gpt-5.2-codex"
       },
       "state": {
-        "nextRunAtMs": 1772281800000,
-        "lastRunAtMs": 1772109000032,
+        "nextRunAtMs": 1772368200000,
+        "lastRunAtMs": 1772287864547,
         "lastStatus": "ok",
-        "lastDurationMs": 49707,
+        "lastDurationMs": 81184,
         "consecutiveErrors": 0,
         "lastRunStatus": "ok",
         "lastDelivered": false,
-        "lastDeliveryStatus": "not-delivered",
-        "runningAtMs": 1772284187598
+        "lastDeliveryStatus": "not-delivered"
       },
       "delivery": {
-        "mode": "none",
-        "channel": "last"
+        "mode": "announce",
+        "channel": "telegram",
+        "to": "8171372724",
+        "bestEffort": true
       }
     },
     {
@@ -101,8 +102,10 @@
         "lastDeliveryStatus": "not-delivered"
       },
       "delivery": {
-        "mode": "none",
-        "channel": "last"
+        "mode": "announce",
+        "channel": "telegram",
+        "to": "8171372724",
+        "bestEffort": true
       },
       "prompt": "\n\nAfter generating your digest, use the message tool to send it to Telegram (channel: telegram, target: 8171372724). Do NOT rely on automatic delivery."
     },
@@ -148,7 +151,7 @@
       "name": "📅 Calendar reminders → Telegram (ALL calendars)",
       "enabled": true,
       "createdAtMs": 1769585938649,
-      "updatedAtMs": 1772276833529,
+      "updatedAtMs": 1772298433148,
       "schedule": {
         "kind": "cron",
         "expr": "7 6-23 * * *",
@@ -162,15 +165,14 @@
         "model": "openai-codex/gpt-5.1"
       },
       "state": {
-        "nextRunAtMs": 1772280420000,
-        "lastRunAtMs": 1772276820018,
+        "nextRunAtMs": 1772302020000,
+        "lastRunAtMs": 1772298420012,
         "lastStatus": "ok",
-        "lastDurationMs": 13511,
+        "lastDurationMs": 13136,
         "consecutiveErrors": 0,
         "lastRunStatus": "ok",
         "lastDelivered": false,
-        "lastDeliveryStatus": "not-delivered",
-        "runningAtMs": 1772284187598
+        "lastDeliveryStatus": "not-delivered"
       },
       "delivery": {
         "mode": "announce",
@@ -262,7 +264,7 @@
       "wakeMode": "now",
       "payload": {
         "kind": "agentTurn",
-        "message": "Stock Market Brief for Hamel.\n\nPREFIX: Always prefix your output with: 💹 Markets - Stock Market Brief. Example: 💹 Markets - Stock Market Brief\n[rest of message]\n\n⚠️ DELIVERY: Do NOT rely on announce delivery. You MUST use the `message` tool (action=send, target=8171372724, channel=telegram) to send your final output. This is required because announce delivery is broken (openclaw/openclaw#16925).\n\nRead the portfolio config at ~/openclaw/tools/portfolio/config.md for full context, constraints, and watch items.\n\nKey constraints:\n- TSLA and NVDA are FOREVER HOLDS. Never recommend selling or trimming.\n- Concentration risk managed via diversification only.\n- Long-term (years/decades) horizon.\n\n## Step 0: Check Market Status\nMARKET_STATUS=$(~/openclaw/skills/markets/check_market_status.sh)\necho \"Market status: $MARKET_STATUS\"\n\nUse $MARKET_STATUS in your analysis. If market is CLOSED, focus on after-hours/pre-market events and their implications for next trading day. Never guess market status.\n\n## Step 1: Pull SAE Finance Data (pre-gathered at 7:00 AM)\n```bash\nexport PATH=\"/opt/homebrew/opt/postgresql@17/bin:$PATH\"\n\n# Get finance sitrep data\nFINANCE=$(psql cortana -t -A -c \"SELECT value FROM cortana_sitrep_latest WHERE domain = 'finance';\")\necho \"Portfolio snapshot: $FINANCE\"\n\n# Check freshness\nFINANCE_AGE=$(psql cortana -t -A -c \"SELECT EXTRACT(EPOCH FROM (NOW() - MAX(timestamp)))/3600 FROM cortana_sitrep WHERE domain = 'finance';\")\necho \"Finance data age: ${FINANCE_AGE} hours\"\n```\n\nIf finance sitrep data is missing or stale (>4 hours), fetch all prices directly using stock-analysis skill.\n\n## Step 2: Pull Finance Insights\n```bash\nINSIGHTS=$(psql cortana -t -A -c \"SELECT json_agg(t) FROM (SELECT id, title, description, priority, action_suggested FROM cortana_insights WHERE acted_on = FALSE AND 'finance' = ANY(domains) ORDER BY priority ASC) t;\")\necho \"$INSIGHTS\"\n```\n\n## Step 3: Fetch fresh prices for tickers where sitrep is stale or missing\nIf sitrep has recent data (< 4 hours), use it. Otherwise:\n```bash\ncd ~/openclaw/skills/stock-analysis && uv run src/stock_analysis/main.py analyze <TICKER> --json\n```\nTickers: TSLA, NVDA, GOOGL, AAPL, MSFT, BA, META, DIS, AMZN, QQQ, BRK.B, COIN, AWAY, GLD\n\n## Step 4: Search for material news (last 24h)\nUse web_search for material news on holdings. Focus on:\n- Earnings releases, SEC filings, regulatory actions\n- Major product/delivery announcements (especially TSLA, NVDA)\n- Significant price moves (>3% in either direction)\n\n## Step 5: Compose brief\n\nInclude MARKET STATUS at top using $MARKET_STATUS variable. Include GOLD section: GLD price, % change, hedge context.\n\n📘 Beginner Corner (REQUIRED, plain English):\n- Market health today: GOOD / SHAKY / BAD (one line, no jargon)\n- Why today is BUY / WATCH / NO-BUY (2-3 simple bullets)\n- One concept of the day (1-2 sentences) for a beginner\n\nFor each MATERIAL event (skip noise):\n- Ticker + what happened (1-2 sentences)\n- Why it matters to long-term thesis\n- Thesis impact: CONFIRMING / NEUTRAL / WARNING / THESIS RISK\n- Sizing relevance: HIGH / MEDIUM / LOW\n- Suggested action: HOLD / WATCH / ADD CANDIDATE / PAUSE ADDING / DIVERSIFY ELSEWHERE\n- What to watch next\n\nIf NO material events: \"No material events today. All positions steady.\"\n\nInclude portfolio snapshot with current values and weights.\n\n🧠 Cortana's Finance Insights — include any finance-related insights from Step 2.\n\n## Step 6: Mark insights delivered\n```bash\npsql cortana -c \"UPDATE cortana_insights SET acted_on = TRUE, acted_at = NOW() WHERE acted_on = FALSE AND 'finance' = ANY(domains);\"\n```\n\nKeep concise. Plain text (no markdown tables for Telegram). Focus on what changes decisions. Weekday only.",
+        "message": "Stock Market Brief for Hamel.\n\nPREFIX: Always prefix your output with: 💹 Markets - Stock Market Brief. Example: 💹 Markets - Stock Market Brief\n[rest of message]\n\n⚠️ DELIVERY: Do NOT rely on announce delivery. You MUST use the `message` tool (action=send, target=8171372724, channel=telegram) to send your final output. This is required because announce delivery is broken (openclaw/openclaw#16925).\n\nRead the portfolio config at ~/openclaw/tools/portfolio/config.md for full context, constraints, and watch items.\n\nKey constraints:\n- TSLA and NVDA are FOREVER HOLDS. Never recommend selling or trimming.\n- Concentration risk managed via diversification only.\n- Long-term (years/decades) horizon.\n\n## Step 0: Check Market Status\nMARKET_STATUS=$(~/openclaw/skills/markets/check_market_status.sh)\necho \"Market status: $MARKET_STATUS\"\n\nUse $MARKET_STATUS in your analysis. If market is CLOSED, focus on after-hours/pre-market events and their implications for next trading day. Never guess market status.\n\n## Step 1: Pull SAE Finance Data (pre-gathered at 7:00 AM)\n```bash\nexport PATH=\"/opt/homebrew/opt/postgresql@17/bin:$PATH\"\n\n# Get finance sitrep data\nFINANCE=$(psql cortana -t -A -c \"SELECT value FROM cortana_sitrep_latest WHERE domain = 'finance';\")\necho \"Portfolio snapshot: $FINANCE\"\n\n# Check freshness\nFINANCE_AGE=$(psql cortana -t -A -c \"SELECT EXTRACT(EPOCH FROM (NOW() - MAX(timestamp)))/3600 FROM cortana_sitrep WHERE domain = 'finance';\")\necho \"Finance data age: ${FINANCE_AGE} hours\"\n```\n\nIf finance sitrep data is missing or stale (>4 hours), fetch all prices directly using stock-analysis skill.\n\n## Step 2: Pull Finance Insights\n```bash\nINSIGHTS=$(psql cortana -t -A -c \"SELECT json_agg(t) FROM (SELECT id, title, description, priority, action_suggested FROM cortana_insights WHERE acted_on = FALSE AND 'finance' = ANY(domains) ORDER BY priority ASC) t;\")\necho \"$INSIGHTS\"\n```\n\n## Step 3: Fetch fresh prices for tickers where sitrep is stale or missing\nIf sitrep has recent data (< 4 hours), use it. Otherwise:\n```bash\ncd ~/openclaw/skills/stock-analysis && uv run src/stock_analysis/main.ts analyze <TICKER> --json\n```\nTickers: TSLA, NVDA, GOOGL, AAPL, MSFT, BA, META, DIS, AMZN, QQQ, BRK.B, COIN, AWAY, GLD\n\n## Step 4: Search for material news (last 24h)\nUse web_search for material news on holdings. Focus on:\n- Earnings releases, SEC filings, regulatory actions\n- Major product/delivery announcements (especially TSLA, NVDA)\n- Significant price moves (>3% in either direction)\n\n## Step 5: Compose brief\n\nInclude MARKET STATUS at top using $MARKET_STATUS variable. Include GOLD section: GLD price, % change, hedge context.\n\n📘 Beginner Corner (REQUIRED, plain English):\n- Market health today: GOOD / SHAKY / BAD (one line, no jargon)\n- Why today is BUY / WATCH / NO-BUY (2-3 simple bullets)\n- One concept of the day (1-2 sentences) for a beginner\n\nFor each MATERIAL event (skip noise):\n- Ticker + what happened (1-2 sentences)\n- Why it matters to long-term thesis\n- Thesis impact: CONFIRMING / NEUTRAL / WARNING / THESIS RISK\n- Sizing relevance: HIGH / MEDIUM / LOW\n- Suggested action: HOLD / WATCH / ADD CANDIDATE / PAUSE ADDING / DIVERSIFY ELSEWHERE\n- What to watch next\n\nIf NO material events: \"No material events today. All positions steady.\"\n\nInclude portfolio snapshot with current values and weights.\n\n🧠 Cortana's Finance Insights — include any finance-related insights from Step 2.\n\n## Step 6: Mark insights delivered\n```bash\npsql cortana -c \"UPDATE cortana_insights SET acted_on = TRUE, acted_at = NOW() WHERE acted_on = FALSE AND 'finance' = ANY(domains);\"\n```\n\nKeep concise. Plain text (no markdown tables for Telegram). Focus on what changes decisions. Weekday only.",
         "model": "openai-codex/gpt-5.2-codex"
       },
       "state": {
@@ -303,7 +305,6 @@
         "timeoutSeconds": 240
       },
       "state": {
-        "nextRunAtMs": 1772283780000,
         "lastRunAtMs": 1772110980016,
         "lastStatus": "ok",
         "lastDurationMs": 69545,
@@ -431,7 +432,7 @@
       "name": "📰 Newsletter Alert (real-time)",
       "enabled": true,
       "createdAtMs": 1769815538299,
-      "updatedAtMs": 1772276846227,
+      "updatedAtMs": 1772298447557,
       "schedule": {
         "kind": "cron",
         "expr": "7,37 6-16 * * *",
@@ -445,15 +446,14 @@
         "model": "openai-codex/gpt-5.1"
       },
       "state": {
-        "nextRunAtMs": 1772278620000,
-        "lastRunAtMs": 1772276833529,
+        "nextRunAtMs": 1772300220000,
+        "lastRunAtMs": 1772298433148,
         "lastStatus": "ok",
-        "lastDurationMs": 12698,
+        "lastDurationMs": 14409,
         "consecutiveErrors": 0,
         "lastRunStatus": "ok",
         "lastDeliveryStatus": "not-delivered",
-        "lastDelivered": false,
-        "runningAtMs": 1772284187598
+        "lastDelivered": false
       },
       "delivery": {
         "mode": "announce",
@@ -528,7 +528,7 @@
       "name": "🛒 Amazon Session Keep-Alive",
       "enabled": true,
       "createdAtMs": 1770932011695,
-      "updatedAtMs": 1772256824653,
+      "updatedAtMs": 1772287789905,
       "schedule": {
         "kind": "every",
         "everyMs": 28800000,
@@ -546,10 +546,10 @@
         "mode": "none"
       },
       "state": {
-        "nextRunAtMs": 1772285611735,
-        "lastRunAtMs": 1772256811735,
+        "nextRunAtMs": 1772316577670,
+        "lastRunAtMs": 1772287777670,
         "lastStatus": "ok",
-        "lastDurationMs": 12918,
+        "lastDurationMs": 12235,
         "consecutiveErrors": 0,
         "lastRunStatus": "ok",
         "lastDelivered": false,
@@ -562,7 +562,7 @@
       "name": "🔧 Daily Upgrade Protocol",
       "enabled": true,
       "createdAtMs": 1770932055504,
-      "updatedAtMs": 1772118850149,
+      "updatedAtMs": 1772291672467,
       "schedule": {
         "kind": "cron",
         "expr": "14 10 * * *",
@@ -583,14 +583,14 @@
         "bestEffort": true
       },
       "state": {
-        "nextRunAtMs": 1772291640000,
-        "lastRunAtMs": 1772118840030,
+        "nextRunAtMs": 1772378040000,
+        "lastRunAtMs": 1772291640029,
         "lastStatus": "ok",
-        "lastDurationMs": 10119,
+        "lastDurationMs": 32438,
         "consecutiveErrors": 0,
         "lastRunStatus": "ok",
-        "lastDeliveryStatus": "not-delivered",
-        "lastDelivered": false
+        "lastDeliveryStatus": "delivered",
+        "lastDelivered": true
       },
       "prompt": "\n\nAfter generating the upgrade proposal, use the message tool to send it to Telegram (channel: telegram, target: 8171372724). Do NOT rely on automatic delivery."
     },
@@ -600,7 +600,7 @@
       "name": "💪 Tonal Health Check",
       "enabled": true,
       "createdAtMs": 1770936710935,
-      "updatedAtMs": 1772275948241,
+      "updatedAtMs": 1772290383481,
       "schedule": {
         "kind": "every",
         "everyMs": 14400000,
@@ -618,10 +618,10 @@
         "mode": "none"
       },
       "state": {
-        "nextRunAtMs": 1772290311027,
-        "lastRunAtMs": 1772275911027,
+        "nextRunAtMs": 1772304711063,
+        "lastRunAtMs": 1772290311063,
         "lastStatus": "ok",
-        "lastDurationMs": 37214,
+        "lastDurationMs": 72418,
         "consecutiveErrors": 0,
         "lastRunStatus": "ok",
         "lastDelivered": false,
@@ -634,7 +634,7 @@
       "name": "🐦 Twitter Auth Check",
       "enabled": true,
       "createdAtMs": 1770936710968,
-      "updatedAtMs": 1772261572818,
+      "updatedAtMs": 1772290392750,
       "schedule": {
         "kind": "every",
         "everyMs": 28800000,
@@ -652,10 +652,10 @@
         "mode": "none"
       },
       "state": {
-        "nextRunAtMs": 1772290365727,
-        "lastRunAtMs": 1772261565727,
+        "nextRunAtMs": 1772319183513,
+        "lastRunAtMs": 1772290383513,
         "lastStatus": "ok",
-        "lastDurationMs": 7091,
+        "lastDurationMs": 9237,
         "consecutiveErrors": 0,
         "lastRunStatus": "ok",
         "lastDelivered": false,
@@ -860,7 +860,7 @@
       "wakeMode": "now",
       "payload": {
         "kind": "agentTurn",
-        "message": "⚠️ DELIVERY: Do NOT rely on announce delivery. You MUST use the `message` tool (action=send, target=8171372724, channel=telegram) to send your final output. This is required because announce delivery is broken (openclaw/openclaw#16925).\n\nRun the CANSLIM alert scanner and return its output exactly (no extra commentary).\n\nCommands:\ncd ~/Developer/cortana-external/backtester\n/Users/hd/Developer/cortana-external/backtester/venv/bin/python canslim_alert.py --limit 8 --min-score 6\n\nRules:\n- Output must include market status summary and candidate signals (BUY/WATCH/NO_BUY).\n- ALWAYS forward full scan output exactly, even when results are all NO_BUY (never suppress no-signal runs).\n- If the script errors, return one concise error line starting with: '📈 Trading Advisor - Error:'",
+        "message": "⚠️ DELIVERY: Do NOT rely on announce delivery. You MUST use the `message` tool (action=send, target=8171372724, channel=telegram) to send your final output. This is required because announce delivery is broken (openclaw/openclaw#16925).\n\nRun the CANSLIM alert scanner and return its output exactly (no extra commentary).\n\nCommands:\ncd ~/Developer/cortana-external/backtester\n/Users/hd/Developer/cortana-external/backtester/venv/bin/npx tsx canslim_alert.ts --limit 8 --min-score 6\n\nRules:\n- Output must include market status summary and candidate signals (BUY/WATCH/NO_BUY).\n- ALWAYS forward full scan output exactly, even when results are all NO_BUY (never suppress no-signal runs).\n- If the script errors, return one concise error line starting with: '📈 Trading Advisor - Error:'",
         "model": "openai-codex/gpt-5.3-codex",
         "timeoutSeconds": 240
       },
@@ -903,15 +903,14 @@
         "channel": "last"
       },
       "state": {
-        "nextRunAtMs": 1772280000000,
+        "nextRunAtMs": 1772301600000,
         "lastRunAtMs": 1772244078890,
         "lastStatus": "ok",
         "lastDurationMs": 13788,
         "consecutiveErrors": 0,
         "lastRunStatus": "ok",
         "lastDelivered": false,
-        "lastDeliveryStatus": "not-delivered",
-        "runningAtMs": 1772284187598
+        "lastDeliveryStatus": "not-delivered"
       }
     },
     {
@@ -938,7 +937,6 @@
         "channel": "last"
       },
       "state": {
-        "nextRunAtMs": 1772280900000,
         "lastRunAtMs": 1772244900019,
         "lastStatus": "ok",
         "lastDurationMs": 8643,
@@ -987,7 +985,7 @@
       "name": "🔍 Proprioception: Cron & Tool Health",
       "enabled": true,
       "createdAtMs": 1771323577113,
-      "updatedAtMs": 1772277620877,
+      "updatedAtMs": 1772298762712,
       "schedule": {
         "kind": "every",
         "everyMs": 900000,
@@ -997,7 +995,7 @@
       "wakeMode": "now",
       "payload": {
         "kind": "agentTurn",
-        "message": "Run /Users/hd/openclaw/proprioception/run_health_checks.py to log cron and tool health. Steps:\\n1) cd /Users/hd/openclaw\\n2) bash -lc '/Users/hd/openclaw/proprioception/run_health_checks.py'\\nThe script handles logging to cortana_cron_health and cortana_tool_health with weather fallback. Keep output minimal.",
+        "message": "Run /Users/hd/openclaw/proprioception/run_health_checks.ts to log cron and tool health. Steps:\\n1) cd /Users/hd/openclaw\\n2) bash -lc '/Users/hd/openclaw/proprioception/run_health_checks.ts'\\nThe script handles logging to cortana_cron_health and cortana_tool_health with weather fallback. Keep output minimal.",
         "model": "openai-codex/gpt-5.3-codex",
         "timeoutSeconds": 180
       },
@@ -1006,15 +1004,14 @@
         "channel": "last"
       },
       "state": {
-        "nextRunAtMs": 1772278509400,
-        "lastRunAtMs": 1772277609400,
+        "nextRunAtMs": 1772299642105,
+        "lastRunAtMs": 1772298742105,
         "lastStatus": "ok",
-        "lastDurationMs": 11477,
+        "lastDurationMs": 20607,
         "consecutiveErrors": 0,
         "lastRunStatus": "ok",
         "lastDeliveryStatus": "not-delivered",
-        "lastDelivered": false,
-        "runningAtMs": 1772284187598
+        "lastDelivered": false
       }
     },
     {
@@ -1022,7 +1019,7 @@
       "name": "📊 Proprioception: Budget & Self-Model",
       "enabled": true,
       "createdAtMs": 1771323590473,
-      "updatedAtMs": 1772278243298,
+      "updatedAtMs": 1772298695590,
       "schedule": {
         "kind": "every",
         "everyMs": 1800000,
@@ -1032,7 +1029,7 @@
       "wakeMode": "now",
       "payload": {
         "kind": "agentTurn",
-        "message": "You are Cortana's proprioception budget/self-model updater. Run these steps exactly.\n\n1) Setup\nexport PATH=\"/opt/homebrew/opt/postgresql@17/bin:$PATH\"\n\n2) Capture usage output (best-effort)\nnode /Users/hd/openclaw/skills/telegram-usage/handler.js > /tmp/proprio_usage.json 2>/tmp/proprio_usage.err || true\n\n3) Parse budget numbers from usage JSON (fallback to 0 if missing)\npython3 - <<'PY2'\nimport json, re\nfrom pathlib import Path\nspend=burn=projected=pct=0.0\nbreakdown={}\np=Path('/tmp/proprio_usage.json')\nif p.exists() and p.read_text().strip():\n    raw=p.read_text()\n    breakdown={'raw': raw[:4000]}\n    try:\n        d=json.loads(raw)\n        def pick(keys, default=0.0):\n            for k in keys:\n                if isinstance(d, dict) and k in d:\n                    try: return float(d[k])\n                    except: pass\n            return default\n        spend=pick(['spend_to_date','spend','cost','total_spend'])\n        burn=pick(['burn_rate','daily_burn','rate'])\n        projected=pick(['projected','projected_monthly','forecast'])\n        pct=pick(['pct_used','percent_used','usage_pct'])\n    except Exception:\n        nums=[float(x) for x in re.findall(r'\\d+\\.?\\d*', raw)]\n        if nums: spend=nums[0]\nprint(f\"{spend}|{burn}|{projected}|{pct}|{json.dumps(breakdown).replace('\\\"','\\\\\\\"')}\")\nPY2\n\n4) Insert one budget snapshot row\nPARSED=$(python3 - <<'PY3'\nimport json, re\nfrom pathlib import Path\nspend=burn=projected=pct=0.0\nbreakdown={}\np=Path('/tmp/proprio_usage.json')\nif p.exists() and p.read_text().strip():\n    raw=p.read_text()\n    breakdown={'raw': raw[:4000]}\nprint(f\"{spend}|{burn}|{projected}|{pct}|{json.dumps(breakdown)}\")\nPY3\n)\nSPEND=$(echo \"$PARSED\" | cut -d'|' -f1)\nBURN=$(echo \"$PARSED\" | cut -d'|' -f2)\nPROJECTED=$(echo \"$PARSED\" | cut -d'|' -f3)\nPCT=$(echo \"$PARSED\" | cut -d'|' -f4)\nBREAKDOWN=$(echo \"$PARSED\" | cut -d'|' -f5-)\npsql cortana -c \"INSERT INTO cortana_budget_log (spend_to_date, burn_rate, projected, breakdown, pct_used) VALUES (${SPEND:-0}, ${BURN:-0}, ${PROJECTED:-0}, '${BREAKDOWN}'::jsonb, ${PCT:-0});\"\n\n5) Build/update self-model in SQL\npsql cortana -c \"WITH t AS (\n  SELECT COUNT(*)::int AS tools_down FROM (\n    SELECT DISTINCT ON (tool_name) tool_name, status FROM cortana_tool_health ORDER BY tool_name, timestamp DESC\n  ) x WHERE COALESCE(status,'') NOT IN ('ok','healthy')\n), c AS (\n  SELECT COUNT(*)::int AS crons_failing FROM (\n    SELECT DISTINCT ON (cron_name) cron_name, status FROM cortana_cron_health ORDER BY cron_name, timestamp DESC\n  ) y WHERE COALESCE(status,'') NOT IN ('ok','healthy')\n), b AS (\n  SELECT COALESCE(spend_to_date,0)::numeric AS spend, COALESCE(burn_rate,0)::numeric AS burn, COALESCE(projected,0)::numeric AS proj, COALESCE(pct_used,0)::numeric AS pct\n  FROM cortana_budget_log ORDER BY timestamp DESC LIMIT 1\n), agg AS (\n  SELECT t.tools_down, c.crons_failing, 0::int AS crons_missed, b.spend, b.burn, b.proj, b.pct,\n         CASE WHEN b.pct >= 90 THEN 30 WHEN b.pct >= 75 THEN 20 WHEN b.pct >= 50 THEN 10 ELSE 0 END AS budget_penalty,\n         CASE WHEN b.pct >= 90 THEN 'emergency' WHEN b.pct >= 75 THEN 'restricted' WHEN b.pct >= 50 THEN 'caution' ELSE 'normal' END AS tier\n  FROM t,c,b\n), score AS (\n  SELECT GREATEST(0, 100 - (10*tools_down) - (5*crons_failing) - (15*crons_missed) - budget_penalty)::int AS health_score, * FROM agg\n), u AS (\n  INSERT INTO cortana_self_model (id, health_score, status, budget_used, budget_pct, burn_rate, projected, throttle_tier, crons_failing, crons_missed, tools_down, updated_at)\n  SELECT 1, health_score, CASE WHEN health_score >= 80 THEN 'nominal' WHEN health_score >= 50 THEN 'degraded' ELSE 'critical' END, spend, pct, burn, proj, tier, crons_failing, crons_missed, tools_down, NOW()\n  FROM score\n  ON CONFLICT (id) DO UPDATE SET\n    health_score = EXCLUDED.health_score,\n    status = EXCLUDED.status,\n    budget_used = EXCLUDED.budget_used,\n    budget_pct = EXCLUDED.budget_pct,\n    burn_rate = EXCLUDED.burn_rate,\n    projected = EXCLUDED.projected,\n    throttle_tier = EXCLUDED.throttle_tier,\n    crons_failing = EXCLUDED.crons_failing,\n    crons_missed = EXCLUDED.crons_missed,\n    tools_down = EXCLUDED.tools_down,\n    updated_at = NOW()\n  RETURNING *\n)\nSELECT health_score, status, tools_down, crons_failing, budget_pct, throttle_tier FROM u;\"\n\n6) Log throttle changes\npsql cortana -c \"WITH cur AS (SELECT throttle_tier FROM cortana_self_model WHERE id=1), prev AS (SELECT tier_to FROM cortana_throttle_log ORDER BY timestamp DESC LIMIT 1) INSERT INTO cortana_throttle_log (tier_from, tier_to, reason, actions_taken) SELECT COALESCE(prev.tier_to,'unknown'), cur.throttle_tier, 'budget threshold evaluation', ARRAY['auto-check'] FROM cur LEFT JOIN prev ON true WHERE COALESCE(prev.tier_to,'') IS DISTINCT FROM cur.throttle_tier;\"\n\n7) Output policy\nReturn NOTHING when status is nominal.\nIf status is degraded or critical, output max 4 lines: score/status/tools_down/crons_failing/budget_pct/throttle_tier.\n",
+        "message": "You are Cortana's proprioception budget/self-model updater. Run these steps exactly.\n\n1) Setup\nexport PATH=\"/opt/homebrew/opt/postgresql@17/bin:$PATH\"\n\n2) Capture usage output (best-effort)\nnode /Users/hd/openclaw/skills/telegram-usage/handler.js > /tmp/proprio_usage.json 2>/tmp/proprio_usage.err || true\n\n3) Parse budget numbers from usage JSON (fallback to 0 if missing)\nnpx tsx - <<'PY2'\nimport json, re\nfrom pathlib import Path\nspend=burn=projected=pct=0.0\nbreakdown={}\np=Path('/tmp/proprio_usage.json')\nif p.exists() and p.read_text().strip():\n    raw=p.read_text()\n    breakdown={'raw': raw[:4000]}\n    try:\n        d=json.loads(raw)\n        def pick(keys, default=0.0):\n            for k in keys:\n                if isinstance(d, dict) and k in d:\n                    try: return float(d[k])\n                    except: pass\n            return default\n        spend=pick(['spend_to_date','spend','cost','total_spend'])\n        burn=pick(['burn_rate','daily_burn','rate'])\n        projected=pick(['projected','projected_monthly','forecast'])\n        pct=pick(['pct_used','percent_used','usage_pct'])\n    except Exception:\n        nums=[float(x) for x in re.findall(r'\\d+\\.?\\d*', raw)]\n        if nums: spend=nums[0]\nprint(f\"{spend}|{burn}|{projected}|{pct}|{json.dumps(breakdown).replace('\\\"','\\\\\\\"')}\")\nPY2\n\n4) Insert one budget snapshot row\nPARSED=$(npx tsx - <<'PY3'\nimport json, re\nfrom pathlib import Path\nspend=burn=projected=pct=0.0\nbreakdown={}\np=Path('/tmp/proprio_usage.json')\nif p.exists() and p.read_text().strip():\n    raw=p.read_text()\n    breakdown={'raw': raw[:4000]}\nprint(f\"{spend}|{burn}|{projected}|{pct}|{json.dumps(breakdown)}\")\nPY3\n)\nSPEND=$(echo \"$PARSED\" | cut -d'|' -f1)\nBURN=$(echo \"$PARSED\" | cut -d'|' -f2)\nPROJECTED=$(echo \"$PARSED\" | cut -d'|' -f3)\nPCT=$(echo \"$PARSED\" | cut -d'|' -f4)\nBREAKDOWN=$(echo \"$PARSED\" | cut -d'|' -f5-)\npsql cortana -c \"INSERT INTO cortana_budget_log (spend_to_date, burn_rate, projected, breakdown, pct_used) VALUES (${SPEND:-0}, ${BURN:-0}, ${PROJECTED:-0}, '${BREAKDOWN}'::jsonb, ${PCT:-0});\"\n\n5) Build/update self-model in SQL\npsql cortana -c \"WITH t AS (\n  SELECT COUNT(*)::int AS tools_down FROM (\n    SELECT DISTINCT ON (tool_name) tool_name, status FROM cortana_tool_health ORDER BY tool_name, timestamp DESC\n  ) x WHERE COALESCE(status,'') NOT IN ('ok','healthy')\n), c AS (\n  SELECT COUNT(*)::int AS crons_failing FROM (\n    SELECT DISTINCT ON (cron_name) cron_name, status FROM cortana_cron_health ORDER BY cron_name, timestamp DESC\n  ) y WHERE COALESCE(status,'') NOT IN ('ok','healthy')\n), b AS (\n  SELECT COALESCE(spend_to_date,0)::numeric AS spend, COALESCE(burn_rate,0)::numeric AS burn, COALESCE(projected,0)::numeric AS proj, COALESCE(pct_used,0)::numeric AS pct\n  FROM cortana_budget_log ORDER BY timestamp DESC LIMIT 1\n), agg AS (\n  SELECT t.tools_down, c.crons_failing, 0::int AS crons_missed, b.spend, b.burn, b.proj, b.pct,\n         CASE WHEN b.pct >= 90 THEN 30 WHEN b.pct >= 75 THEN 20 WHEN b.pct >= 50 THEN 10 ELSE 0 END AS budget_penalty,\n         CASE WHEN b.pct >= 90 THEN 'emergency' WHEN b.pct >= 75 THEN 'restricted' WHEN b.pct >= 50 THEN 'caution' ELSE 'normal' END AS tier\n  FROM t,c,b\n), score AS (\n  SELECT GREATEST(0, 100 - (10*tools_down) - (5*crons_failing) - (15*crons_missed) - budget_penalty)::int AS health_score, * FROM agg\n), u AS (\n  INSERT INTO cortana_self_model (id, health_score, status, budget_used, budget_pct, burn_rate, projected, throttle_tier, crons_failing, crons_missed, tools_down, updated_at)\n  SELECT 1, health_score, CASE WHEN health_score >= 80 THEN 'nominal' WHEN health_score >= 50 THEN 'degraded' ELSE 'critical' END, spend, pct, burn, proj, tier, crons_failing, crons_missed, tools_down, NOW()\n  FROM score\n  ON CONFLICT (id) DO UPDATE SET\n    health_score = EXCLUDED.health_score,\n    status = EXCLUDED.status,\n    budget_used = EXCLUDED.budget_used,\n    budget_pct = EXCLUDED.budget_pct,\n    burn_rate = EXCLUDED.burn_rate,\n    projected = EXCLUDED.projected,\n    throttle_tier = EXCLUDED.throttle_tier,\n    crons_failing = EXCLUDED.crons_failing,\n    crons_missed = EXCLUDED.crons_missed,\n    tools_down = EXCLUDED.tools_down,\n    updated_at = NOW()\n  RETURNING *\n)\nSELECT health_score, status, tools_down, crons_failing, budget_pct, throttle_tier FROM u;\"\n\n6) Log throttle changes\npsql cortana -c \"WITH cur AS (SELECT throttle_tier FROM cortana_self_model WHERE id=1), prev AS (SELECT tier_to FROM cortana_throttle_log ORDER BY timestamp DESC LIMIT 1) INSERT INTO cortana_throttle_log (tier_from, tier_to, reason, actions_taken) SELECT COALESCE(prev.tier_to,'unknown'), cur.throttle_tier, 'budget threshold evaluation', ARRAY['auto-check'] FROM cur LEFT JOIN prev ON true WHERE COALESCE(prev.tier_to,'') IS DISTINCT FROM cur.throttle_tier;\"\n\n7) Output policy\nReturn NOTHING when status is nominal.\nIf status is degraded or critical, output max 4 lines: score/status/tools_down/crons_failing/budget_pct/throttle_tier.\n",
         "model": "openai-codex/gpt-5.3-codex",
         "timeoutSeconds": 180
       },
@@ -1041,15 +1038,14 @@
         "channel": "last"
       },
       "state": {
-        "nextRunAtMs": 1772279991255,
-        "lastRunAtMs": 1772278191255,
+        "nextRunAtMs": 1772300464709,
+        "lastRunAtMs": 1772298664709,
         "lastStatus": "ok",
-        "lastDurationMs": 52043,
+        "lastDurationMs": 30881,
         "consecutiveErrors": 0,
         "lastRunStatus": "ok",
         "lastDeliveryStatus": "not-delivered",
-        "lastDelivered": false,
-        "runningAtMs": 1772284187598
+        "lastDelivered": false
       }
     },
     {
@@ -1057,7 +1053,7 @@
       "name": "📈 Proprioception: Efficiency Analyzer",
       "enabled": true,
       "createdAtMs": 1771323600989,
-      "updatedAtMs": 1772263953415,
+      "updatedAtMs": 1772287984584,
       "schedule": {
         "kind": "cron",
         "expr": "30 2 * * *",
@@ -1067,7 +1063,7 @@
       "wakeMode": "now",
       "payload": {
         "kind": "agentTurn",
-        "message": "You are Cortana's proprioception efficiency analyzer (daily 2:30 AM). Analyze accumulated data:\n\nexport PATH=\"/opt/homebrew/opt/postgresql@17/bin:$PATH\"\n\n1. TOKEN COST PER CRON: Check session file sizes in ~/.openclaw/sessions/ grouped by cron label. Estimate cost at ~$0.015/KB of session file. Identify top 5 most expensive crons this week.\n\n2. SUB-AGENT COST: Check session files matching subagent patterns. Compute spawn rate and cost distribution.\n\n3. BRIEF ENGAGEMENT: Query cortana_feedback_signals for signals related to brief-type wake rules in last 7 days. Calculate engagement rate (responses within 2h / total briefs).\n\n4. Write summary to cortana_self_model metadata field as JSON with keys: top_cost_crons, subagent_cost_7d, brief_engagement_rate, analysis_date.\n\n5. Update cortana_self_model.top_cost_crons and brief_engagement fields.\n\nNo output unless anomalies found (e.g., single cron >30% of total spend).",
+        "message": "Run the efficiency pre-compute script and update self-model:\n1. npx tsx /Users/hd/openclaw/proprioception/efficiency_precompute.ts\n2. Read /tmp/efficiency_analysis.json\n3. Update cortana_self_model metadata with the analysis results:\n   psql cortana -c \"UPDATE cortana_self_model SET metadata = COALESCE(metadata, '{}'::jsonb) || (SELECT pg_read_file('/tmp/efficiency_analysis.json')::jsonb) WHERE id=1;\"\n4. Output NOTHING unless anomalies array is non-empty. If anomalies found, output them (max 3 lines).",
         "model": "openai-codex/gpt-5.3-codex",
         "timeoutSeconds": 120
       },
@@ -1077,13 +1073,13 @@
       },
       "state": {
         "nextRunAtMs": 1772350200000,
-        "lastRunAtMs": 1772263871216,
-        "lastStatus": "ok",
-        "lastDurationMs": 82199,
-        "consecutiveErrors": 0,
-        "lastRunStatus": "ok",
-        "lastDeliveryStatus": "not-delivered",
-        "lastDelivered": false
+        "lastRunAtMs": 1772287864572,
+        "lastStatus": "error",
+        "lastDurationMs": 120012,
+        "consecutiveErrors": 1,
+        "lastRunStatus": "error",
+        "lastDeliveryStatus": "not-requested",
+        "lastError": "Error: cron: job execution timed out"
       }
     },
     {
@@ -1092,7 +1088,7 @@
       "description": "Immune System: threat detection and auto-healing scan",
       "enabled": true,
       "createdAtMs": 1771324082626,
-      "updatedAtMs": 1772277155653,
+      "updatedAtMs": 1772298768985,
       "schedule": {
         "kind": "cron",
         "expr": "11 * * * *",
@@ -1103,7 +1099,7 @@
       "wakeMode": "now",
       "payload": {
         "kind": "agentTurn",
-        "message": "Immune system scan. Be EXTREMELY concise — max 5 lines of output.\n\n1. Check Tonal tokens: cat ~/Developer/cortana-external/tonal_tokens.json | python3 -c \"import sys,json; t=json.load(sys.stdin); print('tonal: ok' if t.get('access_token') else 'tonal: NO TOKEN')\"\n2. Check services: pg_isready -q && echo 'postgres: ok' || echo 'postgres: DOWN'; curl -sf http://localhost:18800/json > /dev/null && echo 'gateway: ok' || echo 'gateway: DOWN'\n3. Check disk: df -h / | tail -1 | awk '{print \"disk: \" $5}'\n4. Check session files over 400KB: find ~/.openclaw/agents/main/sessions -name '*.jsonl' -size +400k 2>/dev/null. If any found, delete them and log: psql cortana -c \"INSERT INTO cortana_events (event_type, source, severity, message) VALUES ('auto_heal', 'immune_scan', 'info', 'Cleaned oversized session');\"\n\nIf everything is healthy: output NOTHING (empty response).\nOnly output if something is DOWN or was auto-healed. Keep output under 3 lines.\nDo NOT write essays. Do NOT analyze patterns. Do NOT track growth rates. Just check and fix.",
+        "message": "Immune system scan. Be EXTREMELY concise — max 5 lines of output.\n\n1. Check Tonal tokens: cat ~/Developer/cortana-external/tonal_tokens.json | npx tsx -c \"import sys,json; t=json.load(sys.stdin); print('tonal: ok' if t.get('access_token') else 'tonal: NO TOKEN')\"\n2. Check services: pg_isready -q && echo 'postgres: ok' || echo 'postgres: DOWN'; curl -sf http://localhost:18800/json > /dev/null && echo 'gateway: ok' || echo 'gateway: DOWN'\n3. Check disk: df -h / | tail -1 | awk '{print \"disk: \" $5}'\n4. Check session files over 400KB: find ~/.openclaw/agents/main/sessions -name '*.jsonl' -size +400k 2>/dev/null. If any found, delete them and log: psql cortana -c \"INSERT INTO cortana_events (event_type, source, severity, message) VALUES ('auto_heal', 'immune_scan', 'info', 'Cleaned oversized session');\"\n\nIf everything is healthy: output NOTHING (empty response).\nOnly output if something is DOWN or was auto-healed. Keep output under 3 lines.\nDo NOT write essays. Do NOT analyze patterns. Do NOT track growth rates. Just check and fix.",
         "model": "openai-codex/gpt-5.1",
         "timeoutSeconds": 180
       },
@@ -1114,15 +1110,14 @@
         "bestEffort": true
       },
       "state": {
-        "lastRunAtMs": 1772277149643,
+        "lastRunAtMs": 1772298762729,
         "lastStatus": "ok",
-        "lastDurationMs": 6010,
+        "lastDurationMs": 6256,
         "consecutiveErrors": 0,
-        "nextRunAtMs": 1772280749622,
+        "nextRunAtMs": 1772302349622,
         "lastRunStatus": "ok",
         "lastDeliveryStatus": "not-delivered",
-        "lastDelivered": false,
-        "runningAtMs": 1772284187598
+        "lastDelivered": false
       }
     },
     {
@@ -1216,8 +1211,7 @@
         "bestEffort": true
       },
       "state": {
-        "nextRunAtMs": 1772280000000,
-        "runningAtMs": 1772284187598
+        "nextRunAtMs": 1772366400000
       }
     },
     {
