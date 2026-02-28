@@ -1,5 +1,7 @@
-#!/usr/bin/env bash
-set -u
+#!/usr/bin/env npx tsx
+import { spawnSync } from "child_process";
+
+const script = String.raw`set -u
 
 SCRIPT="/Users/hd/Developer/cortana-external/backtester/canslim_alert.py"
 PYTHON_BIN="/Users/hd/Developer/cortana-external/backtester/venv/bin/python"
@@ -31,3 +33,14 @@ cat > "$META_FILE" <<EOF
 EOF
 
 exit 0
+`;
+
+async function main(): Promise<void> {
+  const args = process.argv.slice(2);
+  const r = spawnSync("bash", ["-lc", script, "script", ...args], { encoding: "utf8" });
+  if (r.stdout) process.stdout.write(r.stdout);
+  if (r.stderr) process.stderr.write(r.stderr);
+  process.exit(r.status ?? 1);
+}
+
+main();

@@ -1,5 +1,7 @@
-#!/usr/bin/env bash
-set -euo pipefail
+#!/usr/bin/env npx tsx
+import { spawnSync } from "child_process";
+
+const script = String.raw`set -euo pipefail
 
 # Weekly Compounder Scoreboard
 # Builds a Telegram-ready weekly brief for Time / Health / Wealth / Career.
@@ -201,3 +203,14 @@ print(f"1. {task1}")
 print(f"2. {task2}")
 print(f"3. {task3}")
 PY
+`;
+
+async function main(): Promise<void> {
+  const args = process.argv.slice(2);
+  const r = spawnSync("bash", ["-lc", script, "script", ...args], { encoding: "utf8" });
+  if (r.stdout) process.stdout.write(r.stdout);
+  if (r.stderr) process.stderr.write(r.stderr);
+  process.exit(r.status ?? 1);
+}
+
+main();

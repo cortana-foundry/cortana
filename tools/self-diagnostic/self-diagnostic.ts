@@ -1,12 +1,14 @@
-#!/usr/bin/env bash
-set -euo pipefail
+#!/usr/bin/env npx tsx
+import { spawnSync } from "child_process";
+
+const script = String.raw`set -euo pipefail
 
 PSQL_BIN="/opt/homebrew/opt/postgresql@17/bin/psql"
 DB_NAME="cortana"
-REPO_ROOT="${HOME}/clawd"
-MEMORY_FILE="${REPO_ROOT}/MEMORY.md"
-DAILY_DIR="${REPO_ROOT}/memory"
-SESSIONS_DIR="${HOME}/.openclaw/agents/main/sessions"
+REPO_ROOT="\${HOME}/clawd"
+MEMORY_FILE="\${REPO_ROOT}/MEMORY.md"
+DAILY_DIR="\${REPO_ROOT}/memory"
+SESSIONS_DIR="\${HOME}/.openclaw/agents/main/sessions"
 BLOAT_BYTES=$((400 * 1024))
 MODE="full"
 
@@ -155,8 +157,8 @@ fi
 
 TODAY_NOTE_EXISTS=false
 YESTERDAY_NOTE_EXISTS=false
-[[ -f "${DAILY_DIR}/${TODAY}.md" ]] && TODAY_NOTE_EXISTS=true
-[[ -f "${DAILY_DIR}/${YESTERDAY}.md" ]] && YESTERDAY_NOTE_EXISTS=true
+[[ -f "\${DAILY_DIR}/\${TODAY}.md" ]] && TODAY_NOTE_EXISTS=true
+[[ -f "\${DAILY_DIR}/\${YESTERDAY}.md" ]] && YESTERDAY_NOTE_EXISTS=true
 
 SESSION_JSON="[]"
 if [[ -d "$SESSIONS_DIR" ]]; then
@@ -342,3 +344,14 @@ for s in bloated[:10]:
 if len(bloated) > 10:
     print(f"  ... and {len(bloated)-10} more")
 PY
+`;
+
+async function main(): Promise<void> {
+  const args = process.argv.slice(2);
+  const r = spawnSync("bash", ["-lc", script, "script", ...args], { encoding: "utf8" });
+  if (r.stdout) process.stdout.write(r.stdout);
+  if (r.stderr) process.stderr.write(r.stderr);
+  process.exit(r.status ?? 1);
+}
+
+main();

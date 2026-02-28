@@ -1,5 +1,7 @@
-#!/usr/bin/env bash
-set -euo pipefail
+#!/usr/bin/env npx tsx
+import { spawnSync } from "child_process";
+
+const script = String.raw`set -euo pipefail
 
 # Resilience Drillbook: 15-Minute Full Recovery SLO
 # Usage:
@@ -13,7 +15,7 @@ export PATH="/opt/homebrew/bin:/opt/homebrew/opt/postgresql@17/bin:/usr/local/bi
 DB="cortana"
 SLO_SECONDS=900
 START_TS=$(date +%s)
-MODE="${1:-inventory}"
+MODE="\${1:-inventory}"
 SIM_FAIL_TARGET="all"
 LIVE_FAILURE=0
 
@@ -41,23 +43,23 @@ EOF
 
 json_escape() {
   local s="$1"
-  s=${s//\\/\\\\}
-  s=${s//"/\\"}
-  s=${s//$'\n'/\\n}
+  s=\${s//\\/\\\\}
+  s=\${s//"/\\"}
+  s=\${s//$'\n'/\\n}
   printf '%s' "$s"
 }
 
 log_event() {
   local severity="$1"
   local message="$2"
-  local metadata="${3:-{}}"
+  local metadata="\${3:-{}}"
   local esc_msg esc_meta
   esc_msg=$(json_escape "$message")
   esc_meta=$(json_escape "$metadata")
 
   psql "$DB" -v ON_ERROR_STOP=0 -q -c "
     INSERT INTO cortana_events (event_type, source, severity, message, metadata)
-    VALUES ('resilience_drillbook', 'tools/resilience/drillbook.sh', '${severity}', '${esc_msg}', '${esc_meta}'::jsonb);
+    VALUES ('resilience_drillbook', 'tools/resilience/drillbook.sh', '\${severity}', '\${esc_msg}', '\${esc_meta}'::jsonb);
   " >/dev/null 2>&1 || true
 }
 
@@ -201,7 +203,7 @@ print_inventory() {
   echo "6) crons     : OpenClaw cron scheduler (openclaw cron list)"
   echo
 
-  for svc in "${SERVICE_ORDER[@]}"; do
+  for svc in "\${SERVICE_ORDER[@]}"; do
     if check_service "$svc"; then
       status_line "$svc" 0 "healthy"
     else
@@ -213,10 +215,10 @@ print_inventory() {
 recover_services() {
   local recovered=0 failed=0
 
-  log_event "info" "Recovery run started" "{\"mode\":\"recover\",\"slo_seconds\":${SLO_SECONDS}}"
-  echo "Recovery run (dependency order): ${SERVICE_ORDER[*]}"
+  log_event "info" "Recovery run started" "{\"mode\":\"recover\",\"slo_seconds\":\${SLO_SECONDS}}"
+  echo "Recovery run (dependency order): \${SERVICE_ORDER[*]}"
 
-  for svc in "${SERVICE_ORDER[@]}"; do
+  for svc in "\${SERVICE_ORDER[@]}"; do
     if check_service "$svc"; then
       status_line "$svc" 0 "already healthy"
       continue
@@ -249,10 +251,10 @@ recover_services() {
     slo_met="true"
   fi
 
-  log_event "info" "Recovery run complete" "{\"elapsed_seconds\":${total_elapsed},\"recovered\":${recovered},\"failed\":${failed},\"slo_met\":${slo_met}}"
+  log_event "info" "Recovery run complete" "{\"elapsed_seconds\":\${total_elapsed},\"recovered\":\${recovered},\"failed\":\${failed},\"slo_met\":\${slo_met}}"
 
   echo
-  echo "Recovery summary: recovered=${recovered} failed=${failed} elapsed=${total_elapsed}s SLO(${SLO_SECONDS}s)=${slo_met}"
+  echo "Recovery summary: recovered=\${recovered} failed=\${failed} elapsed=\${total_elapsed}s SLO(\${SLO_SECONDS}s)=\${slo_met}"
   [[ "$failed" -eq 0 ]]
 }
 
@@ -309,14 +311,14 @@ run_drill() {
   fi
 
   log_event "info" "Drill complete" "{\"simulate_failure\":\"$SIM_FAIL_TARGET\",\"live_failure\":$LIVE_FAILURE,\"rto_seconds\":$rto,\"slo_seconds\":$SLO_SECONDS,\"slo_met\":$slo_met}"
-  echo "Drill complete: rto=${rto}s slo_met=${slo_met}"
+  echo "Drill complete: rto=\${rto}s slo_met=\${slo_met}"
 }
 
 shift || true
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --simulate-failure)
-      SIM_FAIL_TARGET="${2:-all}"
+      SIM_FAIL_TARGET="\${2:-all}"
       shift 2
       ;;
     --live-failure)
@@ -354,3 +356,14 @@ case "$MODE" in
     exit 2
     ;;
 esac
+`;
+
+async function main(): Promise<void> {
+  const args = process.argv.slice(2);
+  const r = spawnSync("bash", ["-lc", script, "script", ...args], { encoding: "utf8" });
+  if (r.stdout) process.stdout.write(r.stdout);
+  if (r.stderr) process.stderr.write(r.stderr);
+  process.exit(r.status ?? 1);
+}
+
+main();

@@ -1,12 +1,14 @@
-#!/usr/bin/env bash
-set -euo pipefail
+#!/usr/bin/env npx tsx
+import { spawnSync } from "child_process";
+
+const script = String.raw`set -euo pipefail
 
 # create-calendar-events.sh
 # Creates Clawdbot-Calendar events for earnings within 48h.
 # Idempotent: skips if event title already exists on target date.
 # Reminders: T-60m and T-10m only.
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "\${BASH_SOURCE[0]}")" && pwd)"
 CHECK_SCRIPT="$SCRIPT_DIR/check-earnings.sh"
 CAL_NAME="Clawdbot-Calendar"
 
@@ -30,8 +32,8 @@ jq -c '.[] | select(.earnings_date != null and .days_until != null and .days_unt
 | while IFS= read -r row; do
     symbol="$(jq -r '.symbol' <<<"$row")"
     earnings_date="$(jq -r '.earnings_date' <<<"$row")"
-    title="${symbol} Earnings"
-    when_local="${earnings_date} 16:00"
+    title="\${symbol} Earnings"
+    when_local="\${earnings_date} 16:00"
 
     # Idempotency check: same title + date found in calendar listing.
     if echo "$existing" | grep -F "$title" | grep -F "$earnings_date" >/dev/null 2>&1; then
@@ -47,3 +49,14 @@ jq -c '.[] | select(.earnings_date != null and .days_until != null and .days_unt
 
     echo "created: $title @ $when_local"
   done
+`;
+
+async function main(): Promise<void> {
+  const args = process.argv.slice(2);
+  const r = spawnSync("bash", ["-lc", script, "script", ...args], { encoding: "utf8" });
+  if (r.stdout) process.stdout.write(r.stdout);
+  if (r.stderr) process.stderr.write(r.stderr);
+  process.exit(r.status ?? 1);
+}
+
+main();

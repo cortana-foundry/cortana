@@ -1,48 +1,28 @@
-#!/usr/bin/env bash
-set -euo pipefail
+#!/usr/bin/env npx tsx
 
-export PATH="/opt/homebrew/opt/postgresql@17/bin:$PATH"
-DB_NAME="cortana"
+import { spawnSync } from "child_process";
+import { withPostgresPath } from "../lib/db.js";
 
-sql_quote() {
-  local s="${1:-}"
-  s=${s//\'/\'\'}
-  printf "'%s'" "$s"
-}
+const DB_NAME = "cortana";
+const sqlQuote = (s = "") => `'${s.replace(/'/g, "''")}'`;
+const die = (m: string): never => { console.log(JSON.stringify({ ok: false, error: m })); process.exit(1); };
 
-json_error() {
-  local msg="$1"
-  printf '{"ok":false,"error":%s}\n' "$(printf '%s' "$msg" | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read()))')"
-}
+async function main(): Promise<void> {
+  let session = "";
+  const args = process.argv.slice(2);
+  for (let i = 0; i < args.length; i += 1) {
+    const a = args[i];
+    if (a === "--session") session = args[++i] || "";
+    else if (a === "-h" || a === "--help") { console.log("Usage:\n  council-tally.sh --session <UUID>"); process.exit(0); }
+    else die(`Unknown arg: ${a}`);
+  }
+  if (!session) die("Missing --session");
 
-die() {
-  json_error "$1"
-  exit 1
-}
-
-usage() {
-  cat <<'EOF'
-Usage:
-  council-tally.sh --session <UUID>
-EOF
-}
-
-session=""
-while [[ $# -gt 0 ]]; do
-  case "$1" in
-    --session) session="$2"; shift 2 ;;
-    -h|--help) usage; exit 0 ;;
-    *) die "Unknown arg: $1" ;;
-  esac
-done
-
-[[ -n "$session" ]] || die "Missing --session"
-
-out=$(psql "$DB_NAME" -X -v ON_ERROR_STOP=1 -t -A -c "
+  const sql = `
 WITH s AS (
-  SELECT * FROM cortana_council_sessions WHERE id = $(sql_quote "$session")::uuid
+  SELECT * FROM cortana_council_sessions WHERE id = ${sqlQuote(session)}::uuid
 ), votes AS (
-  SELECT * FROM cortana_council_votes WHERE session_id = $(sql_quote "$session")::uuid
+  SELECT * FROM cortana_council_votes WHERE session_id = ${sqlQuote(session)}::uuid
 ), agg AS (
   SELECT
     COUNT(*)::int AS total_votes,
@@ -82,11 +62,11 @@ WITH s AS (
   UPDATE cortana_council_sessions cs
   SET status='decided', decided_at=now(), decision=d.decision
   FROM decision_obj d
-  WHERE cs.id = $(sql_quote "$session")::uuid
+  WHERE cs.id = ${sqlQuote(session)}::uuid
   RETURNING cs.*, d.decision AS tally_decision
 ), ins_evt AS (
   INSERT INTO cortana_council_events (session_id, event_type, payload)
-  SELECT $(sql_quote "$session")::uuid, 'session_tallied', u.tally_decision
+  SELECT ${sqlQuote(session)}::uuid, 'session_tallied', u.tally_decision
   FROM upd u
   RETURNING id
 )
@@ -95,12 +75,16 @@ SELECT CASE
   ELSE json_build_object(
       'ok', true,
       'action', 'tally',
-      'session_id', $(sql_quote "$session"),
+      'session_id', ${sqlQuote(session)},
       'summary', (SELECT decision FROM decision_obj),
       'session', (SELECT (to_jsonb(upd) - 'tally_decision')::json FROM upd LIMIT 1),
       'votes', COALESCE((SELECT json_agg(v ORDER BY v.voted_at) FROM votes v), '[]'::json)
     )
-END::text;
-") || die "Failed to tally session"
+END::text;`;
 
-printf '%s\n' "$out"
+  const r = spawnSync("psql", [DB_NAME, "-X", "-v", "ON_ERROR_STOP=1", "-t", "-A", "-c", sql], { encoding: "utf8", env: withPostgresPath(process.env) });
+  if (r.status !== 0) die("Failed to tally session");
+  console.log((r.stdout || "").trim());
+}
+
+main();

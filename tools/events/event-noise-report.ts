@@ -1,0 +1,15 @@
+#!/usr/bin/env npx tsx
+import { spawnSync } from "child_process";
+import { withPostgresPath } from "../lib/db.js";
+
+async function main(){
+ const DB=process.env.DB||"cortana"; const HOURS=process.argv[2]||"24"; const MIN=process.argv[3]||"warning";
+ if(!/^\d+$/.test(HOURS)){console.error(`Usage: ${process.argv[1]} [hours] [min_severity: info|warning|error|critical]`);process.exit(1);} 
+ const rank:any={info:1,warning:2,error:3,critical:4}; if(!(MIN in rank)){console.error(`Invalid min_severity: ${MIN}`);console.error("Use one of: info warning error critical");process.exit(1);} const MIN_RANK=rank[MIN];
+ const q=(sql:string)=>spawnSync("psql",[DB,"-P","pager=off","-c",sql],{stdio:"inherit",env:withPostgresPath(process.env)});
+ console.log(`== Noise pattern (last ${HOURS}h) ==`); q(`SELECT event_type, source, lower(COALESCE(severity,'info')) AS severity, COUNT(*) AS n FROM cortana_events WHERE timestamp >= NOW() - INTERVAL '${HOURS} hours' GROUP BY event_type, source, lower(COALESCE(severity,'info')) ORDER BY n DESC LIMIT 20;`);
+ console.log(`\n== Severity-filtered rollup (>=${MIN}) by hour/signature ==`); q(`WITH filtered AS (SELECT *, CASE lower(COALESCE(severity,'info')) WHEN 'critical' THEN 4 WHEN 'error' THEN 3 WHEN 'warning' THEN 2 ELSE 1 END AS severity_rank FROM cortana_events WHERE timestamp >= NOW() - INTERVAL '${HOURS} hours'), grouped AS (SELECT date_trunc('hour', timestamp) AS hour_bucket, source, event_type, lower(COALESCE(severity,'info')) AS severity, message, COUNT(*) AS occurrences, MIN(timestamp) AS first_seen, MAX(timestamp) AS last_seen, MAX(severity_rank) AS severity_rank FROM filtered WHERE severity_rank >= ${MIN_RANK} GROUP BY 1,2,3,4,5) SELECT hour_bucket, severity, source, event_type, occurrences, message, first_seen, last_seen FROM grouped ORDER BY hour_bucket DESC, occurrences DESC, severity_rank DESC LIMIT 60;`);
+ console.log("\n== Info-noise rollup (15m identical entries, count > 1) =="); q(`SELECT bucket_15m, source, event_type, occurrences, message, first_seen, last_seen FROM cortana_info_event_rollup_15m WHERE bucket_15m >= NOW() - INTERVAL '${HOURS} hours' ORDER BY bucket_15m DESC, occurrences DESC LIMIT 60;`);
+ console.log("\n== Subagent failure aggregation (per hour) =="); q(`SELECT date_trunc('hour', timestamp) AS hour_bucket, COUNT(*) AS subagent_failures, MIN(timestamp) AS first_seen, MAX(timestamp) AS last_seen, CONCAT(COUNT(*), ' subagent failures in 1h') AS summary FROM cortana_events WHERE event_type = 'subagent_failure' AND lower(COALESCE(severity,'info')) IN ('warning','error','critical') AND timestamp >= NOW() - INTERVAL '${HOURS} hours' GROUP BY 1 HAVING COUNT(*) > 0 ORDER BY hour_bucket DESC;`);
+}
+main();

@@ -1,5 +1,7 @@
-#!/usr/bin/env bash
-# Doc Gardener
+#!/usr/bin/env npx tsx
+import { spawnSync } from "child_process";
+
+const script = String.raw`# Doc Gardener
 #
 # Weekly documentation hygiene sweep for the clawd repo.
 # Intended to be run by a Librarian-style agent or manually.
@@ -23,7 +25,7 @@
 set -euo pipefail
 
 AUTO_FIX=0
-while [[ "${1-}" != "" ]]; do
+while [[ "\${1-}" != "" ]]; do
   case "$1" in
     --auto-fix)
       AUTO_FIX=1
@@ -52,7 +54,7 @@ EOF
 done
 
 # Resolve repo root (assume script lives in tools/doc-gardener/)
-SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+SCRIPT_DIR=$(cd "$(dirname "\${BASH_SOURCE[0]}")" && pwd)
 REPO_ROOT=$(cd "$SCRIPT_DIR/../.." && pwd)
 cd "$REPO_ROOT"
 
@@ -69,15 +71,15 @@ TODAY=$(date +%Y-%m-%d)
 expand_path() {
   local raw="$1"
   # Strip surrounding backticks if present
-  raw=${raw#\`}
-  raw=${raw%\`}
+  raw=\${raw#\\`}
+  raw=\${raw%\\`}
   # Expand ~ and normalize repo-relative paths
   case "$raw" in
     ~/*)
-      printf '%s\n' "/Users/hd/${raw#~/}"
+      printf '%s\n' "/Users/hd/\${raw#~/}"
       ;;
     ./*)
-      printf '%s\n' "$REPO_ROOT/${raw#./}"
+      printf '%s\n' "$REPO_ROOT/\${raw#./}"
       ;;
     */clawd/*)
       # Already absolute or includes clawd path
@@ -234,7 +236,7 @@ scan_tools() {
   # Grep for backticked paths and anything containing /clawd/
   awk '
     {
-      match($0, /`([^`]+)`/, m)
+      match($0, /\`([^\`]+)\`/, m)
       if (m[1] != "") {
         print NR" "m[1]
       }
@@ -264,9 +266,9 @@ scan_orphan_docs() {
 
   local orphan_count=0
   while IFS= read -r -d '' file; do
-    rel=${file#"$REPO_ROOT/"}
+    rel=\${file#"$REPO_ROOT/"}
     base=$(basename "$file")
-    name_without_ext=${base%.*}
+    name_without_ext=\${base%.*}
 
     if ! grep -q "$base" "$AGENTS_FILE" "$MEMORY_FILE" 2>/dev/null && \
        ! grep -q "$name_without_ext" "$AGENTS_FILE" "$MEMORY_FILE" 2>/dev/null; then
@@ -297,7 +299,7 @@ apply_auto_fixes() {
     tmp_tools=$(mktemp)
     awk -v repo_root="$REPO_ROOT" '
       function expand_path(raw,  r) {
-        gsub("`", "", raw)
+        gsub("\`", "", raw)
         r = raw
         if (r ~ /^~\//) {
           sub(/^~\//, "/Users/hd/", r)
@@ -311,13 +313,13 @@ apply_auto_fixes() {
       {
         line=$0
         annotated=0
-        while (match(line, /`([^`]+)`/, m)) {
+        while (match(line, /\`([^\`]+)\`/, m)) {
           raw=m[1]
           full=expand_path(raw)
           if (full ~ /clawd/ && system("[ -e "full" ]") != 0) {
             # Broken path candidate
             if (index(line, "BROKEN?") == 0) {
-              sub("`"raw"`", "`"raw"` (BROKEN? doc-gardener "strftime("%Y-%m-%d")")", line)
+              sub("\`"raw"\`", "\`"raw"\` (BROKEN? doc-gardener "strftime("%Y-%m-%d")")", line)
             }
           }
           annotated=1
@@ -360,9 +362,9 @@ EOF
       echo "### Orphan docs snapshot - $NOW_ISO"
       local count=0
       while IFS= read -r -d '' file; do
-        rel=${file#"$REPO_ROOT/"}
+        rel=\${file#"$REPO_ROOT/"}
         base=$(basename "$file")
-        name_without_ext=${base%.*}
+        name_without_ext=\${base%.*}
         if ! grep -q "$base" "$AGENTS_FILE" "$MEMORY_FILE" 2>/dev/null && \
            ! grep -q "$name_without_ext" "$AGENTS_FILE" "$MEMORY_FILE" 2>/dev/null; then
           echo "- $rel"
@@ -418,3 +420,14 @@ main() {
 }
 
 main "$@"
+`;
+
+async function main(): Promise<void> {
+  const args = process.argv.slice(2);
+  const r = spawnSync("bash", ["-lc", script, "script", ...args], { encoding: "utf8" });
+  if (r.stdout) process.stdout.write(r.stdout);
+  if (r.stderr) process.stderr.write(r.stderr);
+  process.exit(r.status ?? 1);
+}
+
+main();

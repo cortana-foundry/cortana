@@ -1,5 +1,7 @@
-#!/usr/bin/env bash
-set -euo pipefail
+#!/usr/bin/env npx tsx
+import { spawnSync } from "child_process";
+
+const script = String.raw`set -euo pipefail
 
 # check-earnings.sh
 # Outputs JSON array: [{symbol, earnings_date, days_until, confirmed}]
@@ -11,7 +13,7 @@ set -euo pipefail
 #
 # Cache TTL: 12 hours
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "\${BASH_SOURCE[0]}")" && pwd)"
 CACHE_DIR="$SCRIPT_DIR/cache"
 CACHE_FILE="$CACHE_DIR/earnings-cache.json"
 CONFIG_FILE="$SCRIPT_DIR/.env"
@@ -24,9 +26,9 @@ if [[ -f "$CONFIG_FILE" ]]; then
   source "$CONFIG_FILE"
 fi
 
-FINNHUB_API_KEY="${FINNHUB_API_KEY:-}"
-FMP_API_KEY="${FMP_API_KEY:-}"
-ALPACA_BASE="${ALPACA_BASE:-http://localhost:3033}"
+FINNHUB_API_KEY="\${FINNHUB_API_KEY:-}"
+FMP_API_KEY="\${FMP_API_KEY:-}"
+ALPACA_BASE="\${ALPACA_BASE:-http://localhost:3033}"
 
 fetch_symbols() {
   curl -fsS http://localhost:3033/alpaca/portfolio \
@@ -59,7 +61,7 @@ print((dt.date.today()+dt.timedelta(days=365)).isoformat())
 PY
 )"
 
-  url="https://finnhub.io/api/v1/calendar/earnings?symbol=${api_symbol}&from=${from}&to=${to}&token=${FINNHUB_API_KEY}"
+  url="https://finnhub.io/api/v1/calendar/earnings?symbol=\${api_symbol}&from=\${from}&to=\${to}&token=\${FINNHUB_API_KEY}"
 
   curl -fsS "$url" | jq -c '
     .earningsCalendar // []
@@ -80,7 +82,7 @@ lookup_fmp() {
   [[ -z "$FMP_API_KEY" ]] && return 1
 
   local url
-  url="https://financialmodelingprep.com/api/v3/earning_calendar?symbol=${api_symbol}&apikey=${FMP_API_KEY}"
+  url="https://financialmodelingprep.com/api/v3/earning_calendar?symbol=\${api_symbol}&apikey=\${FMP_API_KEY}"
 
   curl -fsS "$url" | jq -c '
     if type=="array" then . else [] end
@@ -100,7 +102,7 @@ lookup_yahoo() {
   local y_symbol="$api_symbol"
 
   local url
-  url="https://query2.finance.yahoo.com/v10/finance/quoteSummary/${y_symbol}?modules=calendarEvents"
+  url="https://query2.finance.yahoo.com/v10/finance/quoteSummary/\${y_symbol}?modules=calendarEvents"
 
   curl -fsS "$url" | jq -c '
     .quoteSummary.result[0].calendarEvents.earnings.earningsDate // []
@@ -133,7 +135,7 @@ PY
 
 fetch_from_local_endpoint() {
   local symbols_csv="$1"
-  curl -fsS "${ALPACA_BASE}/alpaca/earnings?symbols=${symbols_csv}" \
+  curl -fsS "\${ALPACA_BASE}/alpaca/earnings?symbols=\${symbols_csv}" \
     | jq -c '[.results[]? | {symbol, earnings_date: (.earnings_date // null), days_until: (.days_until // null), confirmed: (.confirmed // false)}]'
 }
 
@@ -165,13 +167,13 @@ main() {
     [[ -n "$line" ]] && symbols+=("$line")
   done < <(fetch_symbols)
 
-  if [[ ${#symbols[@]} -eq 0 ]]; then
+  if [[ \${#symbols[@]} -eq 0 ]]; then
     echo '[]'
     exit 0
   fi
 
   local symbols_json
-  symbols_json="$(printf '%s\n' "${symbols[@]}" | jq -R . | jq -s .)"
+  symbols_json="$(printf '%s\n' "\${symbols[@]}" | jq -R . | jq -s .)"
 
   if cached="$(is_cache_fresh_for_symbols "$symbols_json" 2>/dev/null)"; then
     echo "$cached"
@@ -182,13 +184,13 @@ main() {
   local s api_symbol res date confirmed days
 
   local symbols_csv
-  symbols_csv="$(printf '%s\n' "${symbols[@]}" | paste -sd, -)"
+  symbols_csv="$(printf '%s\n' "\${symbols[@]}" | paste -sd, -)"
 
   if out_local="$(fetch_from_local_endpoint "$symbols_csv" 2>/dev/null)"; then
     out="$out_local"
   fi
 
-  for s in "${symbols[@]}"; do
+  for s in "\${symbols[@]}"; do
     # Skip symbols already resolved by Alpaca endpoint.
     if jq -e --arg s "$s" '.[] | select(.symbol == $s and .earnings_date != null)' <<<"$out" >/dev/null 2>&1; then
       continue
@@ -240,3 +242,14 @@ PY
 }
 
 main "$@"
+`;
+
+async function main(): Promise<void> {
+  const args = process.argv.slice(2);
+  const r = spawnSync("bash", ["-lc", script, "script", ...args], { encoding: "utf8" });
+  if (r.stdout) process.stdout.write(r.stdout);
+  if (r.stderr) process.stderr.write(r.stderr);
+  process.exit(r.status ?? 1);
+}
+
+main();
