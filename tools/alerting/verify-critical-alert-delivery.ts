@@ -1,54 +1,81 @@
-#!/usr/bin/env bash
-set -euo pipefail
+#!/usr/bin/env npx tsx
+import { runPsql, withPostgresPath } from "../lib/db.js";
 
-export PATH="/opt/homebrew/opt/postgresql@17/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:$PATH"
-PSQL_BIN="/opt/homebrew/opt/postgresql@17/bin/psql"
-DB_NAME="${CORTANA_DB:-cortana}"
-SOURCE="alert-delivery-verifier"
-LOOKBACK_HOURS="${LOOKBACK_HOURS:-24}"
+const DB_NAME = process.env.CORTANA_DB ?? "cortana";
+const SOURCE = "alert-delivery-verifier";
+const LOOKBACK_HOURS = Number(process.env.LOOKBACK_HOURS ?? "24");
 
-query_json() {
-  "$PSQL_BIN" "$DB_NAME" -q -X -t -A -v ON_ERROR_STOP=1 -c "$1"
+function sqlEscape(value: string): string {
+  return value.replace(/'/g, "''");
 }
 
-sql_escape() {
-  printf "%s" "$1" | sed "s/'/''/g"
+function queryText(sql: string): string {
+  const result = runPsql(sql, {
+    db: DB_NAME,
+    args: ["-q", "-X", "-t", "-A", "-v", "ON_ERROR_STOP=1"],
+    env: withPostgresPath(process.env),
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+  if (result.status !== 0) {
+    return "";
+  }
+  return (result.stdout ?? "").toString().trim();
 }
 
-log_gap() {
-  local intent_id="$1"
-  local alert_type="$2"
-  local target_channel="$3"
-  local expected_delivery_time="$4"
-  local delivered_at="$5"
+function logGap(
+  intentId: string,
+  alertType: string,
+  targetChannel: string,
+  expectedDeliveryTime: string,
+  deliveredAt: string
+): void {
+  const status = deliveredAt ? "late_delivery" : "undelivered";
+  const escMsg = sqlEscape(
+    `Critical alert intent missing on-time delivery: intent_id=${intentId} alert_type=${alertType} status=${status}`
+  );
+  const escMeta = sqlEscape(
+    JSON.stringify({
+      intent_id: intentId,
+      alert_type: alertType,
+      target_channel: targetChannel,
+      expected_delivery_time: expectedDeliveryTime,
+      delivered_at: deliveredAt,
+      status,
+      lookback_hours: LOOKBACK_HOURS,
+    })
+  );
 
-  local status="undelivered"
-  if [[ -n "$delivered_at" ]]; then
-    status="late_delivery"
-  fi
-
-  local esc_msg esc_meta
-  esc_msg="$(sql_escape "Critical alert intent missing on-time delivery: intent_id=${intent_id} alert_type=${alert_type} status=${status}")"
-  esc_meta="$(sql_escape "{\"intent_id\":\"${intent_id}\",\"alert_type\":\"${alert_type}\",\"target_channel\":\"${target_channel}\",\"expected_delivery_time\":\"${expected_delivery_time}\",\"delivered_at\":\"${delivered_at}\",\"status\":\"${status}\",\"lookback_hours\":${LOOKBACK_HOURS}}")"
-
-  "$PSQL_BIN" "$DB_NAME" -q -X -v ON_ERROR_STOP=1 -c "
+  runPsql(
+    `
     INSERT INTO cortana_events (event_type, source, severity, message, metadata)
     VALUES (
       'critical_alert_delivery_gap',
       '${SOURCE}',
       'warning',
-      '${esc_msg}',
-      '${esc_meta}'::jsonb
+      '${escMsg}',
+      '${escMeta}'::jsonb
     );
-  " >/dev/null 2>&1 || true
+  `,
+    {
+      db: DB_NAME,
+      args: ["-q", "-X", "-v", "ON_ERROR_STOP=1"],
+      env: withPostgresPath(process.env),
+      stdio: ["ignore", "ignore", "ignore"],
+    }
+  );
 }
 
-if [[ ! -x "$PSQL_BIN" ]]; then
-  echo '{"ok":false,"error":"psql_not_found"}'
-  exit 1
-fi
+const psqlCheck = runPsql("SELECT 1;", {
+  db: DB_NAME,
+  args: ["-q", "-X", "-v", "ON_ERROR_STOP=1"],
+  env: withPostgresPath(process.env),
+});
+if (psqlCheck.error || psqlCheck.status !== 0) {
+  process.stdout.write('{"ok":false,"error":"psql_not_found"}\n');
+  process.exit(1);
+}
 
-REPORT="$(query_json "
+const report = queryText(`
 WITH windows AS (
   SELECT NOW() - (INTERVAL '1 hour' * ${LOOKBACK_HOURS}) AS since_ts,
          NOW() AS now_ts
@@ -128,20 +155,23 @@ SELECT json_build_object(
   ), '[]'::json),
   'hasGaps', EXISTS(SELECT 1 FROM due_intents WHERE verification_status <> 'delivered_on_time')
 )::text;
-")"
+`);
 
-if [[ -z "${REPORT// }" ]]; then
-  echo '{"ok":false,"error":"empty_report"}'
-  exit 1
-fi
+if (!report.trim()) {
+  process.stdout.write('{"ok":false,"error":"empty_report"}\n');
+  process.exit(1);
+}
 
-HAS_GAPS="$(echo "$REPORT" | /usr/bin/python3 -c 'import json,sys; d=json.load(sys.stdin); print("true" if d.get("hasGaps") else "false")')"
-if [[ "$HAS_GAPS" == "true" ]]; then
-  while IFS='|' read -r intent_id alert_type target_channel expected_delivery_time delivered_at; do
-    [[ -z "$intent_id" ]] && continue
-    log_gap "$intent_id" "$alert_type" "$target_channel" "$expected_delivery_time" "$delivered_at"
-  done < <(
-    query_json "
+let hasGaps = false;
+try {
+  const parsed = JSON.parse(report);
+  hasGaps = Boolean(parsed?.hasGaps);
+} catch {
+  hasGaps = false;
+}
+
+if (hasGaps) {
+  const rows = queryText(`
     WITH windows AS (
       SELECT NOW() - (INTERVAL '1 hour' * ${LOOKBACK_HOURS}) AS since_ts,
              NOW() AS now_ts
@@ -183,8 +213,15 @@ if [[ "$HAS_GAPS" == "true" ]]; then
     WHERE i.expected_delivery_time <= w.now_ts
       AND (c.delivered_at IS NULL OR c.delivered_at > i.expected_delivery_time)
     ORDER BY i.expected_delivery_time ASC;
-    "
-  )
-fi
+    `);
 
-echo "$REPORT"
+  for (const line of rows.split("\n")) {
+    if (!line.trim()) continue;
+    const [intentId, alertType, targetChannel, expectedDeliveryTime, deliveredAt = ""] =
+      line.split("|");
+    if (!intentId) continue;
+    logGap(intentId, alertType ?? "", targetChannel ?? "", expectedDeliveryTime ?? "", deliveredAt);
+  }
+}
+
+process.stdout.write(`${report}\n`);
