@@ -24,3 +24,4 @@ __pycache__/
 memory/heartbeat-state.json
 .openclaw/workspace-state.json
 proprioception/state/heartbeat-remediation.json
+config/cron/*.bak*
