@@ -147,6 +147,9 @@ graph LR
 - **Proprioception** – Cortana’s sense of her own health/budget
   - Budget + token ledger, cron health, tool health, throttle tiers
   - Consolidated into `cortana_self_model` and surfaced in Mission Control
+  - Efficiency precompute pipeline (`proprioception/efficiency_precompute.py`) now pre-computes token costs, sub-agent spend, and brief engagement before LLM analysis
+  - Efficiency Analyzer cron calls the precompute script and uses the LLM only for self-model updates + anomaly reporting
+  - Runtime dropped to sub-second (<1s), replacing prior 120s+ timeout-prone runs
 
 ### 2.6 Senses & awareness
 
