@@ -94,10 +94,12 @@ Post-update script handles:
 - `openclaw gateway install --force`
 - `openclaw gateway restart`
 
-## Symlinks (Repo → Runtime)
+## Cron Config Sync (Runtime → Repo)
 
-- `~/.openclaw/cron/jobs.json` → `/Users/hd/openclaw/config/cron/jobs.json`
-- Any new repo↔runtime symlink must be added here.
+- **Runtime is source of truth**: `~/.openclaw/cron/jobs.json` (gateway writes state here; overwrites symlinks).
+- **Repo is backup**: `config/cron/jobs.json` — synced from runtime via `tools/cron/sync-cron-to-repo.sh`.
+- **Do NOT symlink** `jobs.json` — gateway destroys symlinks on restart.
+- Edit runtime directly for cron changes. Sync to repo afterward.
 
 ## Weather
 
