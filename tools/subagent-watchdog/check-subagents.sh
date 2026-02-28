@@ -7,5 +7,10 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 "/Users/hd/openclaw/tools/heartbeat/validate-heartbeat-state.sh" >/dev/null 2>&1 || true
 
 python3 "$SCRIPT_DIR/check-subagents.py" "$@"
+# Reaper: clean stale sub-agent sessions stuck in running (best-effort, non-fatal)
+"/Users/hd/openclaw/tools/reaper/reaper.sh" --emit-json >/dev/null 2>&1 || true
+
 # Heartbeat companion: reconcile ghost sessions/runs (best-effort, non-fatal)
 "/Users/hd/openclaw/tools/session-reconciler/reconcile-sessions.sh" >/dev/null 2>&1 || true
+# Heartbeat companion: reap stale sub-agent runs (best-effort, non-fatal)
+"/Users/hd/openclaw/tools/reaper/reaper.sh" >/dev/null 2>&1 || true
