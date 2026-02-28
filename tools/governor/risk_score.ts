@@ -1,24 +1,289 @@
 #!/usr/bin/env npx tsx
-import { spawnSync } from 'node:child_process';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
 
-async function main(): Promise<void> {
-  const py = "#!/usr/bin/env python3\nfrom __future__ import annotations\n\nimport argparse\nimport json\nimport os\nimport re\nimport subprocess\nfrom dataclasses import dataclass\nfrom datetime import datetime, timezone\nfrom pathlib import Path\nfrom typing import Any\n\nROOT = Path(__file__).resolve().parents[2]\nDEFAULT_POLICY_FILE = Path(__file__).with_name(\"policy.json\")\n\n\n@dataclass\nclass GovernorDecision:\n    task_id: int | None\n    action_type: str\n    risk_score: float\n    threshold: float\n    requires_human_approval: bool\n    decision: str  # approved|escalated|denied\n    rationale: str\n    queued_for_approval: bool\n    metadata: dict[str, Any]\n\n\nclass RiskScorer:\n    def __init__(self, policy_file: Path = DEFAULT_POLICY_FILE):\n        self.policy_file = policy_file\n        self.policy = json.loads(policy_file.read_text(encoding=\"utf-8\"))\n        self.action_types: dict[str, dict[str, Any]] = self.policy.get(\"action_types\", {})\n        self.auto_approve_threshold: float = float(self.policy.get(\"auto_approve_threshold\", 0.5))\n        self.default_action_type: str = self.policy.get(\"default_action_type\", \"internal-write\")\n        self.deny_unknown_action_type: bool = bool(self.policy.get(\"deny_unknown_action_type\", True))\n        self.command_hints: list[dict[str, str]] = self.policy.get(\"command_action_hints\", [])\n\n    def infer_action_type(self, task: dict[str, Any]) -> str:\n        metadata = task.get(\"metadata\") or {}\n        exec_meta = metadata.get(\"exec\") or {}\n\n        for key in (\n            \"action_type\",\n            \"risk_action_type\",\n        ):\n            if metadata.get(key):\n                return str(metadata[key])\n            if exec_meta.get(key):\n                return str(exec_meta[key])\n\n        cmd = str(exec_meta.get(\"command\") or task.get(\"execution_plan\") or \"\").strip()\n        for hint in self.command_hints:\n            pattern = hint.get(\"pattern\")\n            action_type = hint.get(\"action_type\")\n            if not pattern or not action_type:\n                continue\n            if re.search(pattern, cmd):\n                return action_type\n\n        return self.default_action_type\n\n    def evaluate_task(self, task: dict[str, Any], actor: str = \"auto-executor\") -> GovernorDecision:\n        action_type = self.infer_action_type(task)\n        policy = self.action_types.get(action_type)\n        if not policy:\n            if self.deny_unknown_action_type:\n                return GovernorDecision(\n                    task_id=task.get(\"id\"),\n                    action_type=action_type,\n                    risk_score=1.0,\n                    threshold=self.auto_approve_threshold,\n                    requires_human_approval=True,\n                    decision=\"denied\",\n                    rationale=f\"Unknown action_type '{action_type}' and deny_unknown_action_type=true\",\n                    queued_for_approval=False,\n                    metadata={\"actor\": actor, \"policy_version\": self.policy.get(\"version\", 1)},\n                )\n            policy = self.action_types[self.default_action_type]\n            action_type = self.default_action_type\n\n        risk_score = float(policy.get(\"risk_score\", 1.0))\n        requires_human_approval = bool(policy.get(\"requires_human_approval\", False))\n\n        if requires_human_approval or risk_score >= self.auto_approve_threshold:\n            decision = \"escalated\"\n            queued_for_approval = True\n            rationale = (\n                f\"risk={risk_score:.2f} >= threshold={self.auto_approve_threshold:.2f} \"\n                f\"or action explicitly requires human approval\"\n            )\n        else:\n            decision = \"approved\"\n            queued_for_approval = False\n            rationale = f\"risk={risk_score:.2f} < threshold={self.auto_approve_threshold:.2f}; auto-approved\"\n\n        return GovernorDecision(\n            task_id=task.get(\"id\"),\n            action_type=action_type,\n            risk_score=risk_score,\n            threshold=self.auto_approve_threshold,\n            requires_human_approval=requires_human_approval,\n            decision=decision,\n            rationale=rationale,\n            queued_for_approval=queued_for_approval,\n            metadata={\"actor\": actor, \"policy_version\": self.policy.get(\"version\", 1)},\n        )\n\n\ndef _sql_str(value: str) -> str:\n    return value.replace(\"'\", \"''\")\n\n\ndef _run_psql(db: str, sql: str) -> None:\n    env = os.environ.copy()\n    env[\"PATH\"] = f\"/opt/homebrew/opt/postgresql@17/bin:{env.get('PATH', '')}\"\n    proc = subprocess.run([\"psql\", db, \"-v\", \"ON_ERROR_STOP=1\", \"-c\", sql], text=True, capture_output=True, env=env)\n    if proc.returncode != 0:\n        raise RuntimeError(proc.stderr.strip() or proc.stdout.strip() or \"psql failed\")\n\n\ndef log_decision(db: str, dec: GovernorDecision) -> None:\n    metadata_json = _sql_str(json.dumps(dec.metadata, separators=(\",\", \":\")))\n    rationale = _sql_str(dec.rationale)\n    action_type = _sql_str(dec.action_type)\n    decision = _sql_str(dec.decision)\n\n    task_id_sql = \"NULL\" if dec.task_id is None else str(int(dec.task_id))\n\n    sql = f\"\"\"\n    INSERT INTO cortana_governor_decisions (\n      task_id, action_type, risk_score, threshold, requires_human_approval,\n      decision, rationale, queued_for_approval, metadata\n    ) VALUES (\n      {task_id_sql}, '{action_type}', {dec.risk_score}, {dec.threshold}, {str(dec.requires_human_approval).upper()},\n      '{decision}', '{rationale}', {str(dec.queued_for_approval).upper()}, '{metadata_json}'::jsonb\n    );\n    \"\"\"\n    _run_psql(db, sql)\n\n\ndef update_task_queue_state(db: str, dec: GovernorDecision) -> None:\n    if dec.task_id is None or dec.decision != \"escalated\":\n        return\n\n    rationale = _sql_str(f\"Queued for human approval by governor: {dec.rationale}\")\n    sql = f\"\"\"\n    UPDATE cortana_tasks\n    SET status='ready',\n        assigned_to='governor',\n        outcome='{rationale}',\n        metadata = COALESCE(metadata, '{{}}'::jsonb)\n            || jsonb_build_object(\n                'governor', jsonb_build_object(\n                    'decision', '{_sql_str(dec.decision)}',\n                    'action_type', '{_sql_str(dec.action_type)}',\n                    'risk_score', {dec.risk_score},\n                    'threshold', {dec.threshold},\n                    'queued_for_approval', true,\n                    'evaluated_at', NOW()::text\n                )\n            )\n    WHERE id={int(dec.task_id)};\n    \"\"\"\n    _run_psql(db, sql)\n\n\ndef update_task_denied_state(db: str, dec: GovernorDecision) -> None:\n    if dec.task_id is None or dec.decision != \"denied\":\n        return\n\n    rationale = _sql_str(f\"Denied by governor: {dec.rationale}\")\n    sql = f\"\"\"\n    UPDATE cortana_tasks\n    SET status='cancelled',\n        assigned_to='governor',\n        outcome='{rationale}',\n        completed_at=NOW(),\n        metadata = COALESCE(metadata, '{{}}'::jsonb)\n            || jsonb_build_object(\n                'governor', jsonb_build_object(\n                    'decision', '{_sql_str(dec.decision)}',\n                    'action_type', '{_sql_str(dec.action_type)}',\n                    'risk_score', {dec.risk_score},\n                    'threshold', {dec.threshold},\n                    'queued_for_approval', false,\n                    'evaluated_at', NOW()::text\n                )\n            )\n    WHERE id={int(dec.task_id)};\n    \"\"\"\n    _run_psql(db, sql)\n\n\ndef _task_from_json_arg(raw: str) -> dict[str, Any]:\n    task = json.loads(raw)\n    if not isinstance(task, dict):\n        raise ValueError(\"task-json must decode to an object\")\n    return task\n\n\ndef main() -> int:\n    parser = argparse.ArgumentParser(description=\"Autonomy governor v2 risk scorer\")\n    parser.add_argument(\"--policy\", default=str(DEFAULT_POLICY_FILE))\n    parser.add_argument(\"--db\", default=\"cortana\")\n    parser.add_argument(\"--task-json\", required=True, help=\"JSON for a cortana_tasks row\")\n    parser.add_argument(\"--actor\", default=\"auto-executor\")\n    parser.add_argument(\"--log\", action=\"store_true\", help=\"Persist decision to cortana_governor_decisions\")\n    parser.add_argument(\"--apply-task-state\", action=\"store_true\", help=\"Update task state when escalated/denied\")\n    args = parser.parse_args()\n\n    scorer = RiskScorer(Path(args.policy))\n    task = _task_from_json_arg(args.task_json)\n    decision = scorer.evaluate_task(task=task, actor=args.actor)\n\n    if args.log:\n        log_decision(args.db, decision)\n\n    if args.apply_task_state:\n        update_task_queue_state(args.db, decision)\n        update_task_denied_state(args.db, decision)\n\n    payload = {\n        \"timestamp\": datetime.now(timezone.utc).isoformat(),\n        \"task_id\": decision.task_id,\n        \"action_type\": decision.action_type,\n        \"risk_score\": decision.risk_score,\n        \"threshold\": decision.threshold,\n        \"requires_human_approval\": decision.requires_human_approval,\n        \"decision\": decision.decision,\n        \"rationale\": decision.rationale,\n        \"queued_for_approval\": decision.queued_for_approval,\n        \"metadata\": decision.metadata,\n    }\n    print(json.dumps(payload, sort_keys=True))\n    return 0\n\n\nif __name__ == \"__main__\":\n    raise SystemExit(main())\n";
-  const dir = mkdtempSync(join(tmpdir(), 'pywrap-'));
-  const script = join(dir, 'script.py');
-  writeFileSync(script, py, 'utf8');
-  const proc = spawnSync('python3', [script, ...process.argv.slice(2)], { stdio: 'inherit' });
-  rmSync(dir, { recursive: true, force: true });
-  if (proc.error) {
-    console.error(String(proc.error));
-    process.exit(1);
+import fs from "node:fs";
+import path from "node:path";
+import { getScriptDir } from "../lib/paths.js";
+import { runPsql } from "../lib/db.js";
+
+type GovernorDecision = {
+  task_id: number | null;
+  action_type: string;
+  risk_score: number;
+  threshold: number;
+  requires_human_approval: boolean;
+  decision: "approved" | "escalated" | "denied";
+  rationale: string;
+  queued_for_approval: boolean;
+  metadata: Record<string, unknown>;
+};
+
+const DEFAULT_POLICY_FILE = path.join(getScriptDir(import.meta.url), "policy.json");
+
+class RiskScorer {
+  policy: Record<string, any>;
+  actionTypes: Record<string, Record<string, any>>;
+  autoApproveThreshold: number;
+  defaultActionType: string;
+  denyUnknownActionType: boolean;
+  commandHints: Array<Record<string, string>>;
+
+  constructor(policyFile: string) {
+    const raw = fs.readFileSync(policyFile, "utf8");
+    this.policy = JSON.parse(raw) as Record<string, any>;
+    this.actionTypes = this.policy.action_types ?? {};
+    this.autoApproveThreshold = Number(this.policy.auto_approve_threshold ?? 0.5);
+    this.defaultActionType = String(this.policy.default_action_type ?? "internal-write");
+    this.denyUnknownActionType = Boolean(this.policy.deny_unknown_action_type ?? true);
+    this.commandHints = Array.isArray(this.policy.command_action_hints) ? this.policy.command_action_hints : [];
   }
-  process.exit(proc.status ?? 1);
+
+  inferActionType(task: Record<string, any>): string {
+    const metadata = task.metadata ?? {};
+    const execMeta = metadata.exec ?? {};
+
+    for (const key of ["action_type", "risk_action_type"]) {
+      if (metadata[key]) return String(metadata[key]);
+      if (execMeta[key]) return String(execMeta[key]);
+    }
+
+    const cmd = String(execMeta.command ?? task.execution_plan ?? "").trim();
+    for (const hint of this.commandHints) {
+      const pattern = hint.pattern;
+      const actionType = hint.action_type;
+      if (!pattern || !actionType) continue;
+      if (new RegExp(pattern).test(cmd)) return actionType;
+    }
+
+    return this.defaultActionType;
+  }
+
+  evaluateTask(task: Record<string, any>, actor = "auto-executor"): GovernorDecision {
+    let actionType = this.inferActionType(task);
+    let policy = this.actionTypes[actionType];
+    if (!policy) {
+      if (this.denyUnknownActionType) {
+        return {
+          task_id: task.id ?? null,
+          action_type: actionType,
+          risk_score: 1.0,
+          threshold: this.autoApproveThreshold,
+          requires_human_approval: true,
+          decision: "denied",
+          rationale: `Unknown action_type '${actionType}' and deny_unknown_action_type=true`,
+          queued_for_approval: false,
+          metadata: { actor, policy_version: this.policy.version ?? 1 },
+        };
+      }
+      policy = this.actionTypes[this.defaultActionType];
+      actionType = this.defaultActionType;
+    }
+
+    const riskScore = Number(policy?.risk_score ?? 1.0);
+    const requiresHumanApproval = Boolean(policy?.requires_human_approval ?? false);
+
+    let decision: GovernorDecision["decision"];
+    let queuedForApproval: boolean;
+    let rationale: string;
+
+    if (requiresHumanApproval || riskScore >= this.autoApproveThreshold) {
+      decision = "escalated";
+      queuedForApproval = true;
+      rationale = `risk=${riskScore.toFixed(2)} >= threshold=${this.autoApproveThreshold.toFixed(2)} or action explicitly requires human approval`;
+    } else {
+      decision = "approved";
+      queuedForApproval = false;
+      rationale = `risk=${riskScore.toFixed(2)} < threshold=${this.autoApproveThreshold.toFixed(2)}; auto-approved`;
+    }
+
+    return {
+      task_id: task.id ?? null,
+      action_type: actionType,
+      risk_score: riskScore,
+      threshold: this.autoApproveThreshold,
+      requires_human_approval: requiresHumanApproval,
+      decision,
+      rationale,
+      queued_for_approval: queuedForApproval,
+      metadata: { actor, policy_version: this.policy.version ?? 1 },
+    };
+  }
 }
 
-main().catch((err) => {
-  console.error(err instanceof Error ? err.message : String(err));
-  process.exit(1);
-});
+function sqlStr(value: string): string {
+  return value.replace(/'/g, "''");
+}
+
+function runPsqlChecked(db: string, sql: string): void {
+  const proc = runPsql(sql, { db, args: ["-v", "ON_ERROR_STOP=1"], stdio: "pipe" });
+  if (proc.status !== 0) {
+    throw new Error((proc.stderr || "").trim() || (proc.stdout || "").trim() || "psql failed");
+  }
+}
+
+function logDecision(db: string, dec: GovernorDecision): void {
+  const metadataJson = sqlStr(JSON.stringify(dec.metadata, null, 0));
+  const rationale = sqlStr(dec.rationale);
+  const actionType = sqlStr(dec.action_type);
+  const decision = sqlStr(dec.decision);
+  const taskIdSql = dec.task_id === null ? "NULL" : String(Number(dec.task_id));
+
+  const sql = `
+    INSERT INTO cortana_governor_decisions (
+      task_id, action_type, risk_score, threshold, requires_human_approval,
+      decision, rationale, queued_for_approval, metadata
+    ) VALUES (
+      ${taskIdSql}, '${actionType}', ${dec.risk_score}, ${dec.threshold}, ${dec.requires_human_approval
+        .toString()
+        .toUpperCase()},
+      '${decision}', '${rationale}', ${dec.queued_for_approval.toString().toUpperCase()}, '${metadataJson}'::jsonb
+    );
+    `;
+  runPsqlChecked(db, sql);
+}
+
+function updateTaskQueueState(db: string, dec: GovernorDecision): void {
+  if (dec.task_id === null || dec.decision !== "escalated") return;
+  const rationale = sqlStr(`Queued for human approval by governor: ${dec.rationale}`);
+  const sql = `
+    UPDATE cortana_tasks
+    SET status='ready',
+        assigned_to='governor',
+        outcome='${rationale}',
+        metadata = COALESCE(metadata, '{}'::jsonb)
+            || jsonb_build_object(
+                'governor', jsonb_build_object(
+                    'decision', '${sqlStr(dec.decision)}',
+                    'action_type', '${sqlStr(dec.action_type)}',
+                    'risk_score', ${dec.risk_score},
+                    'threshold', ${dec.threshold},
+                    'queued_for_approval', true,
+                    'evaluated_at', NOW()::text
+                )
+            )
+    WHERE id=${Number(dec.task_id)};
+    `;
+  runPsqlChecked(db, sql);
+}
+
+function updateTaskDeniedState(db: string, dec: GovernorDecision): void {
+  if (dec.task_id === null || dec.decision !== "denied") return;
+  const rationale = sqlStr(`Denied by governor: ${dec.rationale}`);
+  const sql = `
+    UPDATE cortana_tasks
+    SET status='cancelled',
+        assigned_to='governor',
+        outcome='${rationale}',
+        completed_at=NOW(),
+        metadata = COALESCE(metadata, '{}'::jsonb)
+            || jsonb_build_object(
+                'governor', jsonb_build_object(
+                    'decision', '${sqlStr(dec.decision)}',
+                    'action_type', '${sqlStr(dec.action_type)}',
+                    'risk_score', ${dec.risk_score},
+                    'threshold', ${dec.threshold},
+                    'queued_for_approval', false,
+                    'evaluated_at', NOW()::text
+                )
+            )
+    WHERE id=${Number(dec.task_id)};
+    `;
+  runPsqlChecked(db, sql);
+}
+
+function stringifySortedCompact(value: any): string {
+  const seen = new WeakSet();
+  const render = (val: any): string => {
+    if (val === null || val === undefined) return "null";
+    if (typeof val === "number" || typeof val === "boolean") return String(val);
+    if (typeof val === "string") return JSON.stringify(val);
+    if (Array.isArray(val)) {
+      return `[${val.map((v) => render(v)).join(", ")}]`;
+    }
+    if (typeof val === "object") {
+      if (seen.has(val)) return "{}";
+      seen.add(val);
+      const keys = Object.keys(val).sort();
+      const body = keys.map((k) => `${JSON.stringify(k)}: ${render(val[k])}`).join(", ");
+      return `{${body}}`;
+    }
+    return JSON.stringify(String(val));
+  };
+  return render(value);
+}
+
+function parseArgs(argv: string[]) {
+  const args = {
+    policy: DEFAULT_POLICY_FILE,
+    db: "cortana",
+    taskJson: "",
+    actor: "auto-executor",
+    log: false,
+    applyTaskState: false,
+  };
+
+  for (let i = 0; i < argv.length; i += 1) {
+    const a = argv[i];
+    if (a === "--policy") {
+      args.policy = argv[++i] ?? args.policy;
+    } else if (a === "--db") {
+      args.db = argv[++i] ?? args.db;
+    } else if (a === "--task-json") {
+      args.taskJson = argv[++i] ?? "";
+    } else if (a === "--actor") {
+      args.actor = argv[++i] ?? args.actor;
+    } else if (a === "--log") {
+      args.log = true;
+    } else if (a === "--apply-task-state") {
+      args.applyTaskState = true;
+    }
+  }
+  return args;
+}
+
+async function main(): Promise<number> {
+  const args = parseArgs(process.argv.slice(2));
+  if (!args.taskJson) {
+    console.error("--task-json is required");
+    return 2;
+  }
+
+  const task = JSON.parse(args.taskJson) as Record<string, any>;
+  if (!task || typeof task !== "object" || Array.isArray(task)) {
+    throw new Error("task-json must decode to an object");
+  }
+
+  const scorer = new RiskScorer(args.policy);
+  const decision = scorer.evaluateTask(task, args.actor);
+
+  if (args.log) {
+    logDecision(args.db, decision);
+  }
+
+  if (args.applyTaskState) {
+    updateTaskQueueState(args.db, decision);
+    updateTaskDeniedState(args.db, decision);
+  }
+
+  const payload = {
+    timestamp: new Date().toISOString(),
+    task_id: decision.task_id,
+    action_type: decision.action_type,
+    risk_score: decision.risk_score,
+    threshold: decision.threshold,
+    requires_human_approval: decision.requires_human_approval,
+    decision: decision.decision,
+    rationale: decision.rationale,
+    queued_for_approval: decision.queued_for_approval,
+    metadata: decision.metadata,
+  };
+
+  console.log(stringifySortedCompact(payload));
+  return 0;
+}
+
+main()
+  .then((code) => process.exit(code))
+  .catch((err) => {
+    console.error(err instanceof Error ? err.message : String(err));
+    process.exit(1);
+  });

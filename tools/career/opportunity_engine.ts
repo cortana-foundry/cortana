@@ -1,24 +1,389 @@
 #!/usr/bin/env npx tsx
-import { spawnSync } from 'node:child_process';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
 
-async function main(): Promise<void> {
-  const py = "#!/usr/bin/env python3\n\"\"\"Proactive Opportunity Engine for Career.\n\nAggregates engineering signals, matches to goals, scores ROI vs effort, and\nproposes one Career Move of the Week.\n\"\"\"\n\nfrom __future__ import annotations\n\nimport argparse\nimport json\nimport os\nimport re\nimport subprocess\nimport urllib.parse\nimport urllib.request\nimport xml.etree.ElementTree as ET\nfrom dataclasses import dataclass, asdict\nfrom datetime import datetime, timezone\nfrom typing import Any\n\nDB_NAME = \"cortana\"\nDB_PATH = \"/opt/homebrew/opt/postgresql@17/bin\"\nSOURCE = \"opportunity_engine\"\n\nSTACK_KEYWORDS = [\"typescript\", \"react\", \"tanstack\", \"go\", \"golang\", \"security\", \"architecture\", \"reliability\", \"prisma\", \"auth\"]\nGOALS = {\n    \"masters_program\": [\"paper\", \"research\", \"architecture\", \"distributed\", \"security\", \"analysis\"],\n    \"resilience_role\": [\"security\", \"incident\", \"resilience\", \"detection\", \"reliability\", \"threat\"],\n    \"side_projects\": [\"typescript\", \"react\", \"go\", \"api\", \"automation\", \"oauth\", \"product\"],\n}\n\nFEEDS = [\n    \"https://github.blog/security/feed/\",\n    \"https://krebsonsecurity.com/feed/\",\n    \"https://www.cisa.gov/cybersecurity-advisories/all.xml\",\n    \"https://martinfowler.com/feed.atom\",\n    \"https://www.infoq.com/feed/architecture-design/\",\n]\n\n\n@dataclass\nclass Opportunity:\n    title: str\n    source: str\n    url: str\n    summary: str\n    tags: list[str]\n    goal_match: dict[str, float]\n    roi: float\n    effort: float\n    confidence: float\n    why_now: str\n    execution_plan: list[str]\n\n\n\ndef sql_escape(text: str) -> str:\n    return (text or \"\").replace(\"'\", \"''\")\n\n\ndef run_psql(sql: str) -> str:\n    env = os.environ.copy()\n    env[\"PATH\"] = f\"{DB_PATH}:{env.get('PATH', '')}\"\n    cmd = [\"psql\", DB_NAME, \"-q\", \"-X\", \"-v\", \"ON_ERROR_STOP=1\", \"-t\", \"-A\", \"-c\", sql]\n    out = subprocess.run(cmd, text=True, capture_output=True, env=env)\n    if out.returncode != 0:\n        raise RuntimeError(out.stderr.strip() or \"psql failed\")\n    return out.stdout.strip()\n\n\ndef log_event(event_type: str, message: str, severity: str, metadata: dict[str, Any], dry_run: bool) -> None:\n    if dry_run:\n        return\n    run_psql(\n        \"INSERT INTO cortana_events (event_type, source, severity, message, metadata) VALUES \"\n        f\"('{sql_escape(event_type)}','{SOURCE}','{sql_escape(severity)}','{sql_escape(message)}','{sql_escape(json.dumps(metadata))}'::jsonb);\"\n    )\n\n\ndef http_get(url: str, timeout: int = 10) -> str:\n    req = urllib.request.Request(url, headers={\"User-Agent\": \"cortana-opportunity-engine/1.0\"})\n    with urllib.request.urlopen(req, timeout=timeout) as r:\n        return r.read().decode(\"utf-8\", errors=\"replace\")\n\n\ndef fetch_github_trending(language: str = \"typescript\") -> list[dict[str, str]]:\n    # Public HTML parse (no auth).\n    url = f\"https://github.com/trending/{urllib.parse.quote(language)}?since=weekly\"\n    html = http_get(url)\n    cards = re.findall(r'<h2 class=\"h3 lh-condensed\">\\s*<a href=\"([^\"]+)\"[^>]*>(.*?)</a>', html, re.S)\n    out = []\n    for href, raw_title in cards[:12]:\n        title = re.sub(r\"\\s+\", \"\", raw_title).replace(\"/\", \" / \")\n        out.append({\"title\": title.strip(), \"url\": f\"https://github.com{href.strip()}\", \"summary\": \"Trending repository\"})\n    return out\n\n\ndef parse_feed(feed_url: str, limit: int = 8) -> list[dict[str, str]]:\n    xml = http_get(feed_url)\n    root = ET.fromstring(xml)\n    items = root.findall(\".//item\") or root.findall(\".//{http://www.w3.org/2005/Atom}entry\")\n    out: list[dict[str, str]] = []\n    for it in items[:limit]:\n        title = (it.findtext(\"title\") or it.findtext(\"{http://www.w3.org/2005/Atom}title\") or \"\").strip()\n        link = (it.findtext(\"link\") or \"\").strip()\n        if not link:\n            atom_link = it.find(\"{http://www.w3.org/2005/Atom}link\")\n            if atom_link is not None:\n                link = atom_link.attrib.get(\"href\", \"\")\n        summary = (it.findtext(\"description\") or it.findtext(\"{http://www.w3.org/2005/Atom}summary\") or \"\").strip()\n        summary = re.sub(r\"<[^>]+>\", \" \", summary)\n        if title:\n            out.append({\"title\": re.sub(r\"\\s+\", \" \", title), \"url\": link, \"summary\": re.sub(r\"\\s+\", \" \", summary)[:420]})\n    return out\n\n\ndef extract_tags(text: str) -> list[str]:\n    t = text.lower()\n    tags = [k for k in STACK_KEYWORDS if k in t]\n    if \"oauth\" in t:\n        tags.append(\"oauth\")\n    if \"zero trust\" in t:\n        tags.append(\"zero-trust\")\n    return sorted(set(tags))\n\n\ndef goal_alignment(tags: list[str], text: str) -> dict[str, float]:\n    t = text.lower()\n    out: dict[str, float] = {}\n    for goal, words in GOALS.items():\n        hits = sum(1 for w in words if w in t or w in tags)\n        out[goal] = round(min(1.0, hits / max(2, len(words) * 0.45)), 3)\n    return out\n\n\ndef score_roi_effort(tags: list[str], align: dict[str, float], text: str) -> tuple[float, float, float]:\n    align_total = sum(align.values()) / max(1, len(align))\n    stack_fit = min(1.0, len(tags) / 4)\n    novelty_penalty = 0.08 if any(k in text.lower() for k in [\"deep dive\", \"book\", \"long form\"]) else 0.0\n\n    roi = round(min(0.98, 0.52 + 0.30 * align_total + 0.22 * stack_fit), 3)\n    effort = round(min(0.95, 0.30 + 0.40 * (1 - stack_fit) + novelty_penalty), 3)\n    confidence = round(min(0.98, 0.55 + 0.28 * align_total + 0.17 * stack_fit - 0.06 * novelty_penalty), 3)\n    return roi, effort, confidence\n\n\ndef build_plan(title: str, tags: list[str]) -> list[str]:\n    focus = \", \".join(tags[:4]) if tags else \"relevant stack\"\n    return [\n        f\"Read and summarize '{title}' in 10 bullets with emphasis on {focus}.\",\n        \"Extract one reusable pattern for Resilience role deliverables this week.\",\n        \"Implement a tiny proof-of-concept (60-90 min) in a side project repo.\",\n        \"Publish internal notes: problem, pattern, implementation, tradeoffs.\",\n        \"Create one follow-up task to productionize if signal quality remains high.\",\n    ]\n\n\ndef choose_move(candidates: list[Opportunity]) -> Opportunity | None:\n    if not candidates:\n        return None\n    return sorted(candidates, key=lambda o: (-(o.roi - o.effort), -o.confidence, -sum(o.goal_match.values())))[0]\n\n\ndef maybe_create_task(move: Opportunity, threshold: float, dry_run: bool) -> int | None:\n    if dry_run or move.confidence < threshold:\n        return None\n    title = f\"Career Move of the Week: {move.title[:80]}\"\n    desc = (\n        f\"Why now: {move.why_now}\\n\\n\"\n        f\"ROI={move.roi} Effort={move.effort} Confidence={move.confidence}\\n\"\n        \"Execution plan:\\n- \" + \"\\n- \".join(move.execution_plan)\n    )\n    meta = {\"source\": move.source, \"url\": move.url, \"tags\": move.tags, \"goal_match\": move.goal_match, \"confidence\": move.confidence}\n    raw = run_psql(\n        \"INSERT INTO cortana_tasks (source, title, description, priority, status, auto_executable, execution_plan, metadata) VALUES \"\n        f\"('opportunity_engine','{sql_escape(title)}','{sql_escape(desc)}',2,'ready',TRUE,\"\n        \"'Execute this move in one focused block and capture artifact.',\"\n        f\"'{sql_escape(json.dumps(meta))}'::jsonb) RETURNING id;\"\n    )\n    return int(raw) if raw else None\n\n\ndef parse_args() -> argparse.Namespace:\n    p = argparse.ArgumentParser(description=\"Career opportunity engine: aggregate signals and produce one weekly move\")\n    p.add_argument(\"--task-threshold\", type=float, default=0.82, help=\"Confidence threshold for auto task creation\")\n    p.add_argument(\"--create-task\", action=\"store_true\", help=\"Create task in cortana_tasks when threshold passes\")\n    p.add_argument(\"--dry-run\", action=\"store_true\", help=\"No DB writes\")\n    p.add_argument(\"--json\", action=\"store_true\", help=\"Output JSON\")\n    return p.parse_args()\n\n\ndef main() -> int:\n    args = parse_args()\n    errors: list[str] = []\n    signals: list[dict[str, str]] = []\n\n    for lang in (\"typescript\", \"go\"):\n        try:\n            signals.extend(fetch_github_trending(language=lang))\n        except Exception as e:\n            errors.append(f\"trending {lang}: {e}\")\n\n    for feed in FEEDS:\n        try:\n            signals.extend(parse_feed(feed, limit=6))\n        except Exception as e:\n            errors.append(f\"feed {feed}: {e}\")\n\n    opportunities: list[Opportunity] = []\n    for s in signals:\n        text = f\"{s.get('title','')} {s.get('summary','')}\"\n        tags = extract_tags(text)\n        if not tags:\n            continue\n        align = goal_alignment(tags, text)\n        roi, effort, confidence = score_roi_effort(tags, align, text)\n        opportunities.append(\n            Opportunity(\n                title=s.get(\"title\", \"Untitled\"),\n                source=s.get(\"url\", \"\") or \"signal\",\n                url=s.get(\"url\", \"\"),\n                summary=s.get(\"summary\", \"\"),\n                tags=tags,\n                goal_match=align,\n                roi=roi,\n                effort=effort,\n                confidence=confidence,\n                why_now=\"Compounds stack relevance for role + masters while producing side-project artifacts.\",\n                execution_plan=build_plan(s.get(\"title\", \"Untitled\"), tags),\n            )\n        )\n\n    move = choose_move(opportunities)\n    created_task = None\n    if move and args.create_task:\n        try:\n            created_task = maybe_create_task(move, threshold=args.task_threshold, dry_run=args.dry_run)\n        except Exception as e:\n            errors.append(f\"task-create: {e}\")\n\n    if move:\n        log_event(\n            event_type=\"career_opportunity\",\n            message=f\"Career move generated: {move.title[:120]}\",\n            severity=\"info\" if not errors else \"warning\",\n            metadata={\"confidence\": move.confidence, \"roi\": move.roi, \"effort\": move.effort, \"task_id\": created_task, \"errors\": errors[:6]},\n            dry_run=args.dry_run,\n        )\n\n    payload = {\n        \"source\": SOURCE,\n        \"generated_at\": datetime.now(timezone.utc).isoformat(),\n        \"signals_seen\": len(signals),\n        \"opportunities_scored\": len(opportunities),\n        \"career_move_of_the_week\": asdict(move) if move else None,\n        \"task_created\": created_task,\n        \"errors\": errors,\n    }\n\n    if args.json:\n        print(json.dumps(payload, indent=2))\n    else:\n        if not move:\n            print(\"No qualifying opportunity found.\")\n        else:\n            print(\"Career Move of the Week\")\n            print(f\"- move: {move.title}\")\n            print(f\"- why now: {move.why_now}\")\n            print(f\"- roi/effort/confidence: {move.roi}/{move.effort}/{move.confidence}\")\n            print(\"- execution plan:\")\n            for step in move.execution_plan:\n                print(f\"  - {step}\")\n            if created_task:\n                print(f\"- task created: #{created_task}\")\n        if errors:\n            print(\"- errors:\")\n            for e in errors[:10]:\n                print(f\"  - {e}\")\n    return 0\n\n\nif __name__ == \"__main__\":\n    raise SystemExit(main())\n";
-  const dir = mkdtempSync(join(tmpdir(), 'pywrap-'));
-  const script = join(dir, 'script.py');
-  writeFileSync(script, py, 'utf8');
-  const proc = spawnSync('python3', [script, ...process.argv.slice(2)], { stdio: 'inherit' });
-  rmSync(dir, { recursive: true, force: true });
-  if (proc.error) {
-    console.error(String(proc.error));
-    process.exit(1);
-  }
-  process.exit(proc.status ?? 1);
+import { runPsql } from "../lib/db.js";
+
+const DB_NAME = "cortana";
+const SOURCE = "opportunity_engine";
+
+const STACK_KEYWORDS = [
+  "typescript",
+  "react",
+  "tanstack",
+  "go",
+  "golang",
+  "security",
+  "architecture",
+  "reliability",
+  "prisma",
+  "auth",
+];
+
+const GOALS: Record<string, string[]> = {
+  masters_program: ["paper", "research", "architecture", "distributed", "security", "analysis"],
+  resilience_role: ["security", "incident", "resilience", "detection", "reliability", "threat"],
+  side_projects: ["typescript", "react", "go", "api", "automation", "oauth", "product"],
+};
+
+const FEEDS = [
+  "https://github.blog/security/feed/",
+  "https://krebsonsecurity.com/feed/",
+  "https://www.cisa.gov/cybersecurity-advisories/all.xml",
+  "https://martinfowler.com/feed.atom",
+  "https://www.infoq.com/feed/architecture-design/",
+];
+
+type Opportunity = {
+  title: string;
+  source: string;
+  url: string;
+  summary: string;
+  tags: string[];
+  goal_match: Record<string, number>;
+  roi: number;
+  effort: number;
+  confidence: number;
+  why_now: string;
+  execution_plan: string[];
+};
+
+function sqlEscape(value: string): string {
+  return (value || "").replace(/'/g, "''");
 }
 
-main().catch((err) => {
-  console.error(err instanceof Error ? err.message : String(err));
-  process.exit(1);
-});
+function runPsqlText(sql: string): string {
+  const proc = runPsql(sql, {
+    db: DB_NAME,
+    args: ["-q", "-X", "-v", "ON_ERROR_STOP=1", "-t", "-A"],
+    stdio: "pipe",
+  });
+  if (proc.status !== 0) {
+    throw new Error((proc.stderr || "").trim() || "psql failed");
+  }
+  return (proc.stdout || "").trim();
+}
+
+function logEvent(eventType: string, message: string, severity: string, metadata: Record<string, any>, dryRun: boolean): void {
+  if (dryRun) return;
+  const sql =
+    "INSERT INTO cortana_events (event_type, source, severity, message, metadata) VALUES " +
+    `('${sqlEscape(eventType)}','${SOURCE}','${sqlEscape(severity)}','${sqlEscape(message)}','${sqlEscape(
+      JSON.stringify(metadata),
+    )}'::jsonb);`;
+  runPsqlText(sql);
+}
+
+async function httpGet(url: string, timeout = 10): Promise<string> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeout * 1000);
+  try {
+    const res = await fetch(url, {
+      headers: { "User-Agent": "cortana-opportunity-engine/1.0" },
+      signal: controller.signal,
+    });
+    return await res.text();
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function normalizeWhitespace(value: string): string {
+  return value.replace(/\s+/g, " ").trim();
+}
+
+function stripHtml(value: string): string {
+  return value.replace(/<[^>]+>/g, " ");
+}
+
+function extractXmlBlocks(xml: string, tag: string): string[] {
+  const re = new RegExp(`<${tag}[^>]*>([\\s\\S]*?)</${tag}>`, "gi");
+  const out: string[] = [];
+  let match: RegExpExecArray | null;
+  while ((match = re.exec(xml))) {
+    out.push(match[1]);
+  }
+  return out;
+}
+
+function extractTagText(block: string, tag: string): string | null {
+  const tagPattern = tag.includes(":") ? tag.replace(":", "\\:") : `(?:\\w+:)?${tag}`;
+  const re = new RegExp(`<${tagPattern}[^>]*>([\\s\\S]*?)</${tagPattern}>`, "i");
+  const m = block.match(re);
+  if (!m) return null;
+  return m[1];
+}
+
+function extractLink(block: string): string {
+  const text = extractTagText(block, "link");
+  if (text && text.trim()) return text.trim();
+  const m = block.match(/<(?:\w+:)?link\b[^>]*href=["']([^"']+)["'][^>]*>/i);
+  if (m) return m[1];
+  return "";
+}
+
+async function fetchGithubTrending(language = "typescript"): Promise<Array<Record<string, string>>> {
+  const url = `https://github.com/trending/${encodeURIComponent(language)}?since=weekly`;
+  const html = await httpGet(url);
+  const re = /<h2 class="h3 lh-condensed">\s*<a href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/gi;
+  const out: Array<Record<string, string>> = [];
+  let match: RegExpExecArray | null;
+  while ((match = re.exec(html)) && out.length < 12) {
+    const href = match[1];
+    const rawTitle = match[2];
+    const title = rawTitle.replace(/\s+/g, "").replace("/", " / ").trim();
+    out.push({ title, url: `https://github.com${href.trim()}`, summary: "Trending repository" });
+  }
+  return out;
+}
+
+async function parseFeed(feedUrl: string, limit = 8): Promise<Array<Record<string, string>>> {
+  const xml = await httpGet(feedUrl);
+  let items = extractXmlBlocks(xml, "item");
+  if (!items.length) items = extractXmlBlocks(xml, "entry");
+
+  const out: Array<Record<string, string>> = [];
+  for (const it of items.slice(0, limit)) {
+    const titleRaw = extractTagText(it, "title") ?? "";
+    const link = extractLink(it);
+    let summaryRaw = extractTagText(it, "description") ?? extractTagText(it, "summary") ?? "";
+    if (!summaryRaw) summaryRaw = extractTagText(it, "content:encoded") ?? "";
+    summaryRaw = stripHtml(summaryRaw);
+
+    const title = normalizeWhitespace(titleRaw);
+    const summary = normalizeWhitespace(summaryRaw).slice(0, 420);
+    if (title) {
+      out.push({ title, url: link, summary });
+    }
+  }
+  return out;
+}
+
+function extractTags(text: string): string[] {
+  const t = text.toLowerCase();
+  const tags = STACK_KEYWORDS.filter((k) => t.includes(k));
+  if (t.includes("oauth")) tags.push("oauth");
+  if (t.includes("zero trust")) tags.push("zero-trust");
+  return Array.from(new Set(tags)).sort();
+}
+
+function goalAlignment(tags: string[], text: string): Record<string, number> {
+  const t = text.toLowerCase();
+  const out: Record<string, number> = {};
+  for (const [goal, words] of Object.entries(GOALS)) {
+    const hits = words.filter((w) => t.includes(w) || tags.includes(w)).length;
+    const denom = Math.max(2, words.length * 0.45);
+    out[goal] = Math.round(Math.min(1.0, hits / denom) * 1000) / 1000;
+  }
+  return out;
+}
+
+function scoreRoiEffort(
+  tags: string[],
+  align: Record<string, number>,
+  text: string,
+): [number, number, number] {
+  const alignTotal = Object.values(align).reduce((a, b) => a + b, 0) / Math.max(1, Object.keys(align).length);
+  const stackFit = Math.min(1.0, tags.length / 4);
+  const noveltyPenalty = /deep dive|book|long form/i.test(text) ? 0.08 : 0.0;
+
+  const roi = Math.round(Math.min(0.98, 0.52 + 0.3 * alignTotal + 0.22 * stackFit) * 1000) / 1000;
+  const effort = Math.round(Math.min(0.95, 0.3 + 0.4 * (1 - stackFit) + noveltyPenalty) * 1000) / 1000;
+  const confidence = Math.round(
+    Math.min(0.98, 0.55 + 0.28 * alignTotal + 0.17 * stackFit - 0.06 * noveltyPenalty) * 1000,
+  ) / 1000;
+
+  return [roi, effort, confidence];
+}
+
+function buildPlan(title: string, tags: string[]): string[] {
+  const focus = tags.length ? tags.slice(0, 4).join(", ") : "relevant stack";
+  return [
+    `Read and summarize '${title}' in 10 bullets with emphasis on ${focus}.`,
+    "Extract one reusable pattern for Resilience role deliverables this week.",
+    "Implement a tiny proof-of-concept (60-90 min) in a side project repo.",
+    "Publish internal notes: problem, pattern, implementation, tradeoffs.",
+    "Create one follow-up task to productionize if signal quality remains high.",
+  ];
+}
+
+function chooseMove(candidates: Opportunity[]): Opportunity | null {
+  if (!candidates.length) return null;
+  const sorted = [...candidates].sort((a, b) => {
+    const scoreA = a.roi - a.effort;
+    const scoreB = b.roi - b.effort;
+    if (scoreA !== scoreB) return scoreB - scoreA;
+    if (a.confidence !== b.confidence) return b.confidence - a.confidence;
+    const sumA = Object.values(a.goal_match).reduce((x, y) => x + y, 0);
+    const sumB = Object.values(b.goal_match).reduce((x, y) => x + y, 0);
+    return sumB - sumA;
+  });
+  return sorted[0];
+}
+
+function maybeCreateTask(move: Opportunity, threshold: number, dryRun: boolean): number | null {
+  if (dryRun || move.confidence < threshold) return null;
+  const title = `Career Move of the Week: ${move.title.slice(0, 80)}`;
+  const desc =
+    `Why now: ${move.why_now}\n\n` +
+    `ROI=${move.roi} Effort=${move.effort} Confidence=${move.confidence}\n` +
+    "Execution plan:\n- " +
+    move.execution_plan.join("\n- ");
+
+  const meta = {
+    source: move.source,
+    url: move.url,
+    tags: move.tags,
+    goal_match: move.goal_match,
+    confidence: move.confidence,
+  };
+
+  const sql =
+    "INSERT INTO cortana_tasks (source, title, description, priority, status, auto_executable, execution_plan, metadata) VALUES " +
+    `('opportunity_engine','${sqlEscape(title)}','${sqlEscape(desc)}',2,'ready',TRUE,` +
+    "'Execute this move in one focused block and capture artifact.'," +
+    `'${sqlEscape(JSON.stringify(meta))}'::jsonb) RETURNING id;`;
+
+  const raw = runPsqlText(sql);
+  return raw ? Number.parseInt(raw, 10) : null;
+}
+
+function parseArgs(argv: string[]) {
+  const args = {
+    taskThreshold: 0.82,
+    createTask: false,
+    dryRun: false,
+    json: false,
+  };
+
+  for (let i = 0; i < argv.length; i += 1) {
+    const a = argv[i];
+    if (a === "--task-threshold") {
+      args.taskThreshold = Number.parseFloat(argv[++i] ?? "0.82");
+    } else if (a === "--create-task") {
+      args.createTask = true;
+    } else if (a === "--dry-run") {
+      args.dryRun = true;
+    } else if (a === "--json") {
+      args.json = true;
+    }
+  }
+
+  return args;
+}
+
+async function main(): Promise<number> {
+  const args = parseArgs(process.argv.slice(2));
+  const errors: string[] = [];
+  const signals: Array<Record<string, string>> = [];
+
+  for (const lang of ["typescript", "go"]) {
+    try {
+      const trending = await fetchGithubTrending(lang);
+      signals.push(...trending);
+    } catch (err) {
+      errors.push(`trending ${lang}: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
+
+  for (const feed of FEEDS) {
+    try {
+      const items = await parseFeed(feed, 6);
+      signals.push(...items);
+    } catch (err) {
+      errors.push(`feed ${feed}: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
+
+  const opportunities: Opportunity[] = [];
+  for (const s of signals) {
+    const text = `${s.title ?? ""} ${s.summary ?? ""}`;
+    const tags = extractTags(text);
+    if (!tags.length) continue;
+    const align = goalAlignment(tags, text);
+    const [roi, effort, confidence] = scoreRoiEffort(tags, align, text);
+    opportunities.push({
+      title: s.title ?? "Untitled",
+      source: s.url ?? "signal",
+      url: s.url ?? "",
+      summary: s.summary ?? "",
+      tags,
+      goal_match: align,
+      roi,
+      effort,
+      confidence,
+      why_now: "Compounds stack relevance for role + masters while producing side-project artifacts.",
+      execution_plan: buildPlan(s.title ?? "Untitled", tags),
+    });
+  }
+
+  const move = chooseMove(opportunities);
+  let createdTask: number | null = null;
+
+  if (move && args.createTask) {
+    try {
+      createdTask = maybeCreateTask(move, args.taskThreshold, args.dryRun);
+    } catch (err) {
+      errors.push(`task-create: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
+
+  if (move) {
+    logEvent(
+      "career_opportunity",
+      `Career move generated: ${move.title.slice(0, 120)}`,
+      errors.length ? "warning" : "info",
+      {
+        confidence: move.confidence,
+        roi: move.roi,
+        effort: move.effort,
+        task_id: createdTask,
+        errors: errors.slice(0, 6),
+      },
+      args.dryRun,
+    );
+  }
+
+  const payload = {
+    source: SOURCE,
+    generated_at: new Date().toISOString(),
+    signals_seen: signals.length,
+    opportunities_scored: opportunities.length,
+    career_move_of_the_week: move ?? null,
+    task_created: createdTask,
+    errors,
+  };
+
+  if (args.json) {
+    console.log(JSON.stringify(payload, null, 2));
+  } else {
+    if (!move) {
+      console.log("No qualifying opportunity found.");
+    } else {
+      console.log("Career Move of the Week");
+      console.log(`- move: ${move.title}`);
+      console.log(`- why now: ${move.why_now}`);
+      console.log(`- roi/effort/confidence: ${move.roi}/${move.effort}/${move.confidence}`);
+      console.log("- execution plan:");
+      for (const step of move.execution_plan) {
+        console.log(`  - ${step}`);
+      }
+      if (createdTask) {
+        console.log(`- task created: #${createdTask}`);
+      }
+    }
+    if (errors.length) {
+      console.log("- errors:");
+      for (const e of errors.slice(0, 10)) {
+        console.log(`  - ${e}`);
+      }
+    }
+  }
+
+  return 0;
+}
+
+main()
+  .then((code) => process.exit(code))
+  .catch((err) => {
+    console.error(err instanceof Error ? err.message : String(err));
+    process.exit(1);
+  });

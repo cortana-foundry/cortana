@@ -1,24 +1,472 @@
 #!/usr/bin/env npx tsx
-import { spawnSync } from 'node:child_process';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
 
-async function main(): Promise<void> {
-  const py = "#!/usr/bin/env python3\n\"\"\"Mortgage Intel Co-Pilot.\n\nFetches macro + mortgage news signals, classifies topic/impact, and generates\nbroker-ready advisories for daily briefs.\n\"\"\"\n\nfrom __future__ import annotations\n\nimport argparse\nimport json\nimport os\nimport re\nimport subprocess\nimport sys\nimport urllib.parse\nimport urllib.request\nimport xml.etree.ElementTree as ET\nfrom dataclasses import dataclass, asdict\nfrom datetime import datetime, timezone\nfrom typing import Any\n\nDB_NAME = \"cortana\"\nDB_PATH = \"/opt/homebrew/opt/postgresql@17/bin\"\nSOURCE = \"mortgage_intel\"\n\nSERIES = {\n    \"MORTGAGE30US\": \"30Y fixed mortgage average\",\n    \"DGS10\": \"10Y Treasury yield\",\n}\n\nRSS_FEEDS = [\n    \"https://www.mba.org/rss/news-and-research-news.xml\",\n    \"https://www.housingwire.com/feed/\",\n    \"https://www.mortgagenewsdaily.com/rss\",\n    \"https://www.nar.realtor/newsroom/rss\",\n]\n\nTOPIC_RULES = {\n    \"rates\": [\"rate\", \"yield\", \"treasury\", \"fed\", \"inflation\", \"cpi\", \"mortgage pricing\", \"lock\", \"float\"],\n    \"regulation_compliance\": [\"cfpb\", \"fhfa\", \"hud\", \"fannie\", \"freddie\", \"compliance\", \"rule\", \"regulation\", \"lawsuit\"],\n    \"underwriting_changes\": [\"underwriting\", \"du\", \"lp\", \"guideline\", \"ltv\", \"dti\", \"credit\", \"eligibility\", \"reserve\"],\n    \"regional_demand\": [\"inventory\", \"housing starts\", \"regional\", \"metro\", \"demand\", \"purchase volume\", \"refi\", \"application\"],\n}\n\n\n@dataclass\nclass IntelEvent:\n    title: str\n    source: str\n    url: str\n    published_at: str | None\n    summary: str\n    topic: str\n    urgency: int\n    lock_float: str\n    pipeline_effect: str\n    impact_score: float\n    what_changed: str\n    what_to_do: str\n    metadata: dict[str, Any]\n\n\ndef sql_escape(text: str) -> str:\n    return (text or \"\").replace(\"'\", \"''\")\n\n\ndef run_psql(sql: str) -> str:\n    env = os.environ.copy()\n    env[\"PATH\"] = f\"{DB_PATH}:{env.get('PATH', '')}\"\n    cmd = [\"psql\", DB_NAME, \"-q\", \"-X\", \"-v\", \"ON_ERROR_STOP=1\", \"-t\", \"-A\", \"-c\", sql]\n    out = subprocess.run(cmd, text=True, capture_output=True, env=env)\n    if out.returncode != 0:\n        raise RuntimeError(out.stderr.strip() or \"psql failed\")\n    return out.stdout.strip()\n\n\ndef log_event(message: str, severity: str, metadata: dict[str, Any], dry_run: bool) -> None:\n    if dry_run:\n        return\n    run_psql(\n        \"INSERT INTO cortana_events (event_type, source, severity, message, metadata) VALUES \"\n        f\"('mortgage_intel','{SOURCE}','{sql_escape(severity)}','{sql_escape(message)}','{sql_escape(json.dumps(metadata))}'::jsonb);\"\n    )\n\n\ndef http_get(url: str, timeout: int = 10) -> str:\n    req = urllib.request.Request(url, headers={\"User-Agent\": \"cortana-mortgage-intel/1.0\"})\n    with urllib.request.urlopen(req, timeout=timeout) as resp:\n        return resp.read().decode(\"utf-8\", errors=\"replace\")\n\n\ndef fetch_fred_series(series_id: str) -> dict[str, Any]:\n    api_key = os.getenv(\"FRED_API_KEY\", \"\").strip()\n    if api_key:\n        qs = urllib.parse.urlencode({\"series_id\": series_id, \"api_key\": api_key, \"file_type\": \"json\", \"sort_order\": \"desc\", \"limit\": 5})\n        url = f\"https://api.stlouisfed.org/fred/series/observations?{qs}\"\n        payload = json.loads(http_get(url))\n        obs = payload.get(\"observations\", [])\n        points = [o for o in obs if o.get(\"value\") not in (None, \".\")][:2]\n        if not points:\n            raise RuntimeError(f\"No observations for {series_id}\")\n        latest, prior = points[0], (points[1] if len(points) > 1 else points[0])\n        return {\n            \"series_id\": series_id,\n            \"latest_date\": latest.get(\"date\"),\n            \"latest_value\": float(latest.get(\"value\")),\n            \"prior_value\": float(prior.get(\"value\")),\n        }\n\n    # Fallback: public CSV endpoint (no key)\n    csv_url = f\"https://fred.stlouisfed.org/graph/fredgraph.csv?id={urllib.parse.quote(series_id)}\"\n    rows = [r for r in http_get(csv_url).splitlines() if r and not r.endswith(\",.\")]\n    if len(rows) < 3:\n        raise RuntimeError(f\"Insufficient CSV rows for {series_id}\")\n    latest_row = rows[-1].split(\",\")\n    prior_row = rows[-2].split(\",\")\n    return {\n        \"series_id\": series_id,\n        \"latest_date\": latest_row[0],\n        \"latest_value\": float(latest_row[1]),\n        \"prior_value\": float(prior_row[1]),\n    }\n\n\ndef fetch_rss_items(limit_per_feed: int = 8) -> list[dict[str, str | None]]:\n    out: list[dict[str, str | None]] = []\n    for feed in RSS_FEEDS:\n        try:\n            xml_txt = http_get(feed)\n            root = ET.fromstring(xml_txt)\n            items = root.findall(\".//item\") or root.findall(\".//{http://www.w3.org/2005/Atom}entry\")\n            for item in items[:limit_per_feed]:\n                title = (item.findtext(\"title\") or item.findtext(\"{http://www.w3.org/2005/Atom}title\") or \"\").strip()\n                link = (item.findtext(\"link\") or item.findtext(\"{http://www.w3.org/2005/Atom}link\") or \"\").strip()\n                if not link:\n                    atom_link = item.find(\"{http://www.w3.org/2005/Atom}link\")\n                    if atom_link is not None:\n                        link = atom_link.attrib.get(\"href\", \"\")\n                desc = (item.findtext(\"description\") or item.findtext(\"{http://purl.org/rss/1.0/modules/content/}encoded\") or \"\").strip()\n                pub = (item.findtext(\"pubDate\") or item.findtext(\"{http://www.w3.org/2005/Atom}updated\") or item.findtext(\"{http://www.w3.org/2005/Atom}published\"))\n                if title:\n                    out.append({\"feed\": feed, \"title\": re.sub(r\"\\s+\", \" \", title), \"link\": link, \"summary\": re.sub(r\"\\s+\", \" \", re.sub(r\"<[^>]+>\", \" \", desc))[:420], \"published_at\": pub})\n        except Exception:\n            continue\n    return out\n\n\ndef is_mortgage_relevant(text: str) -> bool:\n    anchors = [\"mortgage\", \"housing\", \"loan\", \"lending\", \"borrower\", \"refi\", \"purchase\", \"fannie\", \"freddie\", \"rate\", \"underwriting\", \"listing\", \"realtor\", \"real estate\", \"home sales\", \"inventory\"]\n    return any(_contains_keyword(text, a) for a in anchors)\n\n\ndef _contains_keyword(text: str, keyword: str) -> bool:\n    return re.search(r\"\\\\b\" + re.escape(keyword.lower()) + r\"\\\\b\", text.lower()) is not None\n\n\ndef classify_topic(text: str) -> str:\n    best_topic = \"regional_demand\"\n    best_score = 0\n    for topic, keywords in TOPIC_RULES.items():\n        score = sum(1 for k in keywords if _contains_keyword(text, k))\n        if score > best_score:\n            best_topic, best_score = topic, score\n    return best_topic\n\n\ndef score_impact(topic: str, text: str, rate_shift_bp: float) -> tuple[int, str, str, float]:\n    t = text.lower()\n    urgency = 2\n    if any(w in t for w in [\"immediate\", \"effective\", \"urgent\", \"breaking\"]):\n        urgency = 1\n    elif any(w in t for w in [\"guidance\", \"proposal\", \"comment period\"]):\n        urgency = 3\n\n    lock_float = \"monitor\"\n    if topic == \"rates\":\n        if rate_shift_bp >= 7:\n            lock_float = \"bias_lock\"\n            urgency = min(urgency, 1)\n        elif rate_shift_bp <= -7:\n            lock_float = \"bias_float_selective\"\n\n    pipeline_effect = {\n        \"rates\": \"pricing_volatility\",\n        \"regulation_compliance\": \"process_and_disclosure_updates\",\n        \"underwriting_changes\": \"eligibility_mix_shift\",\n        \"regional_demand\": \"lead_flow_and_conversion_shift\",\n    }.get(topic, \"monitor\")\n\n    base = {\"rates\": 0.78, \"regulation_compliance\": 0.72, \"underwriting_changes\": 0.69, \"regional_demand\": 0.62}.get(topic, 0.6)\n    if urgency == 1:\n        base += 0.12\n    elif urgency == 2:\n        base += 0.05\n    base += min(abs(rate_shift_bp) / 100.0, 0.08)\n    return urgency, lock_float, pipeline_effect, round(min(base, 0.98), 3)\n\n\ndef advisory_for(item: dict[str, Any], rates: dict[str, Any]) -> IntelEvent:\n    title = str(item.get(\"title\") or \"\")\n    summary = str(item.get(\"summary\") or \"\")\n    text = f\"{title} {summary}\"\n    topic = classify_topic(text)\n\n    mort = rates[\"MORTGAGE30US\"]\n    dgs10 = rates[\"DGS10\"]\n    mort_shift_bp = (mort[\"latest_value\"] - mort[\"prior_value\"]) * 100\n    tsy_shift_bp = (dgs10[\"latest_value\"] - dgs10[\"prior_value\"]) * 100\n\n    urgency, lock_float, pipeline_effect, impact_score = score_impact(topic, text, mort_shift_bp)\n\n    macro_blurb = (\n        f\"30Y mortgage {mort['latest_value']:.2f}% ({mort_shift_bp:+.1f} bps) | \"\n        f\"10Y treasury {dgs10['latest_value']:.2f}% ({tsy_shift_bp:+.1f} bps)\"\n    )\n\n    what_changed = f\"{title}. Macro tape: {macro_blurb}.\"\n\n    action_map = {\n        \"rates\": \"Prioritize same-day lock/float calls for active borrowers; send concise rate-change update to hot pipeline clients.\",\n        \"regulation_compliance\": \"Review disclosure/process impacts and align scripts/checklists before next borrower touchpoint.\",\n        \"underwriting_changes\": \"Re-screen active files against guideline changes and flag borderline borrowers for re-structuring.\",\n        \"regional_demand\": \"Adjust outreach by market segment; focus lead-gen where demand velocity is improving.\",\n    }\n\n    return IntelEvent(\n        title=title,\n        source=str(item.get(\"feed\") or \"rss\"),\n        url=str(item.get(\"link\") or \"\"),\n        published_at=item.get(\"published_at\"),\n        summary=summary,\n        topic=topic,\n        urgency=urgency,\n        lock_float=lock_float,\n        pipeline_effect=pipeline_effect,\n        impact_score=impact_score,\n        what_changed=what_changed,\n        what_to_do=action_map.get(topic, \"Monitor for downstream borrower impact and prep comms as needed.\"),\n        metadata={\n            \"macro\": {\"mortgage30\": mort, \"dgs10\": dgs10},\n            \"topic\": topic,\n            \"pipeline_effect\": pipeline_effect,\n        },\n    )\n\n\ndef maybe_create_task(event: IntelEvent, dry_run: bool) -> int | None:\n    if dry_run or event.urgency > 1 or event.impact_score < 0.84:\n        return None\n    title = f\"Mortgage Intel: {event.title[:90]}\"\n    desc = f\"{event.what_changed}\\n\\nWhat to do: {event.what_to_do}\"\n    sql = (\n        \"INSERT INTO cortana_tasks (source, title, description, priority, status, auto_executable, execution_plan, metadata) VALUES \"\n        f\"('mortgage_intel','{sql_escape(title)}','{sql_escape(desc)}',1,'ready',FALSE,\"\n        \"'Draft borrower-facing advisory + lock/float outreach list',\"\n        f\"'{sql_escape(json.dumps({'topic': event.topic, 'impact_score': event.impact_score, 'url': event.url}))}'::jsonb) RETURNING id;\"\n    )\n    raw = run_psql(sql)\n    return int(raw) if raw else None\n\n\ndef parse_args() -> argparse.Namespace:\n    p = argparse.ArgumentParser(description=\"Mortgage Intel Co-Pilot: FRED + mortgage RSS + broker advisory output\")\n    p.add_argument(\"--max-items\", type=int, default=8, help=\"Max advisories to produce\")\n    p.add_argument(\"--create-tasks\", action=\"store_true\", help=\"Auto-create cortana_tasks for high-urgency/high-impact advisories\")\n    p.add_argument(\"--dry-run\", action=\"store_true\", help=\"No DB writes\")\n    p.add_argument(\"--json\", action=\"store_true\", help=\"Output JSON instead of text\")\n    return p.parse_args()\n\n\ndef main() -> int:\n    args = parse_args()\n    now = datetime.now(timezone.utc).isoformat()\n\n    rates: dict[str, Any] = {}\n    errors: list[str] = []\n    for sid in SERIES:\n        try:\n            rates[sid] = fetch_fred_series(sid)\n        except Exception as e:\n            errors.append(f\"FRED {sid}: {e}\")\n\n    feed_items = fetch_rss_items(limit_per_feed=8)\n    advisories: list[IntelEvent] = []\n\n    if \"MORTGAGE30US\" in rates and \"DGS10\" in rates:\n        for item in feed_items:\n            if not is_mortgage_relevant(f\"{item.get('title','')} {item.get('summary','')}\"):\n                continue\n            try:\n                advisories.append(advisory_for(item, rates))\n            except Exception as e:\n                errors.append(f\"advisory {item.get('title','?')[:30]}: {e}\")\n\n    if not advisories and \"MORTGAGE30US\" in rates and \"DGS10\" in rates:\n        mort = rates[\"MORTGAGE30US\"]\n        dgs10 = rates[\"DGS10\"]\n        mort_shift_bp = (mort[\"latest_value\"] - mort[\"prior_value\"]) * 100\n        tsy_shift_bp = (dgs10[\"latest_value\"] - dgs10[\"prior_value\"]) * 100\n        urgency = 1 if abs(mort_shift_bp) >= 7 else 2\n        lock_float = \"bias_lock\" if mort_shift_bp >= 7 else (\"bias_float_selective\" if mort_shift_bp <= -7 else \"monitor\")\n        advisories.append(\n            IntelEvent(\n                title=\"Daily macro rate snapshot\",\n                source=\"FRED\",\n                url=\"https://fred.stlouisfed.org/\",\n                published_at=None,\n                summary=\"Macro-only fallback when RSS signals are thin.\",\n                topic=\"rates\",\n                urgency=urgency,\n                lock_float=lock_float,\n                pipeline_effect=\"pricing_volatility\",\n                impact_score=round(min(0.94, 0.74 + abs(mort_shift_bp) / 80.0), 3),\n                what_changed=(\n                    f\"30Y mortgage {mort['latest_value']:.2f}% ({mort_shift_bp:+.1f} bps) and \"\n                    f\"10Y treasury {dgs10['latest_value']:.2f}% ({tsy_shift_bp:+.1f} bps).\"\n                ),\n                what_to_do=\"Send lock/float guidance to active pipeline and prioritize borrowers near commitment deadlines.\",\n                metadata={\"macro\": {\"mortgage30\": mort, \"dgs10\": dgs10}, \"fallback\": True},\n            )\n        )\n\n    advisories.sort(key=lambda x: (x.urgency, -x.impact_score))\n    advisories = advisories[: max(1, args.max_items)]\n\n    created_tasks: list[int] = []\n    if not args.dry_run:\n        log_event(\n            message=f\"Mortgage intel run completed: {len(advisories)} advisories\",\n            severity=\"info\" if not errors else \"warning\",\n            metadata={\"advisories\": len(advisories), \"errors\": errors[:8]},\n            dry_run=False,\n        )\n\n    if args.create_tasks:\n        for adv in advisories:\n            try:\n                tid = maybe_create_task(adv, dry_run=args.dry_run)\n                if tid:\n                    created_tasks.append(tid)\n            except Exception as e:\n                errors.append(f\"task-create {adv.title[:30]}: {e}\")\n\n    payload = {\n        \"source\": SOURCE,\n        \"generated_at\": now,\n        \"series\": rates,\n        \"advisories\": [asdict(a) for a in advisories],\n        \"tasks_created\": created_tasks,\n        \"errors\": errors,\n    }\n\n    if args.json:\n        print(json.dumps(payload, indent=2))\n        return 0\n\n    print(\"Mortgage Intel \u2014 what changed / what to do\")\n    for i, a in enumerate(advisories, start=1):\n        print(f\"\\n{i}. [{a.topic}] {a.title}\")\n        print(f\"   what changed: {a.what_changed}\")\n        print(f\"   what to do:   {a.what_to_do}\")\n        print(f\"   impact: urgency={a.urgency} lock/float={a.lock_float} pipeline={a.pipeline_effect} score={a.impact_score}\")\n    if errors:\n        print(\"\\nErrors:\")\n        for e in errors[:12]:\n            print(f\"- {e}\")\n    return 0\n\n\nif __name__ == \"__main__\":\n    raise SystemExit(main())\n";
-  const dir = mkdtempSync(join(tmpdir(), 'pywrap-'));
-  const script = join(dir, 'script.py');
-  writeFileSync(script, py, 'utf8');
-  const proc = spawnSync('python3', [script, ...process.argv.slice(2)], { stdio: 'inherit' });
-  rmSync(dir, { recursive: true, force: true });
-  if (proc.error) {
-    console.error(String(proc.error));
-    process.exit(1);
-  }
-  process.exit(proc.status ?? 1);
+import { runPsql } from "../lib/db.js";
+
+const DB_NAME = "cortana";
+const SOURCE = "mortgage_intel";
+
+const SERIES: Record<string, string> = {
+  MORTGAGE30US: "30Y fixed mortgage average",
+  DGS10: "10Y Treasury yield",
+};
+
+const RSS_FEEDS = [
+  "https://www.mba.org/rss/news-and-research-news.xml",
+  "https://www.housingwire.com/feed/",
+  "https://www.mortgagenewsdaily.com/rss",
+  "https://www.nar.realtor/newsroom/rss",
+];
+
+const TOPIC_RULES: Record<string, string[]> = {
+  rates: ["rate", "yield", "treasury", "fed", "inflation", "cpi", "mortgage pricing", "lock", "float"],
+  regulation_compliance: [
+    "cfpb",
+    "fhfa",
+    "hud",
+    "fannie",
+    "freddie",
+    "compliance",
+    "rule",
+    "regulation",
+    "lawsuit",
+  ],
+  underwriting_changes: ["underwriting", "du", "lp", "guideline", "ltv", "dti", "credit", "eligibility", "reserve"],
+  regional_demand: [
+    "inventory",
+    "housing starts",
+    "regional",
+    "metro",
+    "demand",
+    "purchase volume",
+    "refi",
+    "application",
+  ],
+};
+
+type IntelEvent = {
+  title: string;
+  source: string;
+  url: string;
+  published_at: string | null;
+  summary: string;
+  topic: string;
+  urgency: number;
+  lock_float: string;
+  pipeline_effect: string;
+  impact_score: number;
+  what_changed: string;
+  what_to_do: string;
+  metadata: Record<string, any>;
+};
+
+function sqlEscape(value: string): string {
+  return (value || "").replace(/'/g, "''");
 }
 
-main().catch((err) => {
-  console.error(err instanceof Error ? err.message : String(err));
-  process.exit(1);
-});
+function runPsqlText(sql: string): string {
+  const proc = runPsql(sql, {
+    db: DB_NAME,
+    args: ["-q", "-X", "-v", "ON_ERROR_STOP=1", "-t", "-A"],
+    stdio: "pipe",
+  });
+  if (proc.status !== 0) throw new Error((proc.stderr || "").trim() || "psql failed");
+  return (proc.stdout || "").trim();
+}
+
+function logEvent(message: string, severity: string, metadata: Record<string, any>, dryRun: boolean): void {
+  if (dryRun) return;
+  const sql =
+    "INSERT INTO cortana_events (event_type, source, severity, message, metadata) VALUES " +
+    `('mortgage_intel','${SOURCE}','${sqlEscape(severity)}','${sqlEscape(message)}','${sqlEscape(
+      JSON.stringify(metadata),
+    )}'::jsonb);`;
+  runPsqlText(sql);
+}
+
+async function httpGet(url: string, timeout = 10): Promise<string> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeout * 1000);
+  try {
+    const res = await fetch(url, {
+      headers: { "User-Agent": "cortana-mortgage-intel/1.0" },
+      signal: controller.signal,
+    });
+    return await res.text();
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function fetchFredSeries(seriesId: string): Promise<Record<string, any>> {
+  const apiKey = (process.env.FRED_API_KEY ?? "").trim();
+  if (apiKey) {
+    const qs = new URLSearchParams({
+      series_id: seriesId,
+      api_key: apiKey,
+      file_type: "json",
+      sort_order: "desc",
+      limit: "5",
+    });
+    const url = `https://api.stlouisfed.org/fred/series/observations?${qs.toString()}`;
+    const payload = JSON.parse(await httpGet(url));
+    const obs = Array.isArray(payload.observations) ? payload.observations : [];
+    const points = obs.filter((o) => o?.value !== null && o?.value !== ".").slice(0, 2);
+    if (!points.length) throw new Error(`No observations for ${seriesId}`);
+    const latest = points[0];
+    const prior = points[1] ?? points[0];
+    return {
+      series_id: seriesId,
+      latest_date: latest.date,
+      latest_value: Number.parseFloat(latest.value),
+      prior_value: Number.parseFloat(prior.value),
+    };
+  }
+
+  const csvUrl = `https://fred.stlouisfed.org/graph/fredgraph.csv?id=${encodeURIComponent(seriesId)}`;
+  const rows = (await httpGet(csvUrl))
+    .split(/\r?\n/)
+    .filter((r) => r && !r.endsWith(",."));
+  if (rows.length < 3) throw new Error(`Insufficient CSV rows for ${seriesId}`);
+  const latestRow = rows[rows.length - 1].split(",");
+  const priorRow = rows[rows.length - 2].split(",");
+  return {
+    series_id: seriesId,
+    latest_date: latestRow[0],
+    latest_value: Number.parseFloat(latestRow[1]),
+    prior_value: Number.parseFloat(priorRow[1]),
+  };
+}
+
+function normalizeWhitespace(value: string): string {
+  return value.replace(/\s+/g, " ").trim();
+}
+
+function stripHtml(value: string): string {
+  return value.replace(/<[^>]+>/g, " ");
+}
+
+function extractXmlBlocks(xml: string, tag: string): string[] {
+  const re = new RegExp(`<${tag}[^>]*>([\\s\\S]*?)</${tag}>`, "gi");
+  const out: string[] = [];
+  let match: RegExpExecArray | null;
+  while ((match = re.exec(xml))) out.push(match[1]);
+  return out;
+}
+
+function extractTagText(block: string, tag: string): string | null {
+  const tagPattern = tag.includes(":") ? tag.replace(":", "\\:") : `(?:\\w+:)?${tag}`;
+  const re = new RegExp(`<${tagPattern}[^>]*>([\\s\\S]*?)</${tagPattern}>`, "i");
+  const m = block.match(re);
+  return m ? m[1] : null;
+}
+
+function extractLink(block: string): string {
+  const text = extractTagText(block, "link");
+  if (text && text.trim()) return text.trim();
+  const m = block.match(/<(?:\w+:)?link\b[^>]*href=["']([^"']+)["'][^>]*>/i);
+  if (m) return m[1];
+  return "";
+}
+
+async function fetchRssItems(limitPerFeed = 8): Promise<Array<Record<string, any>>> {
+  const out: Array<Record<string, any>> = [];
+  for (const feed of RSS_FEEDS) {
+    try {
+      const xmlTxt = await httpGet(feed);
+      let items = extractXmlBlocks(xmlTxt, "item");
+      if (!items.length) items = extractXmlBlocks(xmlTxt, "entry");
+      for (const item of items.slice(0, limitPerFeed)) {
+        const titleRaw = extractTagText(item, "title") ?? "";
+        const link = extractLink(item);
+        let desc =
+          extractTagText(item, "description") ??
+          extractTagText(item, "content:encoded") ??
+          "";
+        const pub =
+          extractTagText(item, "pubDate") ??
+          extractTagText(item, "updated") ??
+          extractTagText(item, "published") ??
+          null;
+        if (titleRaw) {
+          out.push({
+            feed,
+            title: normalizeWhitespace(titleRaw),
+            link,
+            summary: normalizeWhitespace(stripHtml(desc)).slice(0, 420),
+            published_at: pub,
+          });
+        }
+      }
+    } catch {
+      continue;
+    }
+  }
+  return out;
+}
+
+function containsKeyword(text: string, keyword: string): boolean {
+  const re = new RegExp(`\\b${keyword.toLowerCase().replace(/[-/\\^$*+?.()|[\]{}]/g, "\\$&")}\\b`, "i");
+  return re.test(text.toLowerCase());
+}
+
+function isMortgageRelevant(text: string): boolean {
+  const anchors = [
+    "mortgage",
+    "housing",
+    "loan",
+    "lending",
+    "borrower",
+    "refi",
+    "purchase",
+    "fannie",
+    "freddie",
+    "rate",
+    "underwriting",
+    "listing",
+    "realtor",
+    "real estate",
+    "home sales",
+    "inventory",
+  ];
+  return anchors.some((a) => containsKeyword(text, a));
+}
+
+function classifyTopic(text: string): string {
+  let bestTopic = "regional_demand";
+  let bestScore = 0;
+  for (const [topic, keywords] of Object.entries(TOPIC_RULES)) {
+    const score = keywords.filter((k) => containsKeyword(text, k)).length;
+    if (score > bestScore) {
+      bestTopic = topic;
+      bestScore = score;
+    }
+  }
+  return bestTopic;
+}
+
+function scoreImpact(topic: string, text: string, rateShiftBp: number): [number, string, string, number] {
+  const t = text.toLowerCase();
+  let urgency = 2;
+  if (["immediate", "effective", "urgent", "breaking"].some((w) => t.includes(w))) urgency = 1;
+  else if (["guidance", "proposal", "comment period"].some((w) => t.includes(w))) urgency = 3;
+
+  let lockFloat = "monitor";
+  if (topic === "rates") {
+    if (rateShiftBp >= 7) {
+      lockFloat = "bias_lock";
+      urgency = Math.min(urgency, 1);
+    } else if (rateShiftBp <= -7) {
+      lockFloat = "bias_float_selective";
+    }
+  }
+
+  const pipelineEffect: Record<string, string> = {
+    rates: "pricing_volatility",
+    regulation_compliance: "process_and_disclosure_updates",
+    underwriting_changes: "eligibility_mix_shift",
+    regional_demand: "lead_flow_and_conversion_shift",
+  };
+
+  let base = { rates: 0.78, regulation_compliance: 0.72, underwriting_changes: 0.69, regional_demand: 0.62 }[topic] ?? 0.6;
+  if (urgency === 1) base += 0.12;
+  else if (urgency === 2) base += 0.05;
+  base += Math.min(Math.abs(rateShiftBp) / 100.0, 0.08);
+
+  return [urgency, lockFloat, pipelineEffect[topic] ?? "monitor", Math.round(Math.min(base, 0.98) * 1000) / 1000];
+}
+
+function advisoryFor(item: Record<string, any>, rates: Record<string, any>): IntelEvent {
+  const title = String(item.title ?? "");
+  const summary = String(item.summary ?? "");
+  const text = `${title} ${summary}`;
+  const topic = classifyTopic(text);
+
+  const mort = rates.MORTGAGE30US;
+  const dgs10 = rates.DGS10;
+  const mortShiftBp = (mort.latest_value - mort.prior_value) * 100;
+  const tsyShiftBp = (dgs10.latest_value - dgs10.prior_value) * 100;
+
+  const [urgency, lockFloat, pipelineEffect, impactScore] = scoreImpact(topic, text, mortShiftBp);
+
+  const macroBlurb = `30Y mortgage ${mort.latest_value.toFixed(2)}% (${mortShiftBp >= 0 ? "+" : ""}${mortShiftBp.toFixed(
+    1,
+  )} bps) | 10Y treasury ${dgs10.latest_value.toFixed(2)}% (${tsyShiftBp >= 0 ? "+" : ""}${tsyShiftBp.toFixed(1)} bps)`;
+
+  const whatChanged = `${title}. Macro tape: ${macroBlurb}.`;
+
+  const actionMap: Record<string, string> = {
+    rates: "Prioritize same-day lock/float calls for active borrowers; send concise rate-change update to hot pipeline clients.",
+    regulation_compliance: "Review disclosure/process impacts and align scripts/checklists before next borrower touchpoint.",
+    underwriting_changes: "Re-screen active files against guideline changes and flag borderline borrowers for re-structuring.",
+    regional_demand: "Adjust outreach by market segment; focus lead-gen where demand velocity is improving.",
+  };
+
+  return {
+    title,
+    source: String(item.feed ?? "rss"),
+    url: String(item.link ?? ""),
+    published_at: item.published_at ?? null,
+    summary,
+    topic,
+    urgency,
+    lock_float: lockFloat,
+    pipeline_effect: pipelineEffect,
+    impact_score: impactScore,
+    what_changed: whatChanged,
+    what_to_do: actionMap[topic] ?? "Monitor for downstream borrower impact and prep comms as needed.",
+    metadata: { macro: { mortgage30: mort, dgs10 }, topic, pipeline_effect: pipelineEffect },
+  };
+}
+
+function maybeCreateTask(event: IntelEvent, dryRun: boolean): number | null {
+  if (dryRun || event.urgency > 1 || event.impact_score < 0.84) return null;
+  const title = `Mortgage Intel: ${event.title.slice(0, 90)}`;
+  const desc = `${event.what_changed}\n\nWhat to do: ${event.what_to_do}`;
+  const sql =
+    "INSERT INTO cortana_tasks (source, title, description, priority, status, auto_executable, execution_plan, metadata) VALUES " +
+    `('mortgage_intel','${sqlEscape(title)}','${sqlEscape(desc)}',1,'ready',FALSE,` +
+    "'Draft borrower-facing advisory + lock/float outreach list'," +
+    `'${sqlEscape(JSON.stringify({ topic: event.topic, impact_score: event.impact_score, url: event.url }))}'::jsonb) RETURNING id;`;
+  const raw = runPsqlText(sql);
+  return raw ? Number.parseInt(raw, 10) : null;
+}
+
+function parseArgs(argv: string[]) {
+  const args = {
+    maxItems: 8,
+    createTasks: false,
+    dryRun: false,
+    json: false,
+  };
+
+  for (let i = 0; i < argv.length; i += 1) {
+    const a = argv[i];
+    if (a === "--max-items") args.maxItems = Number.parseInt(argv[++i] ?? "8", 10);
+    else if (a === "--create-tasks") args.createTasks = true;
+    else if (a === "--dry-run") args.dryRun = true;
+    else if (a === "--json") args.json = true;
+  }
+
+  return args;
+}
+
+async function main(): Promise<number> {
+  const args = parseArgs(process.argv.slice(2));
+  const now = new Date().toISOString();
+
+  const rates: Record<string, any> = {};
+  const errors: string[] = [];
+  for (const sid of Object.keys(SERIES)) {
+    try {
+      rates[sid] = await fetchFredSeries(sid);
+    } catch (err) {
+      errors.push(`FRED ${sid}: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
+
+  const feedItems = await fetchRssItems(8);
+  const advisories: IntelEvent[] = [];
+
+  if (rates.MORTGAGE30US && rates.DGS10) {
+    for (const item of feedItems) {
+      if (!isMortgageRelevant(`${item.title ?? ""} ${item.summary ?? ""}`)) continue;
+      try {
+        advisories.push(advisoryFor(item, rates));
+      } catch (err) {
+        errors.push(`advisory ${(item.title ?? "?").slice(0, 30)}: ${err instanceof Error ? err.message : String(err)}`);
+      }
+    }
+  }
+
+  if (!advisories.length && rates.MORTGAGE30US && rates.DGS10) {
+    const mort = rates.MORTGAGE30US;
+    const dgs10 = rates.DGS10;
+    const mortShiftBp = (mort.latest_value - mort.prior_value) * 100;
+    const tsyShiftBp = (dgs10.latest_value - dgs10.prior_value) * 100;
+    const urgency = Math.abs(mortShiftBp) >= 7 ? 1 : 2;
+    const lockFloat = mortShiftBp >= 7 ? "bias_lock" : mortShiftBp <= -7 ? "bias_float_selective" : "monitor";
+    advisories.push({
+      title: "Daily macro rate snapshot",
+      source: "FRED",
+      url: "https://fred.stlouisfed.org/",
+      published_at: null,
+      summary: "Macro-only fallback when RSS signals are thin.",
+      topic: "rates",
+      urgency,
+      lock_float: lockFloat,
+      pipeline_effect: "pricing_volatility",
+      impact_score: Math.round(Math.min(0.94, 0.74 + Math.abs(mortShiftBp) / 80.0) * 1000) / 1000,
+      what_changed: `30Y mortgage ${mort.latest_value.toFixed(2)}% (${mortShiftBp >= 0 ? "+" : ""}${mortShiftBp.toFixed(
+        1,
+      )} bps) and 10Y treasury ${dgs10.latest_value.toFixed(2)}% (${tsyShiftBp >= 0 ? "+" : ""}${tsyShiftBp.toFixed(1)} bps).`,
+      what_to_do: "Send lock/float guidance to active pipeline and prioritize borrowers near commitment deadlines.",
+      metadata: { macro: { mortgage30: mort, dgs10 }, fallback: true },
+    });
+  }
+
+  advisories.sort((a, b) => {
+    if (a.urgency !== b.urgency) return a.urgency - b.urgency;
+    return b.impact_score - a.impact_score;
+  });
+  const maxItems = Math.max(1, args.maxItems);
+  const finalAdvisories = advisories.slice(0, maxItems);
+
+  const createdTasks: number[] = [];
+  if (!args.dryRun) {
+    logEvent(
+      `Mortgage intel run completed: ${finalAdvisories.length} advisories`,
+      errors.length ? "warning" : "info",
+      { advisories: finalAdvisories.length, errors: errors.slice(0, 8) },
+      false,
+    );
+  }
+
+  if (args.createTasks) {
+    for (const adv of finalAdvisories) {
+      try {
+        const tid = maybeCreateTask(adv, args.dryRun);
+        if (tid) createdTasks.push(tid);
+      } catch (err) {
+        errors.push(`task-create ${adv.title.slice(0, 30)}: ${err instanceof Error ? err.message : String(err)}`);
+      }
+    }
+  }
+
+  const payload = {
+    source: SOURCE,
+    generated_at: now,
+    series: rates,
+    advisories: finalAdvisories,
+    tasks_created: createdTasks,
+    errors,
+  };
+
+  if (args.json) {
+    console.log(JSON.stringify(payload, null, 2));
+    return 0;
+  }
+
+  console.log("Mortgage Intel — what changed / what to do");
+  finalAdvisories.forEach((a, idx) => {
+    console.log(`\n${idx + 1}. [${a.topic}] ${a.title}`);
+    console.log(`   what changed: ${a.what_changed}`);
+    console.log(`   what to do:   ${a.what_to_do}`);
+    console.log(
+      `   impact: urgency=${a.urgency} lock/float=${a.lock_float} pipeline=${a.pipeline_effect} score=${a.impact_score}`,
+    );
+  });
+  if (errors.length) {
+    console.log("\nErrors:");
+    for (const e of errors.slice(0, 12)) {
+      console.log(`- ${e}`);
+    }
+  }
+  return 0;
+}
+
+main()
+  .then((code) => process.exit(code))
+  .catch((err) => {
+    console.error(err instanceof Error ? err.message : String(err));
+    process.exit(1);
+  });

@@ -1,24 +1,363 @@
 #!/usr/bin/env npx tsx
-import { spawnSync } from 'node:child_process';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
 
-async function main(): Promise<void> {
-  const py = "#!/usr/bin/env python3\n\"\"\"Precompute Oracle cache for the 6AM brief.\n\nRuns at 5:30 AM (launchd) to prefetch likely morning asks:\n- weather (Warren, NJ)\n- calendar events (today)\n- portfolio snapshot\n- fitness recovery\n- email highlights\n\nCache is stored at ~/openclaw/tmp/oracle-cache.json with per-source TTL.\nAlso exposes a lightweight read API:\n  python3 precompute.py run\n  python3 precompute.py read [weather|calendar|portfolio|recovery|email]\n  python3 precompute.py status\n\"\"\"\n\nfrom __future__ import annotations\n\nimport argparse\nimport json\nimport os\nimport subprocess\nfrom dataclasses import dataclass\nfrom datetime import datetime, timedelta, timezone\nfrom pathlib import Path\nfrom typing import Any\nfrom urllib.error import URLError\nfrom urllib.request import Request, urlopen\n\nROOT = Path(\"/Users/hd/openclaw\")\nCACHE_PATH = ROOT / \"tmp\" / \"oracle-cache.json\"\nLOG_PATH = ROOT / \"tmp\" / \"oracle-precompute.log\"\nET_TZ = \"America/New_York\"\n\nDEFAULT_TTLS = {\n    \"weather\": 3 * 60 * 60,\n    \"calendar\": 90 * 60,\n    \"portfolio\": 45 * 60,\n    \"recovery\": 90 * 60,\n    \"email\": 30 * 60,\n}\n\n\n@dataclass\nclass SourceResult:\n    source: str\n    ok: bool\n    fetched_at: str\n    expires_at: str\n    ttl_seconds: int\n    data: Any = None\n    error: str | None = None\n\n\ndef now_utc() -> datetime:\n    return datetime.now(timezone.utc)\n\n\ndef iso(dt: datetime) -> str:\n    return dt.isoformat()\n\n\ndef run_cmd(cmd: list[str], timeout: int = 20) -> str:\n    env = os.environ.copy()\n    env[\"PATH\"] = \"/opt/homebrew/bin:/opt/homebrew/opt/postgresql@17/bin:/usr/local/bin:/usr/bin:/bin\"\n    p = subprocess.run(cmd, text=True, capture_output=True, timeout=timeout, env=env)\n    if p.returncode != 0:\n        err = (p.stderr or p.stdout or \"command failed\").strip()\n        raise RuntimeError(err)\n    return p.stdout.strip()\n\n\ndef read_json_url(url: str, timeout: int = 10, headers: dict[str, str] | None = None) -> Any:\n    req = Request(url, headers=headers or {\"User-Agent\": \"oracle-precompute/1.0\"})\n    with urlopen(req, timeout=timeout) as r:  # noqa: S310 (trusted public endpoint)\n        return json.loads(r.read().decode(\"utf-8\"))\n\n\ndef fetch_weather() -> Any:\n    # Primary: wttr.in text (fast + human-readable)\n    try:\n        wttr = run_cmd([\"curl\", \"-fsSL\", \"https://wttr.in/Warren,NJ?format=j1\"], timeout=12)\n        return {\"provider\": \"wttr.in\", \"payload\": json.loads(wttr)}\n    except Exception:\n        # Fallback: Open-Meteo (documented local fallback)\n        om_url = (\n            \"https://api.open-meteo.com/v1/forecast\"\n            \"?latitude=40.63&longitude=-74.49\"\n            \"&current_weather=true\"\n            \"&temperature_unit=fahrenheit\"\n            \"&daily=temperature_2m_max,temperature_2m_min,precipitation_sum,weathercode\"\n            \"&timezone=America/New_York&forecast_days=2\"\n        )\n        payload = read_json_url(om_url, timeout=12)\n        return {\"provider\": \"open-meteo\", \"payload\": payload}\n\n\ndef fetch_calendar() -> Any:\n    raw = run_cmd([\"gog\", \"cal\", \"list\", \"--days\", \"1\", \"--plain\"], timeout=20)\n    lines = [ln.strip() for ln in raw.splitlines() if ln.strip()]\n    return {\"provider\": \"gog\", \"events\": lines, \"count\": len(lines)}\n\n\ndef fetch_portfolio() -> Any:\n    # Preferred path: Alpaca account snapshot if credentials exist.\n    key = os.getenv(\"ALPACA_API_KEY\") or os.getenv(\"APCA_API_KEY_ID\")\n    secret = os.getenv(\"ALPACA_API_SECRET\") or os.getenv(\"APCA_API_SECRET_KEY\")\n    base = os.getenv(\"ALPACA_BASE_URL\", \"https://paper-api.alpaca.markets\")\n\n    if key and secret:\n        headers = {\"APCA-API-KEY-ID\": key, \"APCA-API-SECRET-KEY\": secret}\n        acct = read_json_url(f\"{base.rstrip('/')}/v2/account\", timeout=10, headers=headers)\n        positions = read_json_url(f\"{base.rstrip('/')}/v2/positions\", timeout=12, headers=headers)\n        return {\n            \"provider\": \"alpaca\",\n            \"equity\": acct.get(\"equity\"),\n            \"cash\": acct.get(\"cash\"),\n            \"buying_power\": acct.get(\"buying_power\"),\n            \"positions_count\": len(positions) if isinstance(positions, list) else 0,\n            \"top_positions\": positions[:10] if isinstance(positions, list) else [],\n        }\n\n    # Fallback: known long-term snapshot from memory table context.\n    mem = run_cmd(\n        [\n            \"psql\",\n            \"cortana\",\n            \"-At\",\n            \"-c\",\n            \"SELECT metadata::text FROM cortana_tasks WHERE title ILIKE '%portfolio%' ORDER BY created_at DESC LIMIT 1;\",\n        ],\n        timeout=8,\n    )\n    return {\n        \"provider\": \"fallback\",\n        \"note\": \"Alpaca credentials not available in environment during precompute run.\",\n        \"latest_task_metadata\": mem or None,\n    }\n\n\ndef fetch_recovery() -> Any:\n    # Try local fitness service endpoints (best-effort).\n    endpoints = [\n        \"http://localhost:3033/whoop/recovery/latest\",\n        \"http://localhost:3033/fitness/recovery\",\n        \"http://localhost:3033/tonal/recovery\",\n        \"http://localhost:3033/tonal/health\",\n    ]\n    errors = []\n    for ep in endpoints:\n        try:\n            out = run_cmd([\"curl\", \"-fsSL\", \"--max-time\", \"8\", ep], timeout=10)\n            try:\n                payload = json.loads(out)\n            except Exception:\n                payload = {\"raw\": out}\n            return {\"provider\": \"local-fitness-service\", \"endpoint\": ep, \"payload\": payload}\n        except Exception as e:  # noqa: BLE001\n            errors.append(f\"{ep}: {e}\")\n\n    # Fallback: no service available; return a structured failure payload.\n    return {\n        \"provider\": \"fallback\",\n        \"note\": \"No local fitness endpoint responded during precompute.\",\n        \"attempts\": errors,\n    }\n\n\ndef fetch_email() -> Any:\n    # Pull lightweight unread highlights likely relevant to morning triage.\n    queries = [\n        \"is:unread newer_than:3d -category:promotions -category:social\",\n        \"is:unread newer_than:1d\",\n    ]\n\n    last_error = None\n    for q in queries:\n        commands = [\n            [\"gog\", \"gmail\", \"search\", \"--query\", q, \"--max\", \"15\", \"--json\"],\n            [\"gog\", \"gmail\", \"search\", q, \"--max\", \"15\", \"--json\"],\n        ]\n        for cmd in commands:\n            try:\n                raw = run_cmd(cmd, timeout=20)\n                payload = json.loads(raw) if raw else []\n                if isinstance(payload, dict):\n                    for key in (\"messages\", \"results\", \"items\", \"threads\"):\n                        if isinstance(payload.get(key), list):\n                            payload = payload[key]\n                            break\n                if not isinstance(payload, list):\n                    payload = []\n                highlights = []\n                for item in payload[:10]:\n                    if not isinstance(item, dict):\n                        continue\n                    highlights.append(\n                        {\n                            \"id\": item.get(\"id\") or item.get(\"messageId\"),\n                            \"threadId\": item.get(\"threadId\") or item.get(\"thread_id\"),\n                            \"from\": item.get(\"from\") or item.get(\"sender\"),\n                            \"subject\": item.get(\"subject\"),\n                            \"date\": item.get(\"date\") or item.get(\"timestamp\"),\n                            \"snippet\": item.get(\"snippet\") or item.get(\"preview\"),\n                        }\n                    )\n                return {\n                    \"provider\": \"gog\",\n                    \"query\": q,\n                    \"count\": len(highlights),\n                    \"highlights\": highlights,\n                }\n            except Exception as e:  # noqa: BLE001\n                last_error = str(e)\n\n    raise RuntimeError(last_error or \"failed to fetch email highlights\")\n\n\ndef collect() -> dict[str, SourceResult]:\n    handlers = {\n        \"weather\": fetch_weather,\n        \"calendar\": fetch_calendar,\n        \"portfolio\": fetch_portfolio,\n        \"recovery\": fetch_recovery,\n        \"email\": fetch_email,\n    }\n\n    results: dict[str, SourceResult] = {}\n    t0 = now_utc()\n    for name, fn in handlers.items():\n        ttl = DEFAULT_TTLS[name]\n        fetched_at = now_utc()\n        expires_at = fetched_at + timedelta(seconds=ttl)\n        try:\n            data = fn()\n            ok = True\n            err = None\n        except Exception as e:  # noqa: BLE001\n            data = None\n            ok = False\n            err = str(e)\n\n        results[name] = SourceResult(\n            source=name,\n            ok=ok,\n            fetched_at=iso(fetched_at),\n            expires_at=iso(expires_at),\n            ttl_seconds=ttl,\n            data=data,\n            error=err,\n        )\n\n    # Global TTL: minimum of individual expiries.\n    min_expiry = min(datetime.fromisoformat(r.expires_at) for r in results.values())\n    payload = {\n        \"generated_at\": iso(t0),\n        \"expires_at\": iso(min_expiry),\n        \"ttl_seconds\": int((min_expiry - t0).total_seconds()),\n        \"sources\": {k: vars(v) for k, v in results.items()},\n    }\n    return payload\n\n\ndef cache_write(payload: dict[str, Any]) -> None:\n    CACHE_PATH.parent.mkdir(parents=True, exist_ok=True)\n    LOG_PATH.parent.mkdir(parents=True, exist_ok=True)\n    CACHE_PATH.write_text(json.dumps(payload, indent=2), encoding=\"utf-8\")\n    with LOG_PATH.open(\"a\", encoding=\"utf-8\") as f:\n        f.write(f\"[{datetime.now().isoformat()}] precompute run ok={summary_ok(payload)}\\n\")\n\n\ndef summary_ok(payload: dict[str, Any]) -> dict[str, bool]:\n    out: dict[str, bool] = {}\n    for name, src in payload.get(\"sources\", {}).items():\n        out[name] = bool(src.get(\"ok\"))\n    return out\n\n\ndef cache_read() -> dict[str, Any]:\n    if not CACHE_PATH.exists():\n        raise FileNotFoundError(f\"cache not found: {CACHE_PATH}\")\n    return json.loads(CACHE_PATH.read_text(encoding=\"utf-8\"))\n\n\ndef is_stale(entry: dict[str, Any]) -> bool:\n    exp = entry.get(\"expires_at\")\n    if not exp:\n        return True\n    return datetime.fromisoformat(exp) < now_utc()\n\n\ndef cmd_run(_: argparse.Namespace) -> int:\n    payload = collect()\n    cache_write(payload)\n    print(json.dumps({\"cache\": str(CACHE_PATH), \"ok\": summary_ok(payload)}, indent=2))\n    return 0\n\n\ndef cmd_read(args: argparse.Namespace) -> int:\n    cache = cache_read()\n    if args.section:\n        src = cache.get(\"sources\", {}).get(args.section)\n        if not src:\n            raise SystemExit(f\"unknown section: {args.section}\")\n        if is_stale(src) and not args.allow_stale:\n            raise SystemExit(f\"section '{args.section}' is stale (pass --allow-stale)\")\n        print(json.dumps(src, indent=2))\n        return 0\n\n    # full cache read\n    if is_stale(cache) and not args.allow_stale:\n        raise SystemExit(\"oracle cache is stale (pass --allow-stale)\")\n    print(json.dumps(cache, indent=2))\n    return 0\n\n\ndef cmd_status(_: argparse.Namespace) -> int:\n    try:\n        cache = cache_read()\n    except FileNotFoundError:\n        print(json.dumps({\"exists\": False, \"cache\": str(CACHE_PATH)}, indent=2))\n        return 1\n\n    status = {\n        \"exists\": True,\n        \"generated_at\": cache.get(\"generated_at\"),\n        \"expires_at\": cache.get(\"expires_at\"),\n        \"stale\": is_stale(cache),\n        \"sources\": {\n            name: {\n                \"ok\": bool(src.get(\"ok\")),\n                \"stale\": is_stale(src),\n                \"expires_at\": src.get(\"expires_at\"),\n            }\n            for name, src in cache.get(\"sources\", {}).items()\n        },\n    }\n    print(json.dumps(status, indent=2))\n    return 0\n\n\ndef build_parser() -> argparse.ArgumentParser:\n    p = argparse.ArgumentParser(description=\"Precompute Oracle cache for morning brief\")\n    sub = p.add_subparsers(dest=\"cmd\", required=True)\n\n    run = sub.add_parser(\"run\", help=\"prefetch all sources and write cache\")\n    run.set_defaults(func=cmd_run)\n\n    read = sub.add_parser(\"read\", help=\"read cache or a section\")\n    read.add_argument(\"section\", nargs=\"?\", choices=[\"weather\", \"calendar\", \"portfolio\", \"recovery\", \"email\"])\n    read.add_argument(\"--allow-stale\", action=\"store_true\", help=\"allow stale cache reads\")\n    read.set_defaults(func=cmd_read)\n\n    status = sub.add_parser(\"status\", help=\"cache health summary\")\n    status.set_defaults(func=cmd_status)\n\n    return p\n\n\ndef main() -> int:\n    parser = build_parser()\n    args = parser.parse_args()\n    return int(args.func(args))\n\n\nif __name__ == \"__main__\":\n    raise SystemExit(main())\n";
-  const dir = mkdtempSync(join(tmpdir(), 'pywrap-'));
-  const script = join(dir, 'script.py');
-  writeFileSync(script, py, 'utf8');
-  const proc = spawnSync('python3', [script, ...process.argv.slice(2)], { stdio: 'inherit' });
-  rmSync(dir, { recursive: true, force: true });
-  if (proc.error) {
-    console.error(String(proc.error));
-    process.exit(1);
-  }
-  process.exit(proc.status ?? 1);
+import { spawnSync } from "node:child_process";
+import fs from "node:fs";
+import path from "node:path";
+import { repoRoot } from "../lib/paths.js";
+import { readJsonFile, writeJsonFileAtomic } from "../lib/json-file.js";
+
+const ROOT = repoRoot();
+const CACHE_PATH = path.join(ROOT, "tmp", "oracle-cache.json");
+const LOG_PATH = path.join(ROOT, "tmp", "oracle-precompute.log");
+
+const DEFAULT_TTLS: Record<string, number> = {
+  weather: 3 * 60 * 60,
+  calendar: 90 * 60,
+  portfolio: 45 * 60,
+  recovery: 90 * 60,
+  email: 30 * 60,
+};
+
+type SourceResult = {
+  source: string;
+  ok: boolean;
+  fetched_at: string;
+  expires_at: string;
+  ttl_seconds: number;
+  data?: any;
+  error?: string | null;
+};
+
+function nowUtc(): Date {
+  return new Date();
 }
 
-main().catch((err) => {
-  console.error(err instanceof Error ? err.message : String(err));
-  process.exit(1);
-});
+function iso(dt: Date): string {
+  return dt.toISOString();
+}
+
+function runCmd(cmd: string[], timeout = 20): string {
+  const env = { ...process.env };
+  env.PATH = "/opt/homebrew/bin:/opt/homebrew/opt/postgresql@17/bin:/usr/local/bin:/usr/bin:/bin";
+  const proc = spawnSync(cmd[0], cmd.slice(1), { encoding: "utf8", timeout: timeout * 1000, env });
+  if (proc.status !== 0) {
+    const err = (proc.stderr || proc.stdout || "command failed").toString().trim();
+    throw new Error(err);
+  }
+  return (proc.stdout || "").toString().trim();
+}
+
+async function readJsonUrl(url: string, timeout = 10, headers?: Record<string, string>): Promise<any> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeout * 1000);
+  try {
+    const res = await fetch(url, { headers: headers ?? { "User-Agent": "oracle-precompute/1.0" }, signal: controller.signal });
+    const text = await res.text();
+    return JSON.parse(text);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function fetchWeather(): Promise<any> {
+  try {
+    const wttr = runCmd(["curl", "-fsSL", "https://wttr.in/Warren,NJ?format=j1"], 12);
+    return { provider: "wttr.in", payload: JSON.parse(wttr) };
+  } catch {
+    const omUrl =
+      "https://api.open-meteo.com/v1/forecast" +
+      "?latitude=40.63&longitude=-74.49" +
+      "&current_weather=true" +
+      "&temperature_unit=fahrenheit" +
+      "&daily=temperature_2m_max,temperature_2m_min,precipitation_sum,weathercode" +
+      "&timezone=America/New_York&forecast_days=2";
+    const payload = await readJsonUrl(omUrl, 12);
+    return { provider: "open-meteo", payload };
+  }
+}
+
+function fetchCalendar(): any {
+  const raw = runCmd(["gog", "cal", "list", "--days", "1", "--plain"], 20);
+  const lines = raw.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  return { provider: "gog", events: lines, count: lines.length };
+}
+
+async function fetchPortfolio(): Promise<any> {
+  const key = process.env.ALPACA_API_KEY ?? process.env.APCA_API_KEY_ID;
+  const secret = process.env.ALPACA_API_SECRET ?? process.env.APCA_API_SECRET_KEY;
+  const base = process.env.ALPACA_BASE_URL ?? "https://paper-api.alpaca.markets";
+
+  if (key && secret) {
+    const headers = { "APCA-API-KEY-ID": key, "APCA-API-SECRET-KEY": secret };
+    const acct = await readJsonUrl(`${base.replace(/\/$/, "")}/v2/account`, 10, headers);
+    const positions = await readJsonUrl(`${base.replace(/\/$/, "")}/v2/positions`, 12, headers);
+    return {
+      provider: "alpaca",
+      equity: acct?.equity,
+      cash: acct?.cash,
+      buying_power: acct?.buying_power,
+      positions_count: Array.isArray(positions) ? positions.length : 0,
+      top_positions: Array.isArray(positions) ? positions.slice(0, 10) : [],
+    };
+  }
+
+  const mem = runCmd(
+    [
+      "psql",
+      "cortana",
+      "-At",
+      "-c",
+      "SELECT metadata::text FROM cortana_tasks WHERE title ILIKE '%portfolio%' ORDER BY created_at DESC LIMIT 1;",
+    ],
+    8,
+  );
+  return {
+    provider: "fallback",
+    note: "Alpaca credentials not available in environment during precompute run.",
+    latest_task_metadata: mem || null,
+  };
+}
+
+async function fetchRecovery(): Promise<any> {
+  const endpoints = [
+    "http://localhost:3033/whoop/recovery/latest",
+    "http://localhost:3033/fitness/recovery",
+    "http://localhost:3033/tonal/recovery",
+    "http://localhost:3033/tonal/health",
+  ];
+  const errors: string[] = [];
+  for (const ep of endpoints) {
+    try {
+      const out = runCmd(["curl", "-fsSL", "--max-time", "8", ep], 10);
+      let payload: any;
+      try {
+        payload = JSON.parse(out);
+      } catch {
+        payload = { raw: out };
+      }
+      return { provider: "local-fitness-service", endpoint: ep, payload };
+    } catch (err) {
+      errors.push(`${ep}: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
+
+  return {
+    provider: "fallback",
+    note: "No local fitness endpoint responded during precompute.",
+    attempts: errors,
+  };
+}
+
+function normalizeGogPayload(payload: any): any[] {
+  if (Array.isArray(payload)) return payload;
+  if (payload && typeof payload === "object") {
+    for (const key of ["messages", "results", "items", "threads"]) {
+      if (Array.isArray(payload[key])) return payload[key];
+    }
+  }
+  return [];
+}
+
+async function fetchEmail(): Promise<any> {
+  const queries = [
+    "is:unread newer_than:3d -category:promotions -category:social",
+    "is:unread newer_than:1d",
+  ];
+
+  let lastError: string | null = null;
+  for (const q of queries) {
+    const commands = [
+      ["gog", "gmail", "search", "--query", q, "--max", "15", "--json"],
+      ["gog", "gmail", "search", q, "--max", "15", "--json"],
+    ];
+    for (const cmd of commands) {
+      try {
+        const raw = runCmd(cmd, 20);
+        const payload = raw ? JSON.parse(raw) : [];
+        const items = normalizeGogPayload(payload);
+        const highlights = items.slice(0, 10).map((item: any) => ({
+          id: item?.id ?? item?.messageId,
+          threadId: item?.threadId ?? item?.thread_id,
+          from: item?.from ?? item?.sender,
+          subject: item?.subject,
+          date: item?.date ?? item?.timestamp,
+          snippet: item?.snippet ?? item?.preview,
+        }));
+        return { provider: "gog", query: q, count: highlights.length, highlights };
+      } catch (err) {
+        lastError = err instanceof Error ? err.message : String(err);
+      }
+    }
+  }
+
+  throw new Error(lastError || "failed to fetch email highlights");
+}
+
+async function collect(): Promise<Record<string, any>> {
+  const handlers: Record<string, () => Promise<any> | any> = {
+    weather: fetchWeather,
+    calendar: fetchCalendar,
+    portfolio: fetchPortfolio,
+    recovery: fetchRecovery,
+    email: fetchEmail,
+  };
+
+  const results: Record<string, SourceResult> = {};
+  const t0 = nowUtc();
+  for (const [name, fn] of Object.entries(handlers)) {
+    const ttl = DEFAULT_TTLS[name];
+    const fetchedAt = nowUtc();
+    const expiresAt = new Date(fetchedAt.getTime() + ttl * 1000);
+    try {
+      const data = await fn();
+      results[name] = {
+        source: name,
+        ok: true,
+        fetched_at: iso(fetchedAt),
+        expires_at: iso(expiresAt),
+        ttl_seconds: ttl,
+        data,
+        error: null,
+      };
+    } catch (err) {
+      results[name] = {
+        source: name,
+        ok: false,
+        fetched_at: iso(fetchedAt),
+        expires_at: iso(expiresAt),
+        ttl_seconds: ttl,
+        data: null,
+        error: err instanceof Error ? err.message : String(err),
+      };
+    }
+  }
+
+  const minExpiry = new Date(
+    Math.min(...Object.values(results).map((r) => new Date(r.expires_at).getTime())),
+  );
+
+  return {
+    generated_at: iso(t0),
+    expires_at: iso(minExpiry),
+    ttl_seconds: Math.floor((minExpiry.getTime() - t0.getTime()) / 1000),
+    sources: Object.fromEntries(Object.entries(results).map(([k, v]) => [k, { ...v }])),
+  };
+}
+
+function summaryOk(payload: Record<string, any>): Record<string, boolean> {
+  const out: Record<string, boolean> = {};
+  const sources = payload.sources ?? {};
+  for (const [name, src] of Object.entries(sources)) {
+    out[name] = Boolean((src as any).ok);
+  }
+  return out;
+}
+
+function cacheWrite(payload: Record<string, any>): void {
+  fs.mkdirSync(path.dirname(CACHE_PATH), { recursive: true });
+  fs.mkdirSync(path.dirname(LOG_PATH), { recursive: true });
+  writeJsonFileAtomic(CACHE_PATH, payload, 2);
+  const line = `[${new Date().toISOString()}] precompute run ok=${JSON.stringify(summaryOk(payload))}\n`;
+  fs.appendFileSync(LOG_PATH, line, "utf8");
+}
+
+function cacheRead(): Record<string, any> {
+  if (!fs.existsSync(CACHE_PATH)) throw new Error(`cache not found: ${CACHE_PATH}`);
+  const data = readJsonFile<Record<string, any>>(CACHE_PATH);
+  if (!data) throw new Error(`cache not found: ${CACHE_PATH}`);
+  return data;
+}
+
+function isStale(entry: Record<string, any>): boolean {
+  const exp = entry.expires_at;
+  if (!exp) return true;
+  return new Date(exp).getTime() < nowUtc().getTime();
+}
+
+async function cmdRun(): Promise<number> {
+  const payload = await collect();
+  cacheWrite(payload);
+  console.log(JSON.stringify({ cache: CACHE_PATH, ok: summaryOk(payload) }, null, 2));
+  return 0;
+}
+
+function cmdRead(section: string | null, allowStale: boolean): number {
+  const cache = cacheRead();
+  if (section) {
+    const src = cache.sources?.[section];
+    if (!src) throw new Error(`unknown section: ${section}`);
+    if (isStale(src) && !allowStale) throw new Error(`section '${section}' is stale (pass --allow-stale)`);
+    console.log(JSON.stringify(src, null, 2));
+    return 0;
+  }
+
+  if (isStale(cache) && !allowStale) throw new Error("oracle cache is stale (pass --allow-stale)");
+  console.log(JSON.stringify(cache, null, 2));
+  return 0;
+}
+
+function cmdStatus(): number {
+  if (!fs.existsSync(CACHE_PATH)) {
+    console.log(JSON.stringify({ exists: false, cache: CACHE_PATH }, null, 2));
+    return 1;
+  }
+
+  const cache = cacheRead();
+  const status = {
+    exists: true,
+    generated_at: cache.generated_at,
+    expires_at: cache.expires_at,
+    stale: isStale(cache),
+    sources: Object.fromEntries(
+      Object.entries(cache.sources ?? {}).map(([name, src]) => [
+        name,
+        {
+          ok: Boolean((src as any).ok),
+          stale: isStale(src as any),
+          expires_at: (src as any).expires_at,
+        },
+      ]),
+    ),
+  };
+  console.log(JSON.stringify(status, null, 2));
+  return 0;
+}
+
+function parseArgs(argv: string[]) {
+  const cmd = argv[0];
+  if (!cmd) throw new Error("command required: run|read|status");
+
+  if (cmd === "run") return { cmd, section: null, allowStale: false };
+
+  if (cmd === "read") {
+    let section: string | null = null;
+    let allowStale = false;
+    for (let i = 1; i < argv.length; i += 1) {
+      const a = argv[i];
+      if (!a.startsWith("--") && !section) {
+        section = a;
+      } else if (a === "--allow-stale") {
+        allowStale = true;
+      }
+    }
+    return { cmd, section, allowStale };
+  }
+
+  if (cmd === "status") return { cmd, section: null, allowStale: false };
+
+  throw new Error(`unknown command: ${cmd}`);
+}
+
+async function main(): Promise<number> {
+  const args = parseArgs(process.argv.slice(2));
+  if (args.cmd === "run") return cmdRun();
+  if (args.cmd === "read") return cmdRead(args.section, args.allowStale);
+  return cmdStatus();
+}
+
+main()
+  .then((code) => process.exit(code))
+  .catch((err) => {
+    console.error(err instanceof Error ? err.message : String(err));
+    process.exit(1);
+  });

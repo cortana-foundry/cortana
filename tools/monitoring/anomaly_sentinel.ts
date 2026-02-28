@@ -1,21 +1,523 @@
 #!/usr/bin/env npx tsx
-import { spawnSync } from 'node:child_process';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+
+import { query } from "../lib/db.js";
+
+type Json = Record<string, any>;
+
+type Anomaly = {
+  anomaly_class: string;
+  severity: string;
+  title: string;
+  message: string;
+  fingerprint: string;
+  metric_name: string;
+  latest_value: number;
+  baseline_mean: number;
+  baseline_stddev: number;
+  z_score: number;
+  threshold: number;
+  details: Record<string, any>;
+};
+
+const DB_NAME = process.env.CORTANA_DB ?? "cortana";
+const SOURCE = "anomaly_sentinel";
+
+function sqlEscape(text: string): string {
+  return (text || "").replace(/'/g, "''");
+}
+
+function runPsql(sql: string): string {
+  return query(sql).trim();
+}
+
+function fetchJson(sql: string): any {
+  const wrapped = `SELECT COALESCE(json_agg(t), '[]'::json) FROM (${sql}) t;`;
+  const raw = runPsql(wrapped);
+  return raw ? JSON.parse(raw) : [];
+}
+
+function meanStddev(values: number[]): [number, number] {
+  if (!values.length) return [0, 0];
+  if (values.length === 1) return [values[0], 0];
+  const mean = values.reduce((a, b) => a + b, 0) / values.length;
+  const variance = values.reduce((acc, v) => acc + (v - mean) ** 2, 0) / values.length;
+  return [mean, Math.sqrt(variance)];
+}
+
+function spikeTest(
+  metricName: string,
+  latestValue: number,
+  baseline: number[],
+  opts: { hardThreshold: number; zThreshold?: number; ratioThreshold?: number }
+): [boolean, number, number, number] {
+  const [baselineMean, baselineStd] = meanStddev(baseline);
+  let z = 0;
+  if (baselineStd > 0) z = (latestValue - baselineMean) / baselineStd;
+  const ratioThreshold = opts.ratioThreshold ?? 1.6;
+  const zThreshold = opts.zThreshold ?? 2.0;
+  const ratioOk = latestValue >= (baselineMean > 0 ? baselineMean * ratioThreshold : opts.hardThreshold);
+  const hardOk = latestValue >= opts.hardThreshold;
+  const zOk = z >= zThreshold;
+  const triggered = hardOk && (zOk || ratioOk);
+  return [triggered, baselineMean, baselineStd, z];
+}
+
+function isSuppressed(fingerprint: string, suppressionHours: number): boolean {
+  const sql =
+    "SELECT COUNT(*) FROM cortana_events " +
+    "WHERE event_type='anomaly_detected' " +
+    `AND metadata->>'fingerprint'='${sqlEscape(fingerprint)}' ` +
+    `AND timestamp >= NOW() - INTERVAL '${Math.trunc(suppressionHours)} hours';`;
+  const raw = runPsql(sql);
+  return Number(raw || "0") > 0;
+}
+
+function anomalyMetadata(anomaly: Anomaly): Record<string, any> {
+  return {
+    anomaly_class: anomaly.anomaly_class,
+    fingerprint: anomaly.fingerprint,
+    metric: {
+      name: anomaly.metric_name,
+      latest: Math.round(anomaly.latest_value * 10000) / 10000,
+      baseline_mean: Math.round(anomaly.baseline_mean * 10000) / 10000,
+      baseline_stddev: Math.round(anomaly.baseline_stddev * 10000) / 10000,
+      z_score: Math.round(anomaly.z_score * 10000) / 10000,
+      threshold: anomaly.threshold,
+    },
+    details: anomaly.details,
+    detected_at: new Date().toISOString(),
+  };
+}
+
+function writeAnomalyEvent(anomaly: Anomaly): void {
+  const metadata = JSON.stringify(anomalyMetadata(anomaly));
+  const sql =
+    "INSERT INTO cortana_events (event_type, source, severity, message, metadata) VALUES " +
+    `('anomaly_detected','${SOURCE}','${sqlEscape(anomaly.severity)}','${sqlEscape(
+      anomaly.message
+    )}','${sqlEscape(metadata)}'::jsonb);`;
+  runPsql(sql);
+}
+
+function detectTaskRetries(days: number): Anomaly[] {
+  const rows = fetchJson(
+    `
+        WITH grouped AS (
+          SELECT date_trunc('day', created_at) AS day,
+                 COALESCE(source,'unknown') AS source,
+                 lower(regexp_replace(COALESCE(title,''), '\\s+', ' ', 'g')) AS launch_key,
+                 COUNT(*) AS c
+          FROM cortana_tasks
+          WHERE created_at >= NOW() - INTERVAL '${days} days'
+          GROUP BY 1,2,3
+          HAVING COUNT(*) >= 2
+        )
+        SELECT day::date AS day, COUNT(*)::int AS duplicate_groups, SUM(c)::int AS duplicate_launches
+        FROM grouped
+        GROUP BY 1
+        ORDER BY 1
+        `
+  );
+  if (!Array.isArray(rows) || rows.length < 3) return [];
+
+  const series = rows.map((r: any) => Number(r.duplicate_groups ?? 0));
+  const latest = series[series.length - 1];
+  const baseline = series.slice(0, -1);
+  const [triggered, mu, sigma, z] = spikeTest("duplicate_launch_groups_per_day", latest, baseline, {
+    hardThreshold: 3,
+    zThreshold: 2.0,
+    ratioThreshold: 1.7,
+  });
+  if (!triggered) return [];
+
+  const topOffenders = fetchJson(
+    `
+        SELECT COALESCE(source,'unknown') AS source,
+               lower(regexp_replace(COALESCE(title,''), '\\s+', ' ', 'g')) AS launch_key,
+               COUNT(*)::int AS launches,
+               MIN(created_at) AS first_seen,
+               MAX(created_at) AS last_seen
+        FROM cortana_tasks
+        WHERE created_at >= NOW() - INTERVAL '48 hours'
+        GROUP BY 1,2
+        HAVING COUNT(*) >= 2
+        ORDER BY launches DESC, last_seen DESC
+        LIMIT 8
+        `
+  );
+
+  const a: Anomaly = {
+    anomaly_class: "task_retry_duplicate_launches",
+    severity: latest < 8 ? "warning" : "error",
+    title: "Repeated task retries / duplicate launches",
+    message: `Duplicate launch groups rose to ${Math.trunc(latest)} today (baseline ${mu.toFixed(2)}).`,
+    fingerprint: "task_retry_duplicate_launches:global",
+    metric_name: "duplicate_launch_groups_per_day",
+    latest_value: latest,
+    baseline_mean: mu,
+    baseline_stddev: sigma,
+    z_score: z,
+    threshold: 3.0,
+    details: { days, series: rows, top_offenders_48h: topOffenders },
+  };
+
+  return [a];
+}
+
+function detectTimeoutRate(days: number): Anomaly[] {
+  const rows = fetchJson(
+    `
+        SELECT day,
+               SUM(timeout_count)::int AS timeout_count,
+               SUM(total_count)::int AS total_count,
+               ROUND((SUM(timeout_count)::numeric / NULLIF(SUM(total_count), 0)), 4) AS timeout_rate
+        FROM (
+          SELECT date_trunc('day', created_at)::date AS day,
+                 CASE WHEN event_type='agent_timeout' THEN 1 ELSE 0 END AS timeout_count,
+                 CASE WHEN event_type IN ('agent_completed','agent_failed','agent_timeout') THEN 1 ELSE 0 END AS total_count
+          FROM cortana_event_bus_events
+          WHERE created_at >= NOW() - INTERVAL '${days} days'
+            AND event_type IN ('agent_completed','agent_failed','agent_timeout')
+        ) s
+        GROUP BY day
+        HAVING SUM(total_count) >= 5
+        ORDER BY day
+        `
+  );
+  if (!Array.isArray(rows) || rows.length < 3) return [];
+
+  const series = rows.map((r: any) => Number(r.timeout_rate ?? 0));
+  const latest = series[series.length - 1];
+  const baseline = series.slice(0, -1);
+  const [triggered, mu, sigma, z] = spikeTest("subagent_timeout_rate_per_day", latest, baseline, {
+    hardThreshold: 0.15,
+    zThreshold: 2.2,
+    ratioThreshold: 1.8,
+  });
+  if (!triggered) return [];
+
+  const recentSources = fetchJson(
+    `
+        SELECT COALESCE(source, 'unknown') AS source,
+               COUNT(*)::int AS timeout_events
+        FROM cortana_event_bus_events
+        WHERE created_at >= NOW() - INTERVAL '72 hours'
+          AND event_type='agent_timeout'
+        GROUP BY 1
+        ORDER BY 2 DESC
+        LIMIT 8
+        `
+  );
+
+  const latestRow = rows[rows.length - 1] ?? {};
+  const a: Anomaly = {
+    anomaly_class: "subagent_timeout_rate_rising",
+    severity: latest < 0.3 ? "warning" : "error",
+    title: "Rising timeout rate in subagent runs",
+    message: `Subagent timeout rate is ${(latest * 100).toFixed(1)}% today (${Math.trunc(
+      latestRow.timeout_count ?? 0
+    )}/${Math.trunc(latestRow.total_count ?? 0)}) vs baseline ${(mu * 100).toFixed(1)}%.`,
+    fingerprint: "subagent_timeout_rate_rising:global",
+    metric_name: "subagent_timeout_rate_per_day",
+    latest_value: latest,
+    baseline_mean: mu,
+    baseline_stddev: sigma,
+    z_score: z,
+    threshold: 0.15,
+    details: { days, series: rows, timeout_sources_72h: recentSources },
+  };
+
+  return [a];
+}
+
+function detectCronFailureClusters(days: number): Anomaly[] {
+  const rows = fetchJson(
+    `
+        WITH by_day AS (
+          SELECT date_trunc('day', timestamp)::date AS day,
+                 cron_name,
+                 COUNT(*) FILTER (WHERE status IN ('failed','failing','missed'))::int AS fail_count,
+                 MAX(COALESCE(consecutive_failures,0))::int AS max_consecutive
+          FROM cortana_cron_health
+          WHERE timestamp >= NOW() - INTERVAL '${days} days'
+          GROUP BY 1,2
+        )
+        SELECT day,
+               COUNT(*) FILTER (WHERE fail_count >= 3 OR max_consecutive >= 3)::int AS clustered_crons
+        FROM by_day
+        GROUP BY day
+        ORDER BY day
+        `
+  );
+  if (!Array.isArray(rows) || rows.length < 3) return [];
+
+  const series = rows.map((r: any) => Number(r.clustered_crons ?? 0));
+  const latest = series[series.length - 1];
+  const baseline = series.slice(0, -1);
+  const [triggered, mu, sigma, z] = spikeTest("cron_failure_clusters_per_day", latest, baseline, {
+    hardThreshold: 1.0,
+    zThreshold: 1.8,
+    ratioThreshold: 1.6,
+  });
+  if (!triggered) return [];
+
+  const offenders = fetchJson(
+    `
+        SELECT cron_name,
+               COUNT(*) FILTER (WHERE status IN ('failed','failing','missed'))::int AS fail_count_72h,
+               MAX(COALESCE(consecutive_failures,0))::int AS max_consecutive,
+               MAX(timestamp) AS last_seen
+        FROM cortana_cron_health
+        WHERE timestamp >= NOW() - INTERVAL '72 hours'
+        GROUP BY cron_name
+        HAVING COUNT(*) FILTER (WHERE status IN ('failed','failing','missed')) >= 2
+        ORDER BY max_consecutive DESC, fail_count_72h DESC
+        LIMIT 10
+        `
+  );
+
+  const a: Anomaly = {
+    anomaly_class: "cron_failure_cluster",
+    severity: latest < 3 ? "warning" : "error",
+    title: "Cron failure clusters",
+    message: `${Math.trunc(latest)} cron(s) entered repeated-failure cluster state today (baseline ${mu.toFixed(2)}).`,
+    fingerprint: "cron_failure_cluster:global",
+    metric_name: "cron_failure_clusters_per_day",
+    latest_value: latest,
+    baseline_mean: mu,
+    baseline_stddev: sigma,
+    z_score: z,
+    threshold: 1.0,
+    details: { days, series: rows, offenders_72h: offenders },
+  };
+
+  return [a];
+}
+
+function detectTokenBurnSpike(days: number): Anomaly[] {
+  const rows = fetchJson(
+    `
+        SELECT date_trunc('day', timestamp)::date AS day,
+               SUM(tokens_in + tokens_out)::bigint AS total_tokens,
+               SUM(estimated_cost)::numeric(12,6) AS estimated_cost
+        FROM cortana_token_ledger
+        WHERE timestamp >= NOW() - INTERVAL '${days} days'
+        GROUP BY 1
+        ORDER BY 1
+        `
+  );
+  if (!Array.isArray(rows) || rows.length < 3) return [];
+
+  const series = rows.map((r: any) => Number(r.total_tokens ?? 0));
+  const latest = series[series.length - 1];
+  const baseline = series.slice(0, -1);
+  const [triggered, mu, sigma, z] = spikeTest("token_burn_per_day", latest, baseline, {
+    hardThreshold: 120000,
+    zThreshold: 2.0,
+    ratioThreshold: 1.7,
+  });
+  if (!triggered) return [];
+
+  const modelBreakdown = fetchJson(
+    `
+        SELECT model,
+               SUM(tokens_in + tokens_out)::bigint AS total_tokens,
+               SUM(estimated_cost)::numeric(12,6) AS estimated_cost
+        FROM cortana_token_ledger
+        WHERE timestamp >= NOW() - INTERVAL '24 hours'
+        GROUP BY model
+        ORDER BY total_tokens DESC
+        LIMIT 8
+        `
+  );
+
+  const a: Anomaly = {
+    anomaly_class: "token_burn_spike",
+    severity: latest < 250000 ? "warning" : "error",
+    title: "Sudden token burn spike",
+    message: `Token burn rose to ${Math.trunc(latest).toLocaleString()} tokens today (baseline ${
+      Math.trunc(mu).toLocaleString()
+    }).`,
+    fingerprint: "token_burn_spike:global",
+    metric_name: "token_burn_per_day",
+    latest_value: latest,
+    baseline_mean: mu,
+    baseline_stddev: sigma,
+    z_score: z,
+    threshold: 120000,
+    details: { days, series: rows, model_breakdown_24h: modelBreakdown },
+  };
+
+  return [a];
+}
+
+function runScan(days: number, suppressionHours: number, dryRun = false): Json {
+  const anomalies: Anomaly[] = [];
+  const detectorErrors: string[] = [];
+
+  for (const detector of [detectTaskRetries, detectTimeoutRate, detectCronFailureClusters, detectTokenBurnSpike]) {
+    try {
+      anomalies.push(...detector(days));
+    } catch (e) {
+      detectorErrors.push(`${detector.name}: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }
+
+  const emitted: Json[] = [];
+  const suppressed: Json[] = [];
+
+  for (const anomaly of anomalies) {
+    const row = {
+      anomaly_class: anomaly.anomaly_class,
+      severity: anomaly.severity,
+      title: anomaly.title,
+      message: anomaly.message,
+      fingerprint: anomaly.fingerprint,
+      metric_name: anomaly.metric_name,
+      latest_value: anomaly.latest_value,
+      z_score: anomaly.z_score,
+    };
+
+    if (isSuppressed(anomaly.fingerprint, suppressionHours)) {
+      suppressed.push(row);
+      continue;
+    }
+
+    emitted.push(row);
+    if (!dryRun) writeAnomalyEvent(anomaly);
+  }
+
+  return {
+    source: SOURCE,
+    scanned_at: new Date().toISOString(),
+    days,
+    suppression_hours: suppressionHours,
+    detected_count: anomalies.length,
+    emitted_count: emitted.length,
+    suppressed_count: suppressed.length,
+    emitted,
+    suppressed,
+    errors: detectorErrors,
+  };
+}
+
+function report(days: number, weekly: boolean): Json {
+  const sinceInterval = weekly ? "7 days" : `${days} days`;
+  const rows = fetchJson(
+    `
+        SELECT
+          metadata->>'anomaly_class' AS anomaly_class,
+          COALESCE(metadata->>'fingerprint','unknown') AS fingerprint,
+          COUNT(*)::int AS hits,
+          MAX(timestamp) AS last_seen,
+          MAX(severity) AS max_severity,
+          ARRAY_REMOVE(ARRAY_AGG(DISTINCT message ORDER BY message), NULL) AS sample_messages
+        FROM cortana_events
+        WHERE event_type='anomaly_detected'
+          AND timestamp >= NOW() - INTERVAL '${sinceInterval}'
+        GROUP BY 1,2
+        ORDER BY hits DESC, last_seen DESC
+        `
+  );
+
+  const totalEvents = Array.isArray(rows)
+    ? rows.reduce((sum: number, r: any) => sum + Number(r.hits ?? 0), 0)
+    : 0;
+
+  return {
+    source: SOURCE,
+    mode: weekly ? "weekly_summary" : "report",
+    window: sinceInterval,
+    generated_at: new Date().toISOString(),
+    anomalies: rows,
+    total_anomaly_fingerprints: Array.isArray(rows) ? rows.length : 0,
+    total_events: Math.trunc(totalEvents),
+  };
+}
+
+function alert(days: number, suppressionHours: number): Json {
+  const scan = runScan(days, suppressionHours, false);
+  if (scan.emitted_count === 0) {
+    return {
+      source: SOURCE,
+      alert: "none",
+      message: "No meaningful anomalies detected.",
+      scan,
+    };
+  }
+  return {
+    source: SOURCE,
+    alert: "triggered",
+    message: `${scan.emitted_count} anomaly alert(s) emitted.`,
+    scan,
+  };
+}
+
+function usage(): string {
+  return (
+    "Usage: anomaly_sentinel.ts <scan|report|alert> [options]\n" +
+    "scan: --days 7|14|30 [--suppression-hours N] [--dry-run]\n" +
+    "report: [--days N] [--weekly]\n" +
+    "alert: --days 7|14|30 [--suppression-hours N]"
+  );
+}
+
+function parseCommand(argv: string[]): { command: string; options: Record<string, string | boolean> } {
+  if (!argv.length) {
+    throw new Error("missing command");
+  }
+  const command = argv[0];
+  const options: Record<string, string | boolean> = {};
+  for (let i = 1; i < argv.length; i += 1) {
+    const arg = argv[i];
+    if (arg.startsWith("--")) {
+      const key = arg.replace(/^--/, "");
+      const next = argv[i + 1];
+      if (next && !next.startsWith("--")) {
+        options[key] = next;
+        i += 1;
+      } else {
+        options[key] = true;
+      }
+    }
+  }
+  return { command, options };
+}
 
 async function main(): Promise<void> {
-  const py = "#!/usr/bin/env python3\n\"\"\"Anomaly Sentinel: behavior drift + reliability regression detection.\n\nCommands\n- scan --days 7|14|30 [--suppression-hours N] [--dry-run]\n- report [--days N] [--weekly]\n- alert [--days 7|14|30] [--suppression-hours N]\n\"\"\"\n\nfrom __future__ import annotations\n\nimport argparse\nimport json\nimport os\nimport statistics\nimport subprocess\nfrom dataclasses import dataclass\nfrom datetime import datetime, timezone\nfrom typing import Any\n\nDB_NAME = os.getenv(\"CORTANA_DB\", \"cortana\")\nDB_PATH = os.getenv(\"CORTANA_DB_PATH\", \"/opt/homebrew/opt/postgresql@17/bin\")\nSOURCE = \"anomaly_sentinel\"\n\n\n@dataclass\nclass Anomaly:\n    anomaly_class: str\n    severity: str\n    title: str\n    message: str\n    fingerprint: str\n    metric_name: str\n    latest_value: float\n    baseline_mean: float\n    baseline_stddev: float\n    z_score: float\n    threshold: float\n    details: dict[str, Any]\n\n    def to_metadata(self) -> dict[str, Any]:\n        return {\n            \"anomaly_class\": self.anomaly_class,\n            \"fingerprint\": self.fingerprint,\n            \"metric\": {\n                \"name\": self.metric_name,\n                \"latest\": round(self.latest_value, 4),\n                \"baseline_mean\": round(self.baseline_mean, 4),\n                \"baseline_stddev\": round(self.baseline_stddev, 4),\n                \"z_score\": round(self.z_score, 4),\n                \"threshold\": self.threshold,\n            },\n            \"details\": self.details,\n            \"detected_at\": datetime.now(timezone.utc).isoformat(),\n        }\n\n\ndef sql_escape(text: str) -> str:\n    return (text or \"\").replace(\"'\", \"''\")\n\n\ndef run_psql(sql: str) -> str:\n    env = os.environ.copy()\n    env[\"PATH\"] = f\"{DB_PATH}:{env.get('PATH', '')}\"\n    cmd = [\"psql\", DB_NAME, \"-q\", \"-X\", \"-v\", \"ON_ERROR_STOP=1\", \"-t\", \"-A\", \"-c\", sql]\n    out = subprocess.run(cmd, text=True, capture_output=True, env=env)\n    if out.returncode != 0:\n        raise RuntimeError(out.stderr.strip() or \"psql failed\")\n    return out.stdout.strip()\n\n\ndef fetch_json(sql: str) -> Any:\n    wrapped = f\"SELECT COALESCE(json_agg(t), '[]'::json) FROM ({sql}) t;\"\n    raw = run_psql(wrapped)\n    return json.loads(raw) if raw else []\n\n\ndef mean_stddev(values: list[float]) -> tuple[float, float]:\n    if not values:\n        return 0.0, 0.0\n    if len(values) == 1:\n        return values[0], 0.0\n    return statistics.mean(values), statistics.pstdev(values)\n\n\ndef spike_test(\n    metric_name: str,\n    latest_value: float,\n    baseline: list[float],\n    *,\n    hard_threshold: float,\n    z_threshold: float = 2.0,\n    ratio_threshold: float = 1.6,\n) -> tuple[bool, float, float, float]:\n    baseline_mean, baseline_std = mean_stddev(baseline)\n    z = 0.0\n    if baseline_std > 0:\n        z = (latest_value - baseline_mean) / baseline_std\n    ratio_ok = latest_value >= (baseline_mean * ratio_threshold if baseline_mean > 0 else hard_threshold)\n    hard_ok = latest_value >= hard_threshold\n    z_ok = z >= z_threshold\n    triggered = hard_ok and (z_ok or ratio_ok)\n    return triggered, baseline_mean, baseline_std, z\n\n\ndef is_suppressed(fingerprint: str, suppression_hours: int) -> bool:\n    sql = (\n        \"SELECT COUNT(*) FROM cortana_events \"\n        \"WHERE event_type='anomaly_detected' \"\n        f\"AND metadata->>'fingerprint'='{sql_escape(fingerprint)}' \"\n        f\"AND timestamp >= NOW() - INTERVAL '{int(suppression_hours)} hours';\"\n    )\n    raw = run_psql(sql)\n    return int(raw or \"0\") > 0\n\n\ndef write_anomaly_event(anomaly: Anomaly) -> None:\n    metadata = json.dumps(anomaly.to_metadata())\n    sql = (\n        \"INSERT INTO cortana_events (event_type, source, severity, message, metadata) VALUES \"\n        f\"('anomaly_detected','{SOURCE}','{sql_escape(anomaly.severity)}','{sql_escape(anomaly.message)}','{sql_escape(metadata)}'::jsonb);\"\n    )\n    run_psql(sql)\n\n\ndef detect_task_retries(days: int) -> list[Anomaly]:\n    # Daily count of duplicate launch groups: same normalized title+source launched >=2x/day\n    rows = fetch_json(\n        f\"\"\"\n        WITH grouped AS (\n          SELECT date_trunc('day', created_at) AS day,\n                 COALESCE(source,'unknown') AS source,\n                 lower(regexp_replace(COALESCE(title,''), '\\\\s+', ' ', 'g')) AS launch_key,\n                 COUNT(*) AS c\n          FROM cortana_tasks\n          WHERE created_at >= NOW() - INTERVAL '{days} days'\n          GROUP BY 1,2,3\n          HAVING COUNT(*) >= 2\n        )\n        SELECT day::date AS day, COUNT(*)::int AS duplicate_groups, SUM(c)::int AS duplicate_launches\n        FROM grouped\n        GROUP BY 1\n        ORDER BY 1\n        \"\"\"\n    )\n    if len(rows) < 3:\n        return []\n\n    series = [float(r[\"duplicate_groups\"]) for r in rows]\n    latest = series[-1]\n    baseline = series[:-1]\n    trig, mu, sigma, z = spike_test(\n        \"duplicate_launch_groups_per_day\",\n        latest,\n        baseline,\n        hard_threshold=3.0,\n        z_threshold=2.0,\n        ratio_threshold=1.7,\n    )\n    if not trig:\n        return []\n\n    top_offenders = fetch_json(\n        f\"\"\"\n        SELECT COALESCE(source,'unknown') AS source,\n               lower(regexp_replace(COALESCE(title,''), '\\\\s+', ' ', 'g')) AS launch_key,\n               COUNT(*)::int AS launches,\n               MIN(created_at) AS first_seen,\n               MAX(created_at) AS last_seen\n        FROM cortana_tasks\n        WHERE created_at >= NOW() - INTERVAL '48 hours'\n        GROUP BY 1,2\n        HAVING COUNT(*) >= 2\n        ORDER BY launches DESC, last_seen DESC\n        LIMIT 8\n        \"\"\"\n    )\n\n    a = Anomaly(\n        anomaly_class=\"task_retry_duplicate_launches\",\n        severity=\"warning\" if latest < 8 else \"error\",\n        title=\"Repeated task retries / duplicate launches\",\n        message=f\"Duplicate launch groups rose to {int(latest)} today (baseline {mu:.2f}).\",\n        fingerprint=\"task_retry_duplicate_launches:global\",\n        metric_name=\"duplicate_launch_groups_per_day\",\n        latest_value=latest,\n        baseline_mean=mu,\n        baseline_stddev=sigma,\n        z_score=z,\n        threshold=3.0,\n        details={\"days\": days, \"series\": rows, \"top_offenders_48h\": top_offenders},\n    )\n    return [a]\n\n\ndef detect_timeout_rate(days: int) -> list[Anomaly]:\n    rows = fetch_json(\n        f\"\"\"\n        SELECT day,\n               SUM(timeout_count)::int AS timeout_count,\n               SUM(total_count)::int AS total_count,\n               ROUND((SUM(timeout_count)::numeric / NULLIF(SUM(total_count), 0)), 4) AS timeout_rate\n        FROM (\n          SELECT date_trunc('day', created_at)::date AS day,\n                 CASE WHEN event_type='agent_timeout' THEN 1 ELSE 0 END AS timeout_count,\n                 CASE WHEN event_type IN ('agent_completed','agent_failed','agent_timeout') THEN 1 ELSE 0 END AS total_count\n          FROM cortana_event_bus_events\n          WHERE created_at >= NOW() - INTERVAL '{days} days'\n            AND event_type IN ('agent_completed','agent_failed','agent_timeout')\n        ) s\n        GROUP BY day\n        HAVING SUM(total_count) >= 5\n        ORDER BY day\n        \"\"\"\n    )\n    if len(rows) < 3:\n        return []\n\n    series = [float(r[\"timeout_rate\"] or 0.0) for r in rows]\n    latest = series[-1]\n    baseline = series[:-1]\n    trig, mu, sigma, z = spike_test(\n        \"subagent_timeout_rate_per_day\",\n        latest,\n        baseline,\n        hard_threshold=0.15,\n        z_threshold=2.2,\n        ratio_threshold=1.8,\n    )\n    if not trig:\n        return []\n\n    recent_sources = fetch_json(\n        \"\"\"\n        SELECT COALESCE(source, 'unknown') AS source,\n               COUNT(*)::int AS timeout_events\n        FROM cortana_event_bus_events\n        WHERE created_at >= NOW() - INTERVAL '72 hours'\n          AND event_type='agent_timeout'\n        GROUP BY 1\n        ORDER BY 2 DESC\n        LIMIT 8\n        \"\"\"\n    )\n\n    latest_row = rows[-1]\n    a = Anomaly(\n        anomaly_class=\"subagent_timeout_rate_rising\",\n        severity=\"warning\" if latest < 0.30 else \"error\",\n        title=\"Rising timeout rate in subagent runs\",\n        message=(\n            f\"Subagent timeout rate is {latest*100:.1f}% today \"\n            f\"({int(latest_row['timeout_count'])}/{int(latest_row['total_count'])}) vs baseline {mu*100:.1f}%.\"\n        ),\n        fingerprint=\"subagent_timeout_rate_rising:global\",\n        metric_name=\"subagent_timeout_rate_per_day\",\n        latest_value=latest,\n        baseline_mean=mu,\n        baseline_stddev=sigma,\n        z_score=z,\n        threshold=0.15,\n        details={\"days\": days, \"series\": rows, \"timeout_sources_72h\": recent_sources},\n    )\n    return [a]\n\n\ndef detect_cron_failure_clusters(days: int) -> list[Anomaly]:\n    rows = fetch_json(\n        f\"\"\"\n        WITH by_day AS (\n          SELECT date_trunc('day', timestamp)::date AS day,\n                 cron_name,\n                 COUNT(*) FILTER (WHERE status IN ('failed','failing','missed'))::int AS fail_count,\n                 MAX(COALESCE(consecutive_failures,0))::int AS max_consecutive\n          FROM cortana_cron_health\n          WHERE timestamp >= NOW() - INTERVAL '{days} days'\n          GROUP BY 1,2\n        )\n        SELECT day,\n               COUNT(*) FILTER (WHERE fail_count >= 3 OR max_consecutive >= 3)::int AS clustered_crons\n        FROM by_day\n        GROUP BY day\n        ORDER BY day\n        \"\"\"\n    )\n    if len(rows) < 3:\n        return []\n\n    series = [float(r[\"clustered_crons\"] or 0) for r in rows]\n    latest = series[-1]\n    baseline = series[:-1]\n    trig, mu, sigma, z = spike_test(\n        \"cron_failure_clusters_per_day\",\n        latest,\n        baseline,\n        hard_threshold=1.0,\n        z_threshold=1.8,\n        ratio_threshold=1.6,\n    )\n    if not trig:\n        return []\n\n    offenders = fetch_json(\n        \"\"\"\n        SELECT cron_name,\n               COUNT(*) FILTER (WHERE status IN ('failed','failing','missed'))::int AS fail_count_72h,\n               MAX(COALESCE(consecutive_failures,0))::int AS max_consecutive,\n               MAX(timestamp) AS last_seen\n        FROM cortana_cron_health\n        WHERE timestamp >= NOW() - INTERVAL '72 hours'\n        GROUP BY cron_name\n        HAVING COUNT(*) FILTER (WHERE status IN ('failed','failing','missed')) >= 2\n        ORDER BY max_consecutive DESC, fail_count_72h DESC\n        LIMIT 10\n        \"\"\"\n    )\n\n    a = Anomaly(\n        anomaly_class=\"cron_failure_cluster\",\n        severity=\"warning\" if latest < 3 else \"error\",\n        title=\"Cron failure clusters\",\n        message=f\"{int(latest)} cron(s) entered repeated-failure cluster state today (baseline {mu:.2f}).\",\n        fingerprint=\"cron_failure_cluster:global\",\n        metric_name=\"cron_failure_clusters_per_day\",\n        latest_value=latest,\n        baseline_mean=mu,\n        baseline_stddev=sigma,\n        z_score=z,\n        threshold=1.0,\n        details={\"days\": days, \"series\": rows, \"offenders_72h\": offenders},\n    )\n    return [a]\n\n\ndef detect_token_burn_spike(days: int) -> list[Anomaly]:\n    rows = fetch_json(\n        f\"\"\"\n        SELECT date_trunc('day', timestamp)::date AS day,\n               SUM(tokens_in + tokens_out)::bigint AS total_tokens,\n               SUM(estimated_cost)::numeric(12,6) AS estimated_cost\n        FROM cortana_token_ledger\n        WHERE timestamp >= NOW() - INTERVAL '{days} days'\n        GROUP BY 1\n        ORDER BY 1\n        \"\"\"\n    )\n    if len(rows) < 3:\n        return []\n\n    series = [float(r[\"total_tokens\"] or 0) for r in rows]\n    latest = series[-1]\n    baseline = series[:-1]\n    trig, mu, sigma, z = spike_test(\n        \"token_burn_per_day\",\n        latest,\n        baseline,\n        hard_threshold=120000.0,\n        z_threshold=2.0,\n        ratio_threshold=1.7,\n    )\n    if not trig:\n        return []\n\n    model_breakdown = fetch_json(\n        \"\"\"\n        SELECT model,\n               SUM(tokens_in + tokens_out)::bigint AS total_tokens,\n               SUM(estimated_cost)::numeric(12,6) AS estimated_cost\n        FROM cortana_token_ledger\n        WHERE timestamp >= NOW() - INTERVAL '24 hours'\n        GROUP BY model\n        ORDER BY total_tokens DESC\n        LIMIT 8\n        \"\"\"\n    )\n\n    a = Anomaly(\n        anomaly_class=\"token_burn_spike\",\n        severity=\"warning\" if latest < 250000 else \"error\",\n        title=\"Sudden token burn spike\",\n        message=f\"Token burn rose to {int(latest):,} tokens today (baseline {mu:,.0f}).\",\n        fingerprint=\"token_burn_spike:global\",\n        metric_name=\"token_burn_per_day\",\n        latest_value=latest,\n        baseline_mean=mu,\n        baseline_stddev=sigma,\n        z_score=z,\n        threshold=120000.0,\n        details={\"days\": days, \"series\": rows, \"model_breakdown_24h\": model_breakdown},\n    )\n    return [a]\n\n\ndef run_scan(days: int, suppression_hours: int, dry_run: bool = False) -> dict[str, Any]:\n    anomalies: list[Anomaly] = []\n    detector_errors: list[str] = []\n\n    for detector in (\n        detect_task_retries,\n        detect_timeout_rate,\n        detect_cron_failure_clusters,\n        detect_token_burn_spike,\n    ):\n        try:\n            anomalies.extend(detector(days))\n        except Exception as e:\n            detector_errors.append(f\"{detector.__name__}: {e}\")\n\n    emitted: list[dict[str, Any]] = []\n    suppressed: list[dict[str, Any]] = []\n\n    for anomaly in anomalies:\n        row = {\n            \"anomaly_class\": anomaly.anomaly_class,\n            \"severity\": anomaly.severity,\n            \"title\": anomaly.title,\n            \"message\": anomaly.message,\n            \"fingerprint\": anomaly.fingerprint,\n            \"metric_name\": anomaly.metric_name,\n            \"latest_value\": anomaly.latest_value,\n            \"z_score\": anomaly.z_score,\n        }\n        if is_suppressed(anomaly.fingerprint, suppression_hours):\n            suppressed.append(row)\n            continue\n\n        emitted.append(row)\n        if not dry_run:\n            write_anomaly_event(anomaly)\n\n    return {\n        \"source\": SOURCE,\n        \"scanned_at\": datetime.now(timezone.utc).isoformat(),\n        \"days\": days,\n        \"suppression_hours\": suppression_hours,\n        \"detected_count\": len(anomalies),\n        \"emitted_count\": len(emitted),\n        \"suppressed_count\": len(suppressed),\n        \"emitted\": emitted,\n        \"suppressed\": suppressed,\n        \"errors\": detector_errors,\n    }\n\n\ndef report(days: int, weekly: bool) -> dict[str, Any]:\n    since_interval = \"7 days\" if weekly else f\"{days} days\"\n    rows = fetch_json(\n        f\"\"\"\n        SELECT\n          metadata->>'anomaly_class' AS anomaly_class,\n          COALESCE(metadata->>'fingerprint','unknown') AS fingerprint,\n          COUNT(*)::int AS hits,\n          MAX(timestamp) AS last_seen,\n          MAX(severity) AS max_severity,\n          ARRAY_REMOVE(ARRAY_AGG(DISTINCT message ORDER BY message), NULL) AS sample_messages\n        FROM cortana_events\n        WHERE event_type='anomaly_detected'\n          AND timestamp >= NOW() - INTERVAL '{since_interval}'\n        GROUP BY 1,2\n        ORDER BY hits DESC, last_seen DESC\n        \"\"\"\n    )\n\n    return {\n        \"source\": SOURCE,\n        \"mode\": \"weekly_summary\" if weekly else \"report\",\n        \"window\": since_interval,\n        \"generated_at\": datetime.now(timezone.utc).isoformat(),\n        \"anomalies\": rows,\n        \"total_anomaly_fingerprints\": len(rows),\n        \"total_events\": int(sum(int(r.get(\"hits\", 0) or 0) for r in rows)),\n    }\n\n\ndef alert(days: int, suppression_hours: int) -> dict[str, Any]:\n    scan = run_scan(days=days, suppression_hours=suppression_hours, dry_run=False)\n    if scan[\"emitted_count\"] == 0:\n        return {\n            \"source\": SOURCE,\n            \"alert\": \"none\",\n            \"message\": \"No meaningful anomalies detected.\",\n            \"scan\": scan,\n        }\n    return {\n        \"source\": SOURCE,\n        \"alert\": \"triggered\",\n        \"message\": f\"{scan['emitted_count']} anomaly alert(s) emitted.\",\n        \"scan\": scan,\n    }\n\n\ndef parse_args() -> argparse.Namespace:\n    p = argparse.ArgumentParser(description=\"Anomaly Sentinel for Cortana reliability regressions\")\n    sub = p.add_subparsers(dest=\"command\", required=True)\n\n    s = sub.add_parser(\"scan\", help=\"Detect anomalies and write anomaly_detected events\")\n    s.add_argument(\"--days\", type=int, default=7, choices=[7, 14, 30])\n    s.add_argument(\"--suppression-hours\", type=int, default=12)\n    s.add_argument(\"--dry-run\", action=\"store_true\")\n\n    r = sub.add_parser(\"report\", help=\"Show anomaly summary\")\n    r.add_argument(\"--days\", type=int, default=14)\n    r.add_argument(\"--weekly\", action=\"store_true\", help=\"Weekly summary mode (7d)\")\n\n    a = sub.add_parser(\"alert\", help=\"Run scan and emit only meaningful unsuppressed alerts\")\n    a.add_argument(\"--days\", type=int, default=7, choices=[7, 14, 30])\n    a.add_argument(\"--suppression-hours\", type=int, default=12)\n\n    return p.parse_args()\n\n\ndef main() -> int:\n    args = parse_args()\n    if args.command == \"scan\":\n        out = run_scan(days=args.days, suppression_hours=args.suppression_hours, dry_run=args.dry_run)\n    elif args.command == \"report\":\n        out = report(days=args.days, weekly=args.weekly)\n    elif args.command == \"alert\":\n        out = alert(days=args.days, suppression_hours=args.suppression_hours)\n    else:\n        raise ValueError(\"unknown command\")\n\n    print(json.dumps(out, indent=2, default=str))\n    return 0\n\n\nif __name__ == \"__main__\":\n    raise SystemExit(main())\n";
-  const dir = mkdtempSync(join(tmpdir(), 'pywrap-'));
-  const script = join(dir, 'script.py');
-  writeFileSync(script, py, 'utf8');
-  const proc = spawnSync('python3', [script, ...process.argv.slice(2)], { stdio: 'inherit' });
-  rmSync(dir, { recursive: true, force: true });
-  if (proc.error) {
-    console.error(String(proc.error));
-    process.exit(1);
+  let command = "";
+  let options: Record<string, string | boolean> = {};
+  try {
+    const parsed = parseCommand(process.argv.slice(2));
+    command = parsed.command;
+    options = parsed.options;
+  } catch {
+    console.error(usage());
+    process.exit(2);
   }
-  process.exit(proc.status ?? 1);
+
+  let output: Json;
+  if (command === "scan") {
+    const days = Number(options.days ?? 7);
+    const suppression = Number(options["suppression-hours"] ?? 12);
+    const dryRun = Boolean(options["dry-run"] ?? false);
+    if (![7, 14, 30].includes(days)) throw new Error("invalid --days (expected 7, 14, 30)");
+    output = runScan(days, suppression, dryRun);
+  } else if (command === "report") {
+    const days = Number(options.days ?? 14);
+    const weekly = Boolean(options.weekly ?? false);
+    output = report(days, weekly);
+  } else if (command === "alert") {
+    const days = Number(options.days ?? 7);
+    const suppression = Number(options["suppression-hours"] ?? 12);
+    if (![7, 14, 30].includes(days)) throw new Error("invalid --days (expected 7, 14, 30)");
+    output = alert(days, suppression);
+  } else {
+    throw new Error("unknown command");
+  }
+
+  console.log(JSON.stringify(output, null, 2));
+  process.exit(0);
 }
 
 main().catch((err) => {

@@ -1,24 +1,292 @@
 #!/usr/bin/env npx tsx
-import { spawnSync } from 'node:child_process';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
 
-async function main(): Promise<void> {
-  const py = "#!/usr/bin/env python3\nfrom __future__ import annotations\n\nimport argparse\nimport json\nimport os\nimport subprocess\nimport sys\nfrom dataclasses import dataclass\nfrom datetime import datetime, timezone\nfrom typing import Any\n\nDEFAULT_MONTHLY_BUDGET = 200.0\n\n# Approximate USD per 1K tokens (input/output)\nMODEL_RATES_PER_1K: dict[str, tuple[float, float]] = {\n    \"gpt-5\": (0.01, 0.03),\n    \"gpt-5.3-codex\": (0.01, 0.03),\n    \"gpt-5-codex\": (0.01, 0.03),\n    \"codex\": (0.01, 0.03),\n    \"claude-opus\": (0.015, 0.075),\n    \"claude-opus-4\": (0.015, 0.075),\n    \"claude-opus-4-6\": (0.015, 0.075),\n    \"claude-sonnet\": (0.003, 0.015),\n    \"gpt-4o\": (0.005, 0.015),\n    \"gpt-4.1\": (0.005, 0.015),\n    \"gpt-4.1-mini\": (0.0006, 0.0024),\n}\nFALLBACK_RATE_PER_1K = (0.01, 0.03)\n\n\n@dataclass\nclass UsageEvent:\n    agent_role: str\n    task_id: int | None\n    trace_id: str | None\n    tokens_in: int\n    tokens_out: int\n    model: str\n    cost_estimate: float | None = None\n    metadata: dict[str, Any] | None = None\n\n\ndef _db_target() -> str:\n    return os.environ.get(\"CORTANA_DATABASE_URL\") or os.environ.get(\"DATABASE_URL\") or \"cortana\"\n\n\ndef _db_env() -> dict[str, str]:\n    env = os.environ.copy()\n    env[\"PATH\"] = \"/opt/homebrew/opt/postgresql@17/bin:\" + env.get(\"PATH\", \"\")\n    return env\n\n\ndef _run_psql(sql: str, csv: bool = False) -> str:\n    cmd = [\"psql\", _db_target()]\n    if csv:\n        cmd.append(\"--csv\")\n    cmd.extend([\"-c\", sql])\n    result = subprocess.run(cmd, env=_db_env(), check=True, capture_output=True, text=True)\n    return result.stdout.strip()\n\n\ndef _sql_str(value: str) -> str:\n    return \"'\" + value.replace(\"'\", \"''\") + \"'\"\n\n\ndef _sql_nullable_str(value: str | None) -> str:\n    if value is None or value == \"\":\n        return \"NULL\"\n    return _sql_str(value)\n\n\ndef estimate_cost(model: str, tokens_in: int, tokens_out: int) -> float:\n    model_l = model.lower()\n    in_rate, out_rate = FALLBACK_RATE_PER_1K\n    for key, rates in MODEL_RATES_PER_1K.items():\n        if key in model_l:\n            in_rate, out_rate = rates\n            break\n    return round(((tokens_in / 1000.0) * in_rate) + ((tokens_out / 1000.0) * out_rate), 6)\n\n\ndef log_usage(\n    agent_role: str,\n    task_id: int | None,\n    trace_id: str | None,\n    tokens_in: int,\n    tokens_out: int,\n    model: str,\n    cost_estimate: float | None,\n    metadata: dict[str, Any] | None = None,\n) -> dict[str, Any]:\n    metadata = metadata or {}\n    if cost_estimate is None:\n        cost_estimate = estimate_cost(model=model, tokens_in=tokens_in, tokens_out=tokens_out)\n\n    task_sql = \"NULL\" if task_id is None else str(int(task_id))\n    sql = f\"\"\"\n    INSERT INTO cortana_token_ledger (\n      agent_role, task_id, trace_id, model, tokens_in, tokens_out, estimated_cost, metadata\n    ) VALUES (\n      {_sql_str(agent_role)}, {task_sql}, {_sql_nullable_str(trace_id)}, {_sql_str(model)},\n      {int(tokens_in)}, {int(tokens_out)}, {float(cost_estimate)}::numeric(12,6),\n      {_sql_str(json.dumps(metadata))}::jsonb\n    )\n    RETURNING id, timestamp, estimated_cost;\n    \"\"\"\n\n    output = _run_psql(sql, csv=True)\n\n    lines = [line for line in output.splitlines() if line.strip()]\n    # CSV includes header row then data row\n    if len(lines) < 2:\n        raise RuntimeError(\"Failed to parse insert output\")\n    headers = [h.strip() for h in lines[0].split(\",\")]\n    values = [v.strip() for v in lines[1].split(\",\")]\n    return dict(zip(headers, values, strict=False))\n\n\ndef summary(period: str) -> dict[str, Any]:\n    windows = {\"24h\": \"24 hours\", \"7d\": \"7 days\", \"30d\": \"30 days\"}\n    if period not in windows:\n        raise SystemExit(\"period must be one of: 24h, 7d, 30d\")\n\n    interval = windows[period]\n    by_agent_sql = f\"\"\"\n    SELECT agent_role,\n           COUNT(*) AS calls,\n           SUM(tokens_in) AS tokens_in,\n           SUM(tokens_out) AS tokens_out,\n           ROUND(SUM(estimated_cost)::numeric, 4) AS spend_usd\n    FROM cortana_token_ledger\n    WHERE timestamp >= NOW() - INTERVAL '{interval}'\n    GROUP BY agent_role\n    ORDER BY spend_usd DESC;\n    \"\"\"\n    by_model_sql = f\"\"\"\n    SELECT model,\n           COUNT(*) AS calls,\n           SUM(tokens_in) AS tokens_in,\n           SUM(tokens_out) AS tokens_out,\n           ROUND(SUM(estimated_cost)::numeric, 4) AS spend_usd\n    FROM cortana_token_ledger\n    WHERE timestamp >= NOW() - INTERVAL '{interval}'\n    GROUP BY model\n    ORDER BY spend_usd DESC;\n    \"\"\"\n    by_task_type_sql = f\"\"\"\n    SELECT\n      COALESCE(metadata->>'task_type', CASE WHEN task_id IS NULL THEN 'session' ELSE 'task' END) AS task_type,\n      COUNT(*) AS calls,\n      ROUND(SUM(estimated_cost)::numeric, 4) AS spend_usd,\n      SUM(tokens_in + tokens_out) AS total_tokens\n    FROM cortana_token_ledger\n    WHERE timestamp >= NOW() - INTERVAL '{interval}'\n    GROUP BY 1\n    ORDER BY spend_usd DESC;\n    \"\"\"\n    cache_sql = f\"\"\"\n    SELECT\n      COUNT(*) FILTER (WHERE (metadata->>'prompt_cache_hit')::boolean IS TRUE) AS cache_hits,\n      COUNT(*) FILTER (WHERE metadata ? 'prompt_cache_hit') AS cache_observed,\n      COALESCE(SUM((metadata->>'prompt_cache_read_tokens')::bigint),0) AS cache_read_tokens,\n      COALESCE(SUM((metadata->>'prompt_cache_write_tokens')::bigint),0) AS cache_write_tokens\n    FROM cortana_token_ledger\n    WHERE timestamp >= NOW() - INTERVAL '{interval}';\n    \"\"\"\n\n    return {\n        \"period\": period,\n        \"by_agent\": _run_psql(by_agent_sql, csv=True),\n        \"by_model\": _run_psql(by_model_sql, csv=True),\n        \"by_task_type\": _run_psql(by_task_type_sql, csv=True),\n        \"prompt_cache\": _run_psql(cache_sql, csv=True),\n    }\n\n\ndef top_spenders(limit: int) -> str:\n    sql = f\"\"\"\n    SELECT id, timestamp, agent_role, task_id, trace_id, model,\n           (tokens_in + tokens_out) AS total_tokens,\n           ROUND(estimated_cost::numeric, 6) AS estimated_cost,\n           COALESCE(metadata->>'task_type','') AS task_type\n    FROM cortana_token_ledger\n    ORDER BY estimated_cost DESC, timestamp DESC\n    LIMIT {int(limit)};\n    \"\"\"\n    return _run_psql(sql, csv=True)\n\n\ndef budget_check(monthly_budget: float = DEFAULT_MONTHLY_BUDGET) -> dict[str, Any]:\n    sql = f\"\"\"\n    WITH month_data AS (\n      SELECT DATE_TRUNC('month', NOW()) AS month_start,\n             NOW() AS as_of,\n             EXTRACT(DAY FROM (DATE_TRUNC('month', NOW()) + INTERVAL '1 month - 1 day'))::numeric AS days_in_month,\n             EXTRACT(EPOCH FROM (NOW() - DATE_TRUNC('month', NOW()))) / 86400.0 AS elapsed_days,\n             COALESCE(SUM(estimated_cost), 0)::numeric AS spend_to_date\n      FROM cortana_token_ledger\n      WHERE timestamp >= DATE_TRUNC('month', NOW())\n    )\n    SELECT month_start,\n           as_of,\n           spend_to_date,\n           ROUND(CASE WHEN elapsed_days > 0 THEN spend_to_date / elapsed_days ELSE 0 END, 4) AS burn_rate_per_day,\n           ROUND(CASE WHEN elapsed_days > 0 THEN (spend_to_date / elapsed_days) * days_in_month ELSE 0 END, 2) AS projected_monthly_spend,\n           ROUND((spend_to_date / {float(monthly_budget)}) * 100.0, 2) AS pct_of_budget\n    FROM month_data;\n    \"\"\"\n    return {\n        \"budget_usd\": monthly_budget,\n        \"snapshot\": _run_psql(sql, csv=True),\n    }\n\n\ndef _parse_metadata(metadata_arg: str | None) -> dict[str, Any]:\n    if not metadata_arg:\n        return {}\n    try:\n        payload = json.loads(metadata_arg)\n    except json.JSONDecodeError as exc:\n        raise SystemExit(f\"Invalid JSON for --metadata: {exc}\")\n    if not isinstance(payload, dict):\n        raise SystemExit(\"--metadata must be a JSON object\")\n    return payload\n\n\ndef build_parser() -> argparse.ArgumentParser:\n    p = argparse.ArgumentParser(description=\"Cortana token economics ledger and analytics\")\n    sub = p.add_subparsers(dest=\"command\", required=True)\n\n    log_cmd = sub.add_parser(\"log-usage\", help=\"Log a token usage event\")\n    log_cmd.add_argument(\"--agent-role\", required=True)\n    log_cmd.add_argument(\"--task-id\", type=int)\n    log_cmd.add_argument(\"--trace-id\")\n    log_cmd.add_argument(\"--tokens-in\", type=int, required=True)\n    log_cmd.add_argument(\"--tokens-out\", type=int, required=True)\n    log_cmd.add_argument(\"--model\", required=True)\n    log_cmd.add_argument(\"--cost-estimate\", type=float)\n    log_cmd.add_argument(\"--metadata\", help=\"JSON object\")\n\n    summary_cmd = sub.add_parser(\"summary\", help=\"Summarize spend and tokens\")\n    summary_cmd.add_argument(\"--period\", required=True, choices=[\"24h\", \"7d\", \"30d\"])\n\n    top_cmd = sub.add_parser(\"top-spenders\", help=\"Show most expensive operations\")\n    top_cmd.add_argument(\"--limit\", type=int, default=10)\n\n    budget_cmd = sub.add_parser(\"budget-check\", help=\"Spend vs monthly budget\")\n    budget_cmd.add_argument(\"--budget\", type=float, default=DEFAULT_MONTHLY_BUDGET)\n\n    return p\n\n\ndef main() -> int:\n    parser = build_parser()\n    args = parser.parse_args()\n\n    if args.command == \"log-usage\":\n        metadata = _parse_metadata(args.metadata)\n        row = log_usage(\n            agent_role=args.agent_role,\n            task_id=args.task_id,\n            trace_id=args.trace_id,\n            tokens_in=args.tokens_in,\n            tokens_out=args.tokens_out,\n            model=args.model,\n            cost_estimate=args.cost_estimate,\n            metadata=metadata,\n        )\n        print(json.dumps({\"ok\": True, \"event\": row, \"logged_at\": datetime.now(timezone.utc).isoformat()}))\n        return 0\n\n    if args.command == \"summary\":\n        print(json.dumps(summary(args.period), indent=2))\n        return 0\n\n    if args.command == \"top-spenders\":\n        print(top_spenders(args.limit))\n        return 0\n\n    if args.command == \"budget-check\":\n        print(json.dumps(budget_check(args.budget), indent=2))\n        return 0\n\n    raise SystemExit(\"Unknown command\")\n\n\nif __name__ == \"__main__\":\n    try:\n        raise SystemExit(main())\n    except subprocess.CalledProcessError as exc:\n        print(f\"token ledger command failed: {exc}\", file=sys.stderr)\n        raise SystemExit(1)\n";
-  const dir = mkdtempSync(join(tmpdir(), 'pywrap-'));
-  const script = join(dir, 'script.py');
-  writeFileSync(script, py, 'utf8');
-  const proc = spawnSync('python3', [script, ...process.argv.slice(2)], { stdio: 'inherit' });
-  rmSync(dir, { recursive: true, force: true });
-  if (proc.error) {
-    console.error(String(proc.error));
-    process.exit(1);
-  }
-  process.exit(proc.status ?? 1);
+import { runPsql } from "../lib/db.js";
+
+const DEFAULT_MONTHLY_BUDGET = 200.0;
+
+const MODEL_RATES_PER_1K: Record<string, [number, number]> = {
+  "gpt-5": [0.01, 0.03],
+  "gpt-5.3-codex": [0.01, 0.03],
+  "gpt-5-codex": [0.01, 0.03],
+  codex: [0.01, 0.03],
+  "claude-opus": [0.015, 0.075],
+  "claude-opus-4": [0.015, 0.075],
+  "claude-opus-4-6": [0.015, 0.075],
+  "claude-sonnet": [0.003, 0.015],
+  "gpt-4o": [0.005, 0.015],
+  "gpt-4.1": [0.005, 0.015],
+  "gpt-4.1-mini": [0.0006, 0.0024],
+};
+
+const FALLBACK_RATE_PER_1K: [number, number] = [0.01, 0.03];
+
+type UsageEvent = {
+  agent_role: string;
+  task_id: number | null;
+  trace_id: string | null;
+  tokens_in: number;
+  tokens_out: number;
+  model: string;
+  cost_estimate?: number | null;
+  metadata?: Record<string, any> | null;
+};
+
+function dbTarget(): string {
+  return process.env.CORTANA_DATABASE_URL || process.env.DATABASE_URL || "cortana";
 }
 
-main().catch((err) => {
-  console.error(err instanceof Error ? err.message : String(err));
-  process.exit(1);
-});
+function runPsqlRaw(sql: string, csv = false): string {
+  const args = csv ? ["--csv"] : [];
+  const proc = runPsql(sql, { db: dbTarget(), args, stdio: "pipe" });
+  if (proc.status !== 0) {
+    const msg = (proc.stderr || "").trim() || (proc.stdout || "").trim() || "psql failed";
+    throw new Error(msg);
+  }
+  return (proc.stdout || "").trim();
+}
+
+function sqlStr(value: string): string {
+  return `'${value.replace(/'/g, "''")}'`;
+}
+
+function sqlNullableStr(value: string | null | undefined): string {
+  if (!value) return "NULL";
+  return sqlStr(value);
+}
+
+function estimateCost(model: string, tokensIn: number, tokensOut: number): number {
+  const modelLower = model.toLowerCase();
+  let [inRate, outRate] = FALLBACK_RATE_PER_1K;
+  for (const [key, rates] of Object.entries(MODEL_RATES_PER_1K)) {
+    if (modelLower.includes(key)) {
+      [inRate, outRate] = rates;
+      break;
+    }
+  }
+  return Math.round((((tokensIn / 1000.0) * inRate + (tokensOut / 1000.0) * outRate) * 1e6)) / 1e6;
+}
+
+function logUsage(event: UsageEvent): Record<string, any> {
+  const metadata = event.metadata ?? {};
+  const costEstimate =
+    event.cost_estimate === null || event.cost_estimate === undefined
+      ? estimateCost(event.model, event.tokens_in, event.tokens_out)
+      : event.cost_estimate;
+
+  const taskSql = event.task_id === null || event.task_id === undefined ? "NULL" : String(Number(event.task_id));
+
+  const sql = `
+    INSERT INTO cortana_token_ledger (
+      agent_role, task_id, trace_id, model, tokens_in, tokens_out, estimated_cost, metadata
+    ) VALUES (
+      ${sqlStr(event.agent_role)}, ${taskSql}, ${sqlNullableStr(event.trace_id)}, ${sqlStr(event.model)},
+      ${Number(event.tokens_in)}, ${Number(event.tokens_out)}, ${Number(costEstimate)}::numeric(12,6),
+      ${sqlStr(JSON.stringify(metadata))}::jsonb
+    )
+    RETURNING id, timestamp, estimated_cost;
+    `;
+
+  const output = runPsqlRaw(sql, true);
+  const lines = output.split(/\r?\n/).filter((l) => l.trim());
+  if (lines.length < 2) throw new Error("Failed to parse insert output");
+  const headers = lines[0].split(",").map((h) => h.trim());
+  const values = lines[1].split(",").map((v) => v.trim());
+  const row: Record<string, string> = {};
+  headers.forEach((h, idx) => {
+    row[h] = values[idx] ?? "";
+  });
+  return row;
+}
+
+function summary(period: string): Record<string, any> {
+  const windows: Record<string, string> = { "24h": "24 hours", "7d": "7 days", "30d": "30 days" };
+  if (!windows[period]) {
+    throw new Error("period must be one of: 24h, 7d, 30d");
+  }
+  const interval = windows[period];
+
+  const byAgentSql = `
+    SELECT agent_role,
+           COUNT(*) AS calls,
+           SUM(tokens_in) AS tokens_in,
+           SUM(tokens_out) AS tokens_out,
+           ROUND(SUM(estimated_cost)::numeric, 4) AS spend_usd
+    FROM cortana_token_ledger
+    WHERE timestamp >= NOW() - INTERVAL '${interval}'
+    GROUP BY agent_role
+    ORDER BY spend_usd DESC;
+    `;
+  const byModelSql = `
+    SELECT model,
+           COUNT(*) AS calls,
+           SUM(tokens_in) AS tokens_in,
+           SUM(tokens_out) AS tokens_out,
+           ROUND(SUM(estimated_cost)::numeric, 4) AS spend_usd
+    FROM cortana_token_ledger
+    WHERE timestamp >= NOW() - INTERVAL '${interval}'
+    GROUP BY model
+    ORDER BY spend_usd DESC;
+    `;
+  const byTaskTypeSql = `
+    SELECT
+      COALESCE(metadata->>'task_type', CASE WHEN task_id IS NULL THEN 'session' ELSE 'task' END) AS task_type,
+      COUNT(*) AS calls,
+      ROUND(SUM(estimated_cost)::numeric, 4) AS spend_usd,
+      SUM(tokens_in + tokens_out) AS total_tokens
+    FROM cortana_token_ledger
+    WHERE timestamp >= NOW() - INTERVAL '${interval}'
+    GROUP BY 1
+    ORDER BY spend_usd DESC;
+    `;
+  const cacheSql = `
+    SELECT
+      COUNT(*) FILTER (WHERE (metadata->>'prompt_cache_hit')::boolean IS TRUE) AS cache_hits,
+      COUNT(*) FILTER (WHERE metadata ? 'prompt_cache_hit') AS cache_observed,
+      COALESCE(SUM((metadata->>'prompt_cache_read_tokens')::bigint),0) AS cache_read_tokens,
+      COALESCE(SUM((metadata->>'prompt_cache_write_tokens')::bigint),0) AS cache_write_tokens
+    FROM cortana_token_ledger
+    WHERE timestamp >= NOW() - INTERVAL '${interval}';
+    `;
+
+  return {
+    period,
+    by_agent: runPsqlRaw(byAgentSql, true),
+    by_model: runPsqlRaw(byModelSql, true),
+    by_task_type: runPsqlRaw(byTaskTypeSql, true),
+    prompt_cache: runPsqlRaw(cacheSql, true),
+  };
+}
+
+function topSpenders(limit: number): string {
+  const sql = `
+    SELECT id, timestamp, agent_role, task_id, trace_id, model,
+           (tokens_in + tokens_out) AS total_tokens,
+           ROUND(estimated_cost::numeric, 6) AS estimated_cost,
+           COALESCE(metadata->>'task_type','') AS task_type
+    FROM cortana_token_ledger
+    ORDER BY estimated_cost DESC, timestamp DESC
+    LIMIT ${Number(limit)};
+    `;
+  return runPsqlRaw(sql, true);
+}
+
+function budgetCheck(monthlyBudget: number): Record<string, any> {
+  const sql = `
+    WITH month_data AS (
+      SELECT DATE_TRUNC('month', NOW()) AS month_start,
+             NOW() AS as_of,
+             EXTRACT(DAY FROM (DATE_TRUNC('month', NOW()) + INTERVAL '1 month - 1 day'))::numeric AS days_in_month,
+             EXTRACT(EPOCH FROM (NOW() - DATE_TRUNC('month', NOW()))) / 86400.0 AS elapsed_days,
+             COALESCE(SUM(estimated_cost), 0)::numeric AS spend_to_date
+      FROM cortana_token_ledger
+      WHERE timestamp >= DATE_TRUNC('month', NOW())
+    )
+    SELECT month_start,
+           as_of,
+           spend_to_date,
+           ROUND(CASE WHEN elapsed_days > 0 THEN spend_to_date / elapsed_days ELSE 0 END, 4) AS burn_rate_per_day,
+           ROUND(CASE WHEN elapsed_days > 0 THEN (spend_to_date / elapsed_days) * days_in_month ELSE 0 END, 2) AS projected_monthly_spend,
+           ROUND((spend_to_date / ${Number(monthlyBudget)}) * 100.0, 2) AS pct_of_budget
+    FROM month_data;
+    `;
+  return {
+    budget_usd: monthlyBudget,
+    snapshot: runPsqlRaw(sql, true),
+  };
+}
+
+function parseMetadata(raw: string | null): Record<string, any> {
+  if (!raw) return {};
+  let payload: any;
+  try {
+    payload = JSON.parse(raw);
+  } catch (err) {
+    throw new Error(`Invalid JSON for --metadata: ${err instanceof Error ? err.message : String(err)}`);
+  }
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+    throw new Error("--metadata must be a JSON object");
+  }
+  return payload;
+}
+
+function parseArgs(argv: string[]) {
+  const command = argv[0];
+  if (!command) throw new Error("command required");
+  const args = argv.slice(1);
+  const get = (name: string): string | null => {
+    const idx = args.indexOf(name);
+    if (idx === -1) return null;
+    return args[idx + 1] ?? null;
+  };
+
+  return { command, args, get };
+}
+
+async function main(): Promise<number> {
+  try {
+    const { command, args, get } = parseArgs(process.argv.slice(2));
+
+    if (command === "log-usage") {
+      const agentRole = get("--agent-role");
+      const tokensIn = get("--tokens-in");
+      const tokensOut = get("--tokens-out");
+      const model = get("--model");
+      if (!agentRole || !tokensIn || !tokensOut || !model) throw new Error("missing required arguments");
+      const taskIdRaw = get("--task-id");
+      const traceId = get("--trace-id");
+      const costEstimateRaw = get("--cost-estimate");
+      const metadataRaw = get("--metadata");
+
+      const metadata = parseMetadata(metadataRaw);
+      const row = logUsage({
+        agent_role: agentRole,
+        task_id: taskIdRaw ? Number.parseInt(taskIdRaw, 10) : null,
+        trace_id: traceId,
+        tokens_in: Number.parseInt(tokensIn, 10),
+        tokens_out: Number.parseInt(tokensOut, 10),
+        model,
+        cost_estimate: costEstimateRaw ? Number.parseFloat(costEstimateRaw) : null,
+        metadata,
+      });
+
+      console.log(
+        JSON.stringify({ ok: true, event: row, logged_at: new Date().toISOString() }),
+      );
+      return 0;
+    }
+
+    if (command === "summary") {
+      const period = get("--period");
+      if (!period) throw new Error("period must be one of: 24h, 7d, 30d");
+      console.log(JSON.stringify(summary(period), null, 2));
+      return 0;
+    }
+
+    if (command === "top-spenders") {
+      const limitRaw = get("--limit");
+      const limit = limitRaw ? Number.parseInt(limitRaw, 10) : 10;
+      console.log(topSpenders(limit));
+      return 0;
+    }
+
+    if (command === "budget-check") {
+      const budgetRaw = get("--budget");
+      const budget = budgetRaw ? Number.parseFloat(budgetRaw) : DEFAULT_MONTHLY_BUDGET;
+      console.log(JSON.stringify(budgetCheck(budget), null, 2));
+      return 0;
+    }
+
+    console.error("Unknown command");
+    return 1;
+  } catch (err) {
+    console.error(err instanceof Error ? err.message : String(err));
+    return 1;
+  }
+}
+
+main()
+  .then((code) => process.exit(code))
+  .catch((err) => {
+    console.error(err instanceof Error ? err.message : String(err));
+    process.exit(1);
+  });

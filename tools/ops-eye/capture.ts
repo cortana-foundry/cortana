@@ -1,24 +1,216 @@
 #!/usr/bin/env npx tsx
-import { spawnSync } from 'node:child_process';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
 
-async function main(): Promise<void> {
-  const py = "#!/usr/bin/env python3\n\"\"\"Multimodal Ops Eye capture tool.\n\nCaptures macOS screenshots, runs local OCR with tesseract, and returns structured JSON.\n\"\"\"\n\nfrom __future__ import annotations\n\nimport argparse\nimport json\nimport re\nimport shutil\nimport subprocess\nimport sys\nimport tempfile\nfrom datetime import datetime, timezone\nfrom pathlib import Path\nfrom typing import Any\n\nERROR_PATTERNS = [\n    r\"\\berror\\b\",\n    r\"\\bfailed\\b\",\n    r\"\\bexception\\b\",\n    r\"\\btraceback\\b\",\n    r\"\\bwarning\\b\",\n    r\"\\bdenied\\b\",\n    r\"\\bunavailable\\b\",\n    r\"\\bcrash(ed|ing)?\\b\",\n]\n\n\ndef run(cmd: list[str]) -> subprocess.CompletedProcess[str]:\n    return subprocess.run(cmd, text=True, capture_output=True)\n\n\ndef resolve_binary(name: str, fallbacks: list[str] | None = None) -> str | None:\n    found = shutil.which(name)\n    if found:\n        return found\n    for p in fallbacks or []:\n        if Path(p).exists():\n            return p\n    return None\n\n\ndef ensure_dependencies() -> tuple[str, str]:\n    screencapture_bin = resolve_binary(\"screencapture\", [\"/usr/sbin/screencapture\", \"/usr/bin/screencapture\"])\n    tesseract_bin = resolve_binary(\"tesseract\", [\"/opt/homebrew/bin/tesseract\", \"/usr/local/bin/tesseract\"])\n\n    if screencapture_bin is None:\n        raise RuntimeError(\"screencapture is not available on this system\")\n    if tesseract_bin is None:\n        raise RuntimeError(\"tesseract is not installed. Try: brew install tesseract\")\n\n    return screencapture_bin, tesseract_bin\n\n\ndef capture_screenshot(screencapture_bin: str, path: Path, mode: str, window_id: str | None) -> dict[str, Any]:\n    cmd = [screencapture_bin, \"-x\"]\n\n    if mode == \"window\":\n        if not window_id:\n            raise RuntimeError(\"--window-id is required when --mode window\")\n        cmd.extend([\"-l\", str(window_id)])\n\n    cmd.append(str(path))\n    proc = run(cmd)\n    if proc.returncode != 0:\n        raise RuntimeError(f\"screencapture failed: {proc.stderr.strip() or proc.stdout.strip()}\")\n\n    return {\n        \"path\": str(path),\n        \"bytes\": path.stat().st_size if path.exists() else 0,\n        \"mode\": mode,\n        \"window_id\": window_id,\n    }\n\n\ndef ocr_image(tesseract_bin: str, image_path: Path, lang: str = \"eng\") -> dict[str, Any]:\n    cmd = [tesseract_bin, str(image_path), \"stdout\", \"-l\", lang, \"--psm\", \"6\"]\n    proc = run(cmd)\n    if proc.returncode != 0:\n        raise RuntimeError(f\"tesseract failed: {proc.stderr.strip() or proc.stdout.strip()}\")\n\n    text = proc.stdout or \"\"\n    cleaned = text.strip()\n    lines = [ln for ln in cleaned.splitlines() if ln.strip()]\n\n    return {\n        \"text\": cleaned,\n        \"line_count\": len(lines),\n        \"char_count\": len(cleaned),\n        \"language\": lang,\n    }\n\n\ndef get_frontmost_app() -> dict[str, str | None]:\n    script = (\n        'tell application \"System Events\"\\n'\n        'set p to first process whose frontmost is true\\n'\n        'set appName to name of p\\n'\n        'set winName to \"\"\\n'\n        'try\\n'\n        'set winName to name of front window of p\\n'\n        'end try\\n'\n        'return appName & \"|||\" & winName\\n'\n        'end tell'\n    )\n\n    proc = run([\"osascript\", \"-e\", script])\n    if proc.returncode != 0:\n        return {\"app_name\": None, \"window_title\": None}\n\n    out = (proc.stdout or \"\").strip()\n    if \"|||\" in out:\n        app, win = out.split(\"|||\", 1)\n        return {\"app_name\": app or None, \"window_title\": win or None}\n    return {\"app_name\": out or None, \"window_title\": None}\n\n\ndef detect_ui_state(ocr_text: str, frontmost: dict[str, Any]) -> dict[str, Any]:\n    lowered = (ocr_text or \"\").lower()\n    matches = []\n    for pattern in ERROR_PATTERNS:\n        if re.search(pattern, lowered, re.IGNORECASE):\n            matches.append(pattern)\n\n    signals = []\n    if matches:\n        signals.append(\"error_keywords_detected\")\n\n    title = (frontmost.get(\"window_title\") or \"\").lower()\n    app_name = (frontmost.get(\"app_name\") or \"\").lower()\n    if \"dialog\" in title or \"alert\" in title:\n        signals.append(\"dialog_window_title\")\n    if any(k in title for k in [\"error\", \"failed\", \"warning\"]) or any(\n        k in app_name for k in [\"crash\", \"report\", \"installer\"]\n    ):\n        signals.append(\"possible_error_window\")\n\n    severity = \"normal\"\n    if \"possible_error_window\" in signals or matches:\n        severity = \"warning\"\n\n    return {\n        \"severity\": severity,\n        \"signals\": signals,\n        \"error_pattern_matches\": matches,\n    }\n\n\ndef parse_args() -> argparse.Namespace:\n    parser = argparse.ArgumentParser(description=\"Capture screenshot + OCR + UI state JSON\")\n    parser.add_argument(\"--mode\", choices=[\"full\", \"window\"], default=\"full\")\n    parser.add_argument(\"--window-id\", help=\"CGWindowID for --mode window\")\n    parser.add_argument(\"--output-image\", help=\"Save screenshot to this path\")\n    parser.add_argument(\"--lang\", default=\"eng\", help=\"Tesseract language (default: eng)\")\n    parser.add_argument(\n        \"--ui-state\",\n        action=\"store_true\",\n        help=\"Include UI state detection (frontmost app + error heuristics)\",\n    )\n    parser.add_argument(\n        \"--keep-temp\",\n        action=\"store_true\",\n        help=\"Keep temp screenshot when --output-image is not provided\",\n    )\n    return parser.parse_args()\n\n\ndef main() -> int:\n    args = parse_args()\n    started = datetime.now(timezone.utc)\n\n    try:\n        screencapture_bin, tesseract_bin = ensure_dependencies()\n\n        explicit_image = Path(args.output_image).expanduser() if args.output_image else None\n        if explicit_image:\n            explicit_image.parent.mkdir(parents=True, exist_ok=True)\n            image_path = explicit_image\n            temp_used = False\n        else:\n            tmp_dir = Path(tempfile.mkdtemp(prefix=\"ops-eye-\"))\n            image_path = tmp_dir / \"capture.png\"\n            temp_used = True\n\n        capture_meta = capture_screenshot(screencapture_bin, image_path, args.mode, args.window_id)\n        ocr_meta = ocr_image(tesseract_bin, image_path, lang=args.lang)\n\n        frontmost = get_frontmost_app() if args.ui_state else {}\n        ui_state = detect_ui_state(ocr_meta[\"text\"], frontmost) if args.ui_state else None\n\n        payload: dict[str, Any] = {\n            \"ok\": True,\n            \"timestamp_utc\": started.isoformat(),\n            \"capture\": capture_meta,\n            \"ocr\": ocr_meta,\n            \"frontmost\": frontmost if args.ui_state else None,\n            \"ui_state\": ui_state,\n            \"engine\": {\"ocr\": \"tesseract\", \"platform\": \"macOS\"},\n        }\n\n        if temp_used and not args.keep_temp:\n            try:\n                image_path.unlink(missing_ok=True)\n                image_path.parent.rmdir()\n                payload[\"capture\"][\"path\"] = None\n            except Exception:\n                pass\n\n        print(json.dumps(payload, indent=2))\n        return 0\n\n    except Exception as exc:\n        err = {\n            \"ok\": False,\n            \"error\": str(exc),\n            \"timestamp_utc\": started.isoformat(),\n        }\n        print(json.dumps(err, indent=2), file=sys.stderr)\n        return 1\n\n\nif __name__ == \"__main__\":\n    raise SystemExit(main())\n";
-  const dir = mkdtempSync(join(tmpdir(), 'pywrap-'));
-  const script = join(dir, 'script.py');
-  writeFileSync(script, py, 'utf8');
-  const proc = spawnSync('python3', [script, ...process.argv.slice(2)], { stdio: 'inherit' });
-  rmSync(dir, { recursive: true, force: true });
-  if (proc.error) {
-    console.error(String(proc.error));
-    process.exit(1);
-  }
-  process.exit(proc.status ?? 1);
+import { spawnSync } from "node:child_process";
+import fs from "node:fs";
+import path from "node:path";
+import os from "node:os";
+
+const ERROR_PATTERNS = [
+  "\\berror\\b",
+  "\\bfailed\\b",
+  "\\bexception\\b",
+  "\\btraceback\\b",
+  "\\bwarning\\b",
+  "\\bdenied\\b",
+  "\\bunavailable\\b",
+  "\\bcrash(ed|ing)?\\b",
+];
+
+function run(cmd: string[]): { code: number; stdout: string; stderr: string } {
+  const proc = spawnSync(cmd[0], cmd.slice(1), { encoding: "utf8" });
+  return {
+    code: proc.status ?? 1,
+    stdout: proc.stdout || "",
+    stderr: proc.stderr || "",
+  };
 }
 
-main().catch((err) => {
-  console.error(err instanceof Error ? err.message : String(err));
-  process.exit(1);
-});
+function resolveBinary(name: string, fallbacks: string[] = []): string | null {
+  const which = spawnSync("which", [name], { encoding: "utf8" });
+  const found = (which.stdout || "").trim();
+  if (which.status === 0 && found) return found;
+  for (const p of fallbacks) {
+    if (fs.existsSync(p)) return p;
+  }
+  return null;
+}
+
+function ensureDependencies(): [string, string] {
+  const screencaptureBin = resolveBinary("screencapture", ["/usr/sbin/screencapture", "/usr/bin/screencapture"]);
+  const tesseractBin = resolveBinary("tesseract", ["/opt/homebrew/bin/tesseract", "/usr/local/bin/tesseract"]);
+  if (!screencaptureBin) throw new Error("screencapture is not available on this system");
+  if (!tesseractBin) throw new Error("tesseract is not installed. Try: brew install tesseract");
+  return [screencaptureBin, tesseractBin];
+}
+
+function captureScreenshot(
+  screencaptureBin: string,
+  imagePath: string,
+  mode: string,
+  windowId: string | null,
+): Record<string, any> {
+  const cmd = [screencaptureBin, "-x"];
+  if (mode === "window") {
+    if (!windowId) throw new Error("--window-id is required when --mode window");
+    cmd.push("-l", String(windowId));
+  }
+  cmd.push(imagePath);
+  const proc = run(cmd);
+  if (proc.code !== 0) {
+    throw new Error(`screencapture failed: ${(proc.stderr || proc.stdout).trim()}`);
+  }
+  const bytes = fs.existsSync(imagePath) ? fs.statSync(imagePath).size : 0;
+  return { path: imagePath, bytes, mode, window_id: windowId };
+}
+
+function ocrImage(tesseractBin: string, imagePath: string, lang = "eng"): Record<string, any> {
+  const cmd = [tesseractBin, imagePath, "stdout", "-l", lang, "--psm", "6"];
+  const proc = run(cmd);
+  if (proc.code !== 0) {
+    throw new Error(`tesseract failed: ${(proc.stderr || proc.stdout).trim()}`);
+  }
+  const text = proc.stdout || "";
+  const cleaned = text.trim();
+  const lines = cleaned.split(/\r?\n/).filter((ln) => ln.trim());
+  return {
+    text: cleaned,
+    line_count: lines.length,
+    char_count: cleaned.length,
+    language: lang,
+  };
+}
+
+function getFrontmostApp(): Record<string, string | null> {
+  const script =
+    'tell application "System Events"\n' +
+    'set p to first process whose frontmost is true\n' +
+    'set appName to name of p\n' +
+    'set winName to ""\n' +
+    'try\n' +
+    'set winName to name of front window of p\n' +
+    'end try\n' +
+    'return appName & "|||" & winName\n' +
+    'end tell';
+
+  const proc = run(["osascript", "-e", script]);
+  if (proc.code !== 0) return { app_name: null, window_title: null };
+  const out = (proc.stdout || "").trim();
+  if (out.includes("|||")) {
+    const [app, win] = out.split("|||", 2);
+    return { app_name: app || null, window_title: win || null };
+  }
+  return { app_name: out || null, window_title: null };
+}
+
+function detectUiState(ocrText: string, frontmost: Record<string, any>): Record<string, any> {
+  const lowered = (ocrText || "").toLowerCase();
+  const matches: string[] = [];
+  for (const pattern of ERROR_PATTERNS) {
+    if (new RegExp(pattern, "i").test(lowered)) matches.push(pattern);
+  }
+
+  const signals: string[] = [];
+  if (matches.length) signals.push("error_keywords_detected");
+
+  const title = String(frontmost.window_title ?? "").toLowerCase();
+  const appName = String(frontmost.app_name ?? "").toLowerCase();
+  if (title.includes("dialog") || title.includes("alert")) signals.push("dialog_window_title");
+  if (["error", "failed", "warning"].some((k) => title.includes(k)) ||
+      ["crash", "report", "installer"].some((k) => appName.includes(k))) {
+    signals.push("possible_error_window");
+  }
+
+  let severity = "normal";
+  if (signals.includes("possible_error_window") || matches.length) severity = "warning";
+
+  return { severity, signals, error_pattern_matches: matches };
+}
+
+function parseArgs(argv: string[]) {
+  const args = {
+    mode: "full",
+    windowId: null as string | null,
+    outputImage: null as string | null,
+    lang: "eng",
+    uiState: false,
+    keepTemp: false,
+  };
+
+  for (let i = 0; i < argv.length; i += 1) {
+    const a = argv[i];
+    if (a === "--mode") args.mode = argv[++i] ?? args.mode;
+    else if (a === "--window-id") args.windowId = argv[++i] ?? null;
+    else if (a === "--output-image") args.outputImage = argv[++i] ?? null;
+    else if (a === "--lang") args.lang = argv[++i] ?? args.lang;
+    else if (a === "--ui-state") args.uiState = true;
+    else if (a === "--keep-temp") args.keepTemp = true;
+  }
+
+  return args;
+}
+
+async function main(): Promise<number> {
+  const args = parseArgs(process.argv.slice(2));
+  const started = new Date().toISOString();
+
+  try {
+    const [screencaptureBin, tesseractBin] = ensureDependencies();
+
+    let imagePath: string;
+    let tempUsed = false;
+
+    if (args.outputImage) {
+      const explicit = path.resolve(args.outputImage);
+      fs.mkdirSync(path.dirname(explicit), { recursive: true });
+      imagePath = explicit;
+    } else {
+      const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "ops-eye-"));
+      imagePath = path.join(tmpDir, "capture.png");
+      tempUsed = true;
+    }
+
+    const captureMeta = captureScreenshot(screencaptureBin, imagePath, args.mode, args.windowId);
+    const ocrMeta = ocrImage(tesseractBin, imagePath, args.lang);
+
+    const frontmost = args.uiState ? getFrontmostApp() : {};
+    const uiState = args.uiState ? detectUiState(ocrMeta.text, frontmost) : null;
+
+    const payload: Record<string, any> = {
+      ok: true,
+      timestamp_utc: started,
+      capture: captureMeta,
+      ocr: ocrMeta,
+      frontmost: args.uiState ? frontmost : null,
+      ui_state: uiState,
+      engine: { ocr: "tesseract", platform: "macOS" },
+    };
+
+    if (tempUsed && !args.keepTemp) {
+      try {
+        fs.unlinkSync(imagePath);
+        fs.rmdirSync(path.dirname(imagePath));
+        payload.capture.path = null;
+      } catch {
+        // ignore
+      }
+    }
+
+    console.log(JSON.stringify(payload, null, 2));
+    return 0;
+  } catch (err) {
+    const payload = {
+      ok: false,
+      error: err instanceof Error ? err.message : String(err),
+      timestamp_utc: started,
+    };
+    console.error(JSON.stringify(payload, null, 2));
+    return 1;
+  }
+}
+
+main()
+  .then((code) => process.exit(code))
+  .catch((err) => {
+    console.error(err instanceof Error ? err.message : String(err));
+    process.exit(1);
+  });

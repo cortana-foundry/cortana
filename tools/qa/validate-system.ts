@@ -1,21 +1,588 @@
 #!/usr/bin/env npx tsx
-import { spawnSync } from 'node:child_process';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+
+import fs from "fs";
+import os from "os";
+import path from "path";
+import { spawnSync } from "child_process";
+import { PSQL_BIN, resolveRepoPath } from "../lib/paths.js";
+
+type Check = {
+  name: string;
+  status: "pass" | "warn" | "fail";
+  passed: boolean;
+  details: Record<string, any>;
+  message?: string;
+};
+
+type Json = Record<string, any>;
+
+const REPO_ROOT = resolveRepoPath();
+const DB_NAME = "cortana";
+const RUNTIME_JOBS = path.join(os.homedir(), ".openclaw", "cron", "jobs.json");
+const REPO_JOBS = path.join(REPO_ROOT, "config", "cron", "jobs.json");
+
+const MEMORY_FILES = ["MEMORY.md", "SOUL.md", "USER.md", "IDENTITY.md"];
+
+const REQUIRED_DB_TABLES = [
+  "cortana_events",
+  "cortana_tasks",
+  "cortana_epics",
+  "cortana_feedback",
+  "cortana_patterns",
+  "cortana_self_model",
+];
+
+const REQUIRED_TOOLS = [
+  "tools/subagent-watchdog/check-subagents.sh",
+  "tools/heartbeat/validate-heartbeat-state.sh",
+  "tools/session-reconciler/reconcile-sessions.sh",
+];
+
+const OPTIONAL_TOOLS = [
+  "tools/task-board/completion-sync.sh",
+  "tools/reaper/reaper.sh",
+  "tools/notifications/telegram-delivery-guard.ts",
+];
+
+function run(cmd: string[], cwd?: string): [number, string, string] {
+  const proc = spawnSync(cmd[0], cmd.slice(1), {
+    cwd,
+    encoding: "utf8",
+  });
+  return [proc.status ?? 1, (proc.stdout ?? "").trim(), (proc.stderr ?? "").trim()];
+}
+
+function makeCheck(name: string): Check {
+  return { name, status: "pass", passed: true, details: {} };
+}
+
+function fail(check: Check, message: string): void {
+  check.status = "fail";
+  check.passed = false;
+  check.message = message;
+}
+
+function warn(check: Check, message: string): void {
+  if (check.status !== "fail") check.status = "warn";
+  check.message = message;
+}
+
+function isSymlink(filePath: string): boolean {
+  try {
+    return fs.lstatSync(filePath).isSymbolicLink();
+  } catch {
+    return false;
+  }
+}
+
+function checkSymlink(fix: boolean): Check {
+  const check = makeCheck("symlink_integrity");
+  const expectedTarget = REPO_JOBS;
+  const exists = fs.existsSync(RUNTIME_JOBS) || isSymlink(RUNTIME_JOBS);
+  const details: Json = {
+    path: RUNTIME_JOBS,
+    expected_target: expectedTarget,
+    exists,
+  };
+
+  if (isSymlink(RUNTIME_JOBS)) {
+    const actualTarget = fs.readlinkSync(RUNTIME_JOBS);
+    const resolved = fs.existsSync(RUNTIME_JOBS) ? fs.realpathSync(RUNTIME_JOBS) : null;
+    details.actual_target = actualTarget;
+    details.resolved_target = resolved;
+    if (resolved !== expectedTarget) {
+      if (fix) {
+        fs.mkdirSync(path.dirname(RUNTIME_JOBS), { recursive: true });
+        if (fs.existsSync(RUNTIME_JOBS) || isSymlink(RUNTIME_JOBS)) fs.unlinkSync(RUNTIME_JOBS);
+        fs.symlinkSync(REPO_JOBS, RUNTIME_JOBS);
+        details.fixed = true;
+        details.actual_target = REPO_JOBS;
+        details.resolved_target = REPO_JOBS;
+      } else {
+        fail(check, "Symlink points to the wrong target");
+      }
+    } else if (!fs.existsSync(RUNTIME_JOBS)) {
+      fail(check, "Symlink exists but target is broken/missing");
+    }
+  } else {
+    details.is_symlink = false;
+    if (fix) {
+      fs.mkdirSync(path.dirname(RUNTIME_JOBS), { recursive: true });
+      if (fs.existsSync(RUNTIME_JOBS)) fs.unlinkSync(RUNTIME_JOBS);
+      fs.symlinkSync(REPO_JOBS, RUNTIME_JOBS);
+      details.fixed = true;
+      details.actual_target = REPO_JOBS;
+      details.resolved_target = REPO_JOBS;
+    } else {
+      fail(check, "jobs.json is missing or not a symlink");
+    }
+  }
+
+  check.details = details;
+  return check;
+}
+
+function checkCronDefinitions(): Check {
+  const check = makeCheck("cron_definitions");
+  const details: Json = { path: REPO_JOBS, required_fields: ["name", "schedule", "enabled", "command"] };
+
+  if (!fs.existsSync(REPO_JOBS)) {
+    fail(check, "config/cron/jobs.json is missing");
+    check.details = details;
+    return check;
+  }
+
+  let data: any;
+  try {
+    data = JSON.parse(fs.readFileSync(REPO_JOBS, "utf8"));
+  } catch (err) {
+    fail(check, `Invalid JSON: ${err instanceof Error ? err.message : String(err)}`);
+    check.details = details;
+    return check;
+  }
+
+  const jobs = data && typeof data === "object" ? data.jobs : null;
+  if (!Array.isArray(jobs)) {
+    fail(check, "jobs.json must contain a top-level 'jobs' array");
+    check.details = details;
+    return check;
+  }
+
+  const missingRequired: Json[] = [];
+  const missingModel: Json[] = [];
+
+  jobs.forEach((job: any, idx: number) => {
+    if (!job || typeof job !== "object") {
+      missingRequired.push({ index: idx, name: null, missing: ["<job is not an object>"] });
+      return;
+    }
+    const jobName = job.name ?? `index:${idx}`;
+    const missing = ["name", "schedule", "enabled", "command"].filter((k) => !(k in job));
+    if (missing.length) missingRequired.push({ index: idx, name: jobName, missing });
+
+    const hasModel = "model" in job;
+    const payloadModel = typeof job.payload === "object" && job.payload && "model" in job.payload;
+    if (!hasModel && !payloadModel) missingModel.push({ index: idx, name: jobName });
+  });
+
+  details.job_count = jobs.length;
+  details.missing_required = missingRequired;
+  details.missing_model = missingModel;
+
+  if (missingRequired.length) fail(check, "One or more cron jobs are missing required fields");
+  else if (missingModel.length) warn(check, "One or more cron jobs are missing a model field");
+
+  check.details = details;
+  return check;
+}
+
+function checkDbConnectivity(): Check {
+  const check = makeCheck("db_connectivity");
+  const details: Json = { psql_path: PSQL_BIN, database: DB_NAME, required_tables: REQUIRED_DB_TABLES };
+
+  if (!fs.existsSync(PSQL_BIN)) {
+    fail(check, "psql binary not found");
+    check.details = details;
+    return check;
+  }
+
+  let rc: number;
+  let out: string;
+  let err: string;
+
+  [rc, out, err] = run([PSQL_BIN, DB_NAME, "-t", "-A", "-c", "SELECT 1;"]);
+  details.connect_stdout = out;
+  if (rc !== 0) {
+    fail(check, `Cannot connect to PostgreSQL/${DB_NAME}: ${err || out}`);
+    check.details = details;
+    return check;
+  }
+
+  const sql =
+    "SELECT table_name FROM information_schema.tables " +
+    "WHERE table_schema='public' AND table_name = ANY(ARRAY[" +
+    REQUIRED_DB_TABLES.map((t) => `'${t}'`).join(",") +
+    "])";
+
+  [rc, out, err] = run([PSQL_BIN, DB_NAME, "-t", "-A", "-c", sql]);
+  if (rc !== 0) {
+    fail(check, `Failed checking required tables: ${err || out}`);
+    check.details = details;
+    return check;
+  }
+
+  const found = out
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .sort();
+  const missing = REQUIRED_DB_TABLES.filter((t) => !found.includes(t)).sort();
+  details.found_tables = found;
+  details.missing_tables = missing;
+
+  if (missing.length) fail(check, "Database is reachable but missing required tables");
+
+  check.details = details;
+  return check;
+}
+
+function checkCriticalTools(): Check {
+  const check = makeCheck("critical_tools");
+  const details: Json = { required: [], optional: [] };
+
+  const missing: string[] = [];
+  for (const rel of REQUIRED_TOOLS) {
+    const p = path.join(REPO_ROOT, rel);
+    const exists = fs.existsSync(p);
+    const executable = exists ? fs.accessSync(p, fs.constants.X_OK) === undefined : false;
+    details.required.push({ path: rel, exists, executable, required: true });
+    if (!exists || !executable) missing.push(rel);
+  }
+
+  for (const rel of OPTIONAL_TOOLS) {
+    const p = path.join(REPO_ROOT, rel);
+    const exists = fs.existsSync(p);
+    let executable: boolean | null = null;
+    if (exists) {
+      try {
+        fs.accessSync(p, fs.constants.X_OK);
+        executable = true;
+      } catch {
+        executable = false;
+      }
+    }
+    details.optional.push({ path: rel, exists, executable, required: false });
+  }
+
+  if (missing.length) fail(check, `Missing or non-executable required tools: ${missing.join(", ")}`);
+
+  check.details = details;
+  return check;
+}
+
+function checkHeartbeatState(): Check {
+  const check = makeCheck("heartbeat_state");
+  const filePath = path.join(REPO_ROOT, "memory", "heartbeat-state.json");
+  const details: Json = { path: filePath };
+
+  if (!fs.existsSync(filePath)) {
+    fail(check, "heartbeat-state.json is missing");
+    check.details = details;
+    return check;
+  }
+
+  let data: any;
+  try {
+    data = JSON.parse(fs.readFileSync(filePath, "utf8"));
+  } catch (err) {
+    fail(check, `Invalid heartbeat-state JSON: ${err instanceof Error ? err.message : String(err)}`);
+    check.details = details;
+    return check;
+  }
+
+  const version = data && typeof data === "object" ? data.version : null;
+  details.version = version;
+
+  if (typeof version !== "number" || version < 2) fail(check, "heartbeat-state version must be >= 2");
+
+  check.details = details;
+  return check;
+}
+
+function checkMemoryFiles(): Check {
+  const check = makeCheck("memory_files");
+  const details: Json = { files: [] };
+  const bad: string[] = [];
+
+  for (const fname of MEMORY_FILES) {
+    const p = path.join(REPO_ROOT, fname);
+    const exists = fs.existsSync(p);
+    const size = exists ? fs.statSync(p).size : 0;
+    const nonEmpty = size > 0;
+    details.files.push({ path: fname, exists, size, non_empty: nonEmpty });
+    if (!exists || !nonEmpty) bad.push(fname);
+  }
+
+  if (bad.length) fail(check, `Missing or empty memory files: ${bad.join(", ")}`);
+
+  check.details = details;
+  return check;
+}
+
+function checkGitStatus(): Check {
+  const check = makeCheck("git_status");
+  const details: Json = {};
+
+  const [rc, out, err] = run(["git", "status", "--porcelain"], REPO_ROOT);
+  if (rc !== 0) {
+    fail(check, `git status failed: ${err || out}`);
+    check.details = details;
+    return check;
+  }
+
+  let modified = 0;
+  let untracked = 0;
+  for (const line of out.split(/\r?\n/)) {
+    if (!line.trim()) continue;
+    if (line.startsWith("??")) untracked += 1;
+    else modified += 1;
+  }
+
+  details.modified_count = modified;
+  details.untracked_count = untracked;
+  details.total_changes = modified + untracked;
+  details.clean = modified + untracked === 0;
+
+  check.details = details;
+  return check;
+}
+
+function checkDiskSpace(): Check {
+  const check = makeCheck("disk_space");
+  const stat = fs.statfsSync("/");
+  const freeBytes = stat.bsize * stat.bfree;
+  const totalBytes = stat.bsize * stat.blocks;
+  const freeGb = freeBytes / 1024 ** 3;
+  const totalGb = totalBytes / 1024 ** 3;
+  const details = {
+    mount: "/",
+    free_bytes: freeBytes,
+    free_gb: Math.round(freeGb * 100) / 100,
+    total_gb: Math.round(totalGb * 100) / 100,
+    threshold_gb: 5,
+  };
+
+  if (freeGb < 5) warn(check, "Free disk space is below 5GB");
+
+  check.details = details;
+  return check;
+}
+
+function parseSimpleStep(field: string): number | null {
+  if (field.startsWith("*/")) {
+    const v = Number(field.slice(2));
+    return Number.isFinite(v) ? v : null;
+  }
+  return null;
+}
+
+function parseIntList(field: string, minV: number, maxV: number): number[] | null {
+  if (!field || field.includes("*") || field.includes("/")) return null;
+  const out: number[] = [];
+  for (const part of field.split(",")) {
+    const t = part.trim();
+    if (!/^\d+$/.test(t)) return null;
+    const v = Number(t);
+    if (v < minV || v > maxV) return null;
+    out.push(v);
+  }
+  return out.length ? Array.from(new Set(out)).sort((a, b) => a - b) : null;
+}
+
+function estimateIntervalMs(expr: string): number | null {
+  const parts = expr.split(/\s+/);
+  if (parts.length < 5) return null;
+  const [minute, hour] = parts;
+
+  const minuteStep = parseSimpleStep(minute);
+  const hourStep = parseSimpleStep(hour);
+  if (hourStep && hourStep > 0) return hourStep * 60 * 60 * 1000;
+
+  const hourValues = parseIntList(hour, 0, 23);
+  if (hourValues) {
+    if (hourValues.length === 1) return 24 * 60 * 60 * 1000;
+    const diffs: number[] = [];
+    for (let i = 0; i < hourValues.length; i += 1) {
+      const cur = hourValues[i];
+      const nxt = hourValues[(i + 1) % hourValues.length];
+      const diff = (nxt - cur + 24) % 24;
+      if (diff !== 0) diffs.push(diff);
+    }
+    if (diffs.length) return Math.min(...diffs) * 60 * 60 * 1000;
+  }
+
+  if (hour === "*") {
+    if (minuteStep && minuteStep > 0) return minuteStep * 60 * 1000;
+    const minuteValues = parseIntList(minute, 0, 59);
+    if (minuteValues) {
+      if (minuteValues.length === 1) return 60 * 60 * 1000;
+      const diffs: number[] = [];
+      for (let i = 0; i < minuteValues.length; i += 1) {
+        const cur = minuteValues[i];
+        const nxt = minuteValues[(i + 1) % minuteValues.length];
+        const diff = (nxt - cur + 60) % 60;
+        if (diff !== 0) diffs.push(diff);
+      }
+      if (diffs.length) return Math.min(...diffs) * 60 * 1000;
+    }
+    return 60 * 60 * 1000;
+  }
+
+  return null;
+}
+
+function checkCronStaleness(fix: boolean): Check {
+  const check = makeCheck("cron_staleness");
+  const details: Json = { path: RUNTIME_JOBS, late_jobs: [], fix_attempts: [] };
+
+  if (!fs.existsSync(RUNTIME_JOBS)) {
+    fail(check, "Runtime cron jobs file is missing");
+    check.details = details;
+    return check;
+  }
+
+  let data: any;
+  try {
+    data = JSON.parse(fs.readFileSync(RUNTIME_JOBS, "utf8"));
+  } catch (err) {
+    fail(check, `Invalid runtime jobs JSON: ${err instanceof Error ? err.message : String(err)}`);
+    check.details = details;
+    return check;
+  }
+
+  const jobs = data && typeof data === "object" ? data.jobs : null;
+  if (!Array.isArray(jobs)) {
+    fail(check, "Runtime jobs.json must contain a top-level 'jobs' array");
+    check.details = details;
+    return check;
+  }
+
+  const nowMs = Math.trunc(Date.now());
+  details.now_ms = nowMs;
+  details.job_count = jobs.length;
+
+  let enabledCount = 0;
+  let analyzedCount = 0;
+
+  jobs.forEach((job: any, idx: number) => {
+    if (!job || typeof job !== "object") return;
+    if (!job.enabled) return;
+    enabledCount += 1;
+
+    const jobId = String(job.id ?? job.name ?? `index:${idx}`);
+    const schedule = job.schedule && typeof job.schedule === "object" ? job.schedule : {};
+    const expr = schedule.expr;
+    const state = job.state && typeof job.state === "object" ? job.state : {};
+    if (!expr || typeof expr !== "string" || !expr.trim()) return;
+
+    const expectedIntervalMs = estimateIntervalMs(expr.trim());
+    if (!expectedIntervalMs) return;
+
+    let lastRunAt = state.lastRunAt;
+    if (typeof lastRunAt !== "number") lastRunAt = state.lastFiredAt;
+    if (typeof lastRunAt !== "number") return;
+
+    analyzedCount += 1;
+    const lagMs = Math.max(0, nowMs - Math.trunc(lastRunAt));
+    const staleThresholdMs = expectedIntervalMs * 2;
+    if (lagMs > staleThresholdMs) {
+      const lateByMs = lagMs - staleThresholdMs;
+      details.late_jobs.push({
+        id: jobId,
+        name: job.name,
+        expr,
+        last_run_at_ms: Math.trunc(lastRunAt),
+        lag_ms: lagMs,
+        expected_interval_ms: expectedIntervalMs,
+        stale_threshold_ms: staleThresholdMs,
+        late_by_ms: lateByMs,
+      });
+    }
+  });
+
+  details.enabled_jobs = enabledCount;
+  details.analyzed_jobs = analyzedCount;
+
+  if (details.late_jobs.length) {
+    if (fix) {
+      for (const item of details.late_jobs) {
+        const [rc, out, err] = run(["openclaw", "cron", "run", item.id]);
+        details.fix_attempts.push({ id: item.id, rc, stdout: out, stderr: err, ok: rc === 0 });
+      }
+      const failed = details.fix_attempts.filter((x: any) => !x.ok);
+      if (failed.length) warn(check, `Found ${details.late_jobs.length} stale job(s); some fix attempts failed`);
+      else warn(check, `Found and force-ran ${details.late_jobs.length} stale job(s)`);
+    } else {
+      warn(check, `Found ${details.late_jobs.length} stale cron job(s)`);
+    }
+  }
+
+  check.details = details;
+  return check;
+}
+
+function summarize(checks: Check[]): Json {
+  const failed = checks.filter((c) => c.status === "fail").length;
+  const warned = checks.filter((c) => c.status === "warn").length;
+  const passed = checks.filter((c) => c.status === "pass").length;
+  return {
+    overall_ok: failed === 0,
+    counts: { pass: passed, warn: warned, fail: failed, total: checks.length },
+  };
+}
+
+function printHuman(report: Json, verbose: boolean): void {
+  console.log("OpenClaw System Validation");
+  console.log("=".repeat(28));
+  console.log(`Timestamp: ${report.timestamp}`);
+  console.log(`Repo: ${report.repo_root}`);
+  console.log();
+
+  for (const c of report.checks as Check[]) {
+    const icon = c.status === "pass" ? "✅" : c.status === "warn" ? "⚠️" : c.status === "fail" ? "❌" : "•";
+    console.log(`${icon} ${c.name}: ${c.status.toUpperCase()}`);
+    if (c.message) console.log(`   ${c.message}`);
+    if (verbose) {
+      console.log("   details:");
+      console.log("   " + JSON.stringify(c.details ?? {}, null, 2).replace(/\n/g, "\n   "));
+    }
+  }
+
+  const counts = report.summary.counts;
+  console.log();
+  console.log(
+    `Result: ${report.summary.overall_ok ? "PASS" : "FAIL"} (pass=${counts.pass}, warn=${counts.warn}, fail=${counts.fail})`
+  );
+}
+
+type Args = { json: boolean; fix: boolean; verbose: boolean };
+
+function parseArgs(argv: string[]): Args {
+  const args: Args = { json: false, fix: false, verbose: false };
+  for (const arg of argv) {
+    if (arg === "--json") args.json = true;
+    if (arg === "--fix") args.fix = true;
+    if (arg === "--verbose") args.verbose = true;
+  }
+  return args;
+}
 
 async function main(): Promise<void> {
-  const py = "#!/usr/bin/env python3\n\"\"\"System validation suite for critical OpenClaw paths.\"\"\"\n\nfrom __future__ import annotations\n\nimport argparse\nimport json\nimport os\nimport shutil\nimport subprocess\nimport sys\nfrom datetime import datetime, timezone\nfrom pathlib import Path\nfrom typing import Any, Dict, List, Tuple\n\nREPO_ROOT = Path(__file__).resolve().parents[2]\nPSQL = Path(\"/opt/homebrew/opt/postgresql@17/bin/psql\")\nDB_NAME = \"cortana\"\n\nRUNTIME_JOBS = Path.home() / \".openclaw/cron/jobs.json\"\nREPO_JOBS = REPO_ROOT / \"config/cron/jobs.json\"\n\nMEMORY_FILES = [\"MEMORY.md\", \"SOUL.md\", \"USER.md\", \"IDENTITY.md\"]\n\nREQUIRED_DB_TABLES = [\n    \"cortana_events\",\n    \"cortana_tasks\",\n    \"cortana_epics\",\n    \"cortana_feedback\",\n    \"cortana_patterns\",\n    \"cortana_self_model\",\n]\n\nREQUIRED_TOOLS = [\n    \"tools/subagent-watchdog/check-subagents.sh\",\n    \"tools/heartbeat/validate-heartbeat-state.sh\",\n    \"tools/session-reconciler/reconcile-sessions.sh\",\n]\n\nOPTIONAL_TOOLS = [\n    \"tools/task-board/completion-sync.sh\",\n    \"tools/reaper/reaper.sh\",\n    \"tools/notifications/telegram-delivery-guard.ts\",\n]\n\n\ndef run(cmd: List[str], cwd: Path | None = None) -> Tuple[int, str, str]:\n    proc = subprocess.run(\n        cmd,\n        cwd=str(cwd) if cwd else None,\n        stdout=subprocess.PIPE,\n        stderr=subprocess.PIPE,\n        text=True,\n    )\n    return proc.returncode, proc.stdout.strip(), proc.stderr.strip()\n\n\ndef make_check(name: str) -> Dict[str, Any]:\n    return {\"name\": name, \"status\": \"pass\", \"passed\": True, \"details\": {}}\n\n\ndef fail(check: Dict[str, Any], message: str) -> None:\n    check[\"status\"] = \"fail\"\n    check[\"passed\"] = False\n    check[\"message\"] = message\n\n\ndef warn(check: Dict[str, Any], message: str) -> None:\n    if check[\"status\"] != \"fail\":\n        check[\"status\"] = \"warn\"\n    check[\"message\"] = message\n\n\ndef check_symlink(fix: bool) -> Dict[str, Any]:\n    check = make_check(\"symlink_integrity\")\n    expected_target = str(REPO_JOBS)\n    details = {\n        \"path\": str(RUNTIME_JOBS),\n        \"expected_target\": expected_target,\n        \"exists\": RUNTIME_JOBS.exists() or RUNTIME_JOBS.is_symlink(),\n    }\n\n    if RUNTIME_JOBS.is_symlink():\n        actual_target = os.readlink(RUNTIME_JOBS)\n        resolved = str(RUNTIME_JOBS.resolve()) if RUNTIME_JOBS.exists() else None\n        details.update({\"actual_target\": actual_target, \"resolved_target\": resolved})\n        if resolved != expected_target:\n            if fix:\n                RUNTIME_JOBS.parent.mkdir(parents=True, exist_ok=True)\n                RUNTIME_JOBS.unlink(missing_ok=True)\n                RUNTIME_JOBS.symlink_to(REPO_JOBS)\n                details[\"fixed\"] = True\n                details[\"actual_target\"] = str(REPO_JOBS)\n                details[\"resolved_target\"] = str(REPO_JOBS)\n            else:\n                fail(check, \"Symlink points to the wrong target\")\n        elif not RUNTIME_JOBS.exists():\n            fail(check, \"Symlink exists but target is broken/missing\")\n    else:\n        details[\"is_symlink\"] = False\n        if fix:\n            RUNTIME_JOBS.parent.mkdir(parents=True, exist_ok=True)\n            if RUNTIME_JOBS.exists():\n                RUNTIME_JOBS.unlink()\n            RUNTIME_JOBS.symlink_to(REPO_JOBS)\n            details[\"fixed\"] = True\n            details[\"actual_target\"] = str(REPO_JOBS)\n            details[\"resolved_target\"] = str(REPO_JOBS)\n        else:\n            fail(check, \"jobs.json is missing or not a symlink\")\n\n    check[\"details\"] = details\n    return check\n\n\ndef check_cron_definitions() -> Dict[str, Any]:\n    check = make_check(\"cron_definitions\")\n    details: Dict[str, Any] = {\"path\": str(REPO_JOBS), \"required_fields\": [\"name\", \"schedule\", \"enabled\", \"command\"]}\n\n    if not REPO_JOBS.exists():\n        fail(check, \"config/cron/jobs.json is missing\")\n        check[\"details\"] = details\n        return check\n\n    try:\n        data = json.loads(REPO_JOBS.read_text())\n    except Exception as exc:\n        fail(check, f\"Invalid JSON: {exc}\")\n        check[\"details\"] = details\n        return check\n\n    jobs = data.get(\"jobs\") if isinstance(data, dict) else None\n    if not isinstance(jobs, list):\n        fail(check, \"jobs.json must contain a top-level 'jobs' array\")\n        check[\"details\"] = details\n        return check\n\n    missing_required = []\n    missing_model = []\n    for idx, job in enumerate(jobs):\n        if not isinstance(job, dict):\n            missing_required.append({\"index\": idx, \"name\": None, \"missing\": [\"<job is not an object>\"]})\n            continue\n        job_name = job.get(\"name\", f\"index:{idx}\")\n        missing = [k for k in [\"name\", \"schedule\", \"enabled\", \"command\"] if k not in job]\n        if missing:\n            missing_required.append({\"index\": idx, \"name\": job_name, \"missing\": missing})\n\n        has_model = \"model\" in job\n        payload_model = isinstance(job.get(\"payload\"), dict) and \"model\" in job[\"payload\"]\n        if not (has_model or payload_model):\n            missing_model.append({\"index\": idx, \"name\": job_name})\n\n    details.update(\n        {\n            \"job_count\": len(jobs),\n            \"missing_required\": missing_required,\n            \"missing_model\": missing_model,\n        }\n    )\n\n    if missing_required:\n        fail(check, \"One or more cron jobs are missing required fields\")\n    elif missing_model:\n        warn(check, \"One or more cron jobs are missing a model field\")\n\n    check[\"details\"] = details\n    return check\n\n\ndef check_db_connectivity() -> Dict[str, Any]:\n    check = make_check(\"db_connectivity\")\n    details: Dict[str, Any] = {\n        \"psql_path\": str(PSQL),\n        \"database\": DB_NAME,\n        \"required_tables\": REQUIRED_DB_TABLES,\n    }\n\n    if not PSQL.exists():\n        fail(check, \"psql binary not found\")\n        check[\"details\"] = details\n        return check\n\n    rc, out, err = run([str(PSQL), DB_NAME, \"-t\", \"-A\", \"-c\", \"SELECT 1;\"])\n    details[\"connect_stdout\"] = out\n    if rc != 0:\n        fail(check, f\"Cannot connect to PostgreSQL/{DB_NAME}: {err or out}\")\n        check[\"details\"] = details\n        return check\n\n    sql = (\n        \"SELECT table_name FROM information_schema.tables \"\n        \"WHERE table_schema='public' AND table_name = ANY(ARRAY[\" + \",\".join(f\"'{t}'\" for t in REQUIRED_DB_TABLES) + \"])\"\n    )\n    rc, out, err = run([str(PSQL), DB_NAME, \"-t\", \"-A\", \"-c\", sql])\n    if rc != 0:\n        fail(check, f\"Failed checking required tables: {err or out}\")\n        check[\"details\"] = details\n        return check\n\n    found = sorted([line.strip() for line in out.splitlines() if line.strip()])\n    missing = sorted(set(REQUIRED_DB_TABLES) - set(found))\n    details.update({\"found_tables\": found, \"missing_tables\": missing})\n\n    if missing:\n        fail(check, \"Database is reachable but missing required tables\")\n\n    check[\"details\"] = details\n    return check\n\n\ndef check_critical_tools() -> Dict[str, Any]:\n    check = make_check(\"critical_tools\")\n    details: Dict[str, Any] = {\"required\": [], \"optional\": []}\n\n    missing_or_not_exec = []\n\n    for rel in REQUIRED_TOOLS:\n        p = REPO_ROOT / rel\n        exists = p.exists()\n        executable = os.access(p, os.X_OK)\n        item = {\"path\": rel, \"exists\": exists, \"executable\": executable, \"required\": True}\n        details[\"required\"].append(item)\n        if not exists or not executable:\n            missing_or_not_exec.append(rel)\n\n    for rel in OPTIONAL_TOOLS:\n        p = REPO_ROOT / rel\n        exists = p.exists()\n        executable = os.access(p, os.X_OK) if exists else None\n        item = {\"path\": rel, \"exists\": exists, \"executable\": executable, \"required\": False}\n        details[\"optional\"].append(item)\n\n    if missing_or_not_exec:\n        fail(check, f\"Missing or non-executable required tools: {', '.join(missing_or_not_exec)}\")\n\n    check[\"details\"] = details\n    return check\n\n\ndef check_heartbeat_state() -> Dict[str, Any]:\n    check = make_check(\"heartbeat_state\")\n    path = REPO_ROOT / \"memory/heartbeat-state.json\"\n    details: Dict[str, Any] = {\"path\": str(path)}\n\n    if not path.exists():\n        fail(check, \"heartbeat-state.json is missing\")\n        check[\"details\"] = details\n        return check\n\n    try:\n        data = json.loads(path.read_text())\n    except Exception as exc:\n        fail(check, f\"Invalid heartbeat-state JSON: {exc}\")\n        check[\"details\"] = details\n        return check\n\n    version = data.get(\"version\") if isinstance(data, dict) else None\n    details[\"version\"] = version\n\n    if not isinstance(version, (int, float)) or version < 2:\n        fail(check, \"heartbeat-state version must be >= 2\")\n\n    check[\"details\"] = details\n    return check\n\n\ndef check_memory_files() -> Dict[str, Any]:\n    check = make_check(\"memory_files\")\n    details: Dict[str, Any] = {\"files\": []}\n    bad = []\n\n    for fname in MEMORY_FILES:\n        p = REPO_ROOT / fname\n        exists = p.exists()\n        size = p.stat().st_size if exists else 0\n        non_empty = size > 0\n        details[\"files\"].append({\"path\": fname, \"exists\": exists, \"size\": size, \"non_empty\": non_empty})\n        if not exists or not non_empty:\n            bad.append(fname)\n\n    if bad:\n        fail(check, f\"Missing or empty memory files: {', '.join(bad)}\")\n\n    check[\"details\"] = details\n    return check\n\n\ndef check_git_status() -> Dict[str, Any]:\n    check = make_check(\"git_status\")\n    details: Dict[str, Any] = {}\n\n    rc, out, err = run([\"git\", \"status\", \"--porcelain\"], cwd=REPO_ROOT)\n    if rc != 0:\n        fail(check, f\"git status failed: {err or out}\")\n        check[\"details\"] = details\n        return check\n\n    modified = 0\n    untracked = 0\n    for line in out.splitlines():\n        if not line.strip():\n            continue\n        if line.startswith(\"??\"):\n            untracked += 1\n        else:\n            modified += 1\n\n    details.update(\n        {\n            \"modified_count\": modified,\n            \"untracked_count\": untracked,\n            \"total_changes\": modified + untracked,\n            \"clean\": (modified + untracked) == 0,\n        }\n    )\n\n    check[\"details\"] = details\n    return check\n\n\ndef check_disk_space() -> Dict[str, Any]:\n    check = make_check(\"disk_space\")\n    usage = shutil.disk_usage(\"/\")\n    free_gb = usage.free / (1024 ** 3)\n    total_gb = usage.total / (1024 ** 3)\n    details = {\n        \"mount\": \"/\",\n        \"free_bytes\": usage.free,\n        \"free_gb\": round(free_gb, 2),\n        \"total_gb\": round(total_gb, 2),\n        \"threshold_gb\": 5,\n    }\n\n    if free_gb < 5:\n        warn(check, \"Free disk space is below 5GB\")\n\n    check[\"details\"] = details\n    return check\n\n\ndef _parse_simple_step(field: str) -> int | None:\n    if field.startswith(\"*/\"):\n        try:\n            return int(field[2:])\n        except ValueError:\n            return None\n    return None\n\n\ndef _parse_int_list(field: str, min_v: int, max_v: int) -> List[int] | None:\n    if not field or \"*\" in field or \"/\" in field:\n        return None\n    out = []\n    for part in field.split(\",\"):\n        part = part.strip()\n        if not part.isdigit():\n            return None\n        v = int(part)\n        if v < min_v or v > max_v:\n            return None\n        out.append(v)\n    return sorted(set(out)) if out else None\n\n\ndef _estimate_interval_ms(expr: str) -> int | None:\n    parts = expr.split()\n    if len(parts) < 5:\n        return None\n\n    minute, hour = parts[0], parts[1]\n\n    minute_step = _parse_simple_step(minute)\n    hour_step = _parse_simple_step(hour)\n\n    if hour_step and hour_step > 0:\n        return hour_step * 60 * 60 * 1000\n\n    hour_values = _parse_int_list(hour, 0, 23)\n    if hour_values:\n        if len(hour_values) == 1:\n            return 24 * 60 * 60 * 1000\n        diffs = []\n        for i in range(len(hour_values)):\n            cur = hour_values[i]\n            nxt = hour_values[(i + 1) % len(hour_values)]\n            diff_hours = (nxt - cur) % 24\n            if diff_hours == 0:\n                continue\n            diffs.append(diff_hours)\n        if diffs:\n            return min(diffs) * 60 * 60 * 1000\n\n    if hour == \"*\":\n        if minute_step and minute_step > 0:\n            return minute_step * 60 * 1000\n        minute_values = _parse_int_list(minute, 0, 59)\n        if minute_values:\n            if len(minute_values) == 1:\n                return 60 * 60 * 1000\n            diffs = []\n            for i in range(len(minute_values)):\n                cur = minute_values[i]\n                nxt = minute_values[(i + 1) % len(minute_values)]\n                diff_minutes = (nxt - cur) % 60\n                if diff_minutes == 0:\n                    continue\n                diffs.append(diff_minutes)\n            if diffs:\n                return min(diffs) * 60 * 1000\n        return 60 * 60 * 1000\n\n    return None\n\n\ndef check_cron_staleness(fix: bool) -> Dict[str, Any]:\n    check = make_check(\"cron_staleness\")\n    details: Dict[str, Any] = {\"path\": str(RUNTIME_JOBS), \"late_jobs\": [], \"fix_attempts\": []}\n\n    if not RUNTIME_JOBS.exists():\n        fail(check, \"Runtime cron jobs file is missing\")\n        check[\"details\"] = details\n        return check\n\n    try:\n        data = json.loads(RUNTIME_JOBS.read_text())\n    except Exception as exc:\n        fail(check, f\"Invalid runtime jobs JSON: {exc}\")\n        check[\"details\"] = details\n        return check\n\n    jobs = data.get(\"jobs\") if isinstance(data, dict) else None\n    if not isinstance(jobs, list):\n        fail(check, \"Runtime jobs.json must contain a top-level 'jobs' array\")\n        check[\"details\"] = details\n        return check\n\n    now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)\n    details[\"now_ms\"] = now_ms\n    details[\"job_count\"] = len(jobs)\n\n    enabled_count = 0\n    analyzed_count = 0\n\n    for idx, job in enumerate(jobs):\n        if not isinstance(job, dict):\n            continue\n        if not job.get(\"enabled\", False):\n            continue\n\n        enabled_count += 1\n        job_id = str(job.get(\"id\") or job.get(\"name\") or f\"index:{idx}\")\n        schedule = job.get(\"schedule\") if isinstance(job.get(\"schedule\"), dict) else {}\n        expr = schedule.get(\"expr\") if isinstance(schedule, dict) else None\n        state = job.get(\"state\") if isinstance(job.get(\"state\"), dict) else {}\n\n        if not isinstance(expr, str) or not expr.strip():\n            continue\n\n        expected_interval_ms = _estimate_interval_ms(expr.strip())\n        if not expected_interval_ms:\n            continue\n\n        last_run_at = state.get(\"lastRunAt\")\n        if not isinstance(last_run_at, (int, float)):\n            last_run_at = state.get(\"lastFiredAt\")\n        if not isinstance(last_run_at, (int, float)):\n            continue\n\n        analyzed_count += 1\n        lag_ms = max(0, now_ms - int(last_run_at))\n        stale_threshold_ms = expected_interval_ms * 2\n\n        if lag_ms > stale_threshold_ms:\n            late_by_ms = lag_ms - stale_threshold_ms\n            late_job = {\n                \"id\": job_id,\n                \"name\": job.get(\"name\"),\n                \"expr\": expr,\n                \"last_run_at_ms\": int(last_run_at),\n                \"lag_ms\": lag_ms,\n                \"expected_interval_ms\": expected_interval_ms,\n                \"stale_threshold_ms\": stale_threshold_ms,\n                \"late_by_ms\": late_by_ms,\n            }\n            details[\"late_jobs\"].append(late_job)\n\n    details[\"enabled_jobs\"] = enabled_count\n    details[\"analyzed_jobs\"] = analyzed_count\n\n    if details[\"late_jobs\"]:\n        if fix:\n            for item in details[\"late_jobs\"]:\n                rc, out, err = run([\"openclaw\", \"cron\", \"run\", item[\"id\"]])\n                details[\"fix_attempts\"].append(\n                    {\n                        \"id\": item[\"id\"],\n                        \"rc\": rc,\n                        \"stdout\": out,\n                        \"stderr\": err,\n                        \"ok\": rc == 0,\n                    }\n                )\n            failed_fixes = [x for x in details[\"fix_attempts\"] if not x[\"ok\"]]\n            if failed_fixes:\n                warn(check, f\"Found {len(details['late_jobs'])} stale job(s); some fix attempts failed\")\n            else:\n                warn(check, f\"Found and force-ran {len(details['late_jobs'])} stale job(s)\")\n        else:\n            warn(check, f\"Found {len(details['late_jobs'])} stale cron job(s)\")\n\n    check[\"details\"] = details\n    return check\n\n\ndef summarize(checks: List[Dict[str, Any]]) -> Dict[str, Any]:\n    failed = sum(1 for c in checks if c[\"status\"] == \"fail\")\n    warned = sum(1 for c in checks if c[\"status\"] == \"warn\")\n    passed = sum(1 for c in checks if c[\"status\"] == \"pass\")\n    overall_ok = failed == 0\n    return {\n        \"overall_ok\": overall_ok,\n        \"counts\": {\n            \"pass\": passed,\n            \"warn\": warned,\n            \"fail\": failed,\n            \"total\": len(checks),\n        },\n    }\n\n\ndef print_human(report: Dict[str, Any], verbose: bool) -> None:\n    print(\"OpenClaw System Validation\")\n    print(\"=\" * 28)\n    print(f\"Timestamp: {report['timestamp']}\")\n    print(f\"Repo: {report['repo_root']}\")\n    print()\n\n    for c in report[\"checks\"]:\n        icon = {\"pass\": \"\u2705\", \"warn\": \"\u26a0\ufe0f\", \"fail\": \"\u274c\"}.get(c[\"status\"], \"\u2022\")\n        print(f\"{icon} {c['name']}: {c['status'].upper()}\")\n        if c.get(\"message\"):\n            print(f\"   {c['message']}\")\n        if verbose:\n            print(\"   details:\")\n            print(\"   \" + json.dumps(c.get(\"details\", {}), indent=2).replace(\"\\n\", \"\\n   \"))\n\n    counts = report[\"summary\"][\"counts\"]\n    print()\n    print(\n        f\"Result: {'PASS' if report['summary']['overall_ok'] else 'FAIL'} \"\n        f\"(pass={counts['pass']}, warn={counts['warn']}, fail={counts['fail']})\"\n    )\n\n\ndef main() -> int:\n    parser = argparse.ArgumentParser(description=\"Validate OpenClaw system critical paths\")\n    parser.add_argument(\"--json\", action=\"store_true\", help=\"Emit structured JSON output\")\n    parser.add_argument(\"--fix\", action=\"store_true\", help=\"Auto-fix issues where possible\")\n    parser.add_argument(\"--verbose\", action=\"store_true\", help=\"Include detailed check output\")\n    args = parser.parse_args()\n\n    checks = [\n        check_symlink(fix=args.fix),\n        check_cron_definitions(),\n        check_db_connectivity(),\n        check_critical_tools(),\n        check_heartbeat_state(),\n        check_memory_files(),\n        check_git_status(),\n        check_disk_space(),\n    ]\n\n    report = {\n        \"timestamp\": datetime.now(timezone.utc).isoformat(),\n        \"repo_root\": str(REPO_ROOT),\n        \"options\": {\"json\": args.json, \"fix\": args.fix, \"verbose\": args.verbose},\n        \"checks\": checks,\n    }\n    report[\"summary\"] = summarize(checks)\n\n    if args.json:\n        print(json.dumps(report, indent=2))\n    else:\n        print_human(report, verbose=args.verbose)\n\n    return 0 if report[\"summary\"][\"overall_ok\"] else 1\n\n\nif __name__ == \"__main__\":\n    sys.exit(main())\n";
-  const dir = mkdtempSync(join(tmpdir(), 'pywrap-'));
-  const script = join(dir, 'script.py');
-  writeFileSync(script, py, 'utf8');
-  const proc = spawnSync('python3', [script, ...process.argv.slice(2)], { stdio: 'inherit' });
-  rmSync(dir, { recursive: true, force: true });
-  if (proc.error) {
-    console.error(String(proc.error));
-    process.exit(1);
-  }
-  process.exit(proc.status ?? 1);
+  const args = parseArgs(process.argv.slice(2));
+
+  const checks: Check[] = [
+    checkSymlink(args.fix),
+    checkCronDefinitions(),
+    checkDbConnectivity(),
+    checkCriticalTools(),
+    checkHeartbeatState(),
+    checkMemoryFiles(),
+    checkGitStatus(),
+    checkDiskSpace(),
+  ];
+
+  const report: Json = {
+    timestamp: new Date().toISOString(),
+    repo_root: REPO_ROOT,
+    options: { json: args.json, fix: args.fix, verbose: args.verbose },
+    checks,
+  };
+  report.summary = summarize(checks);
+
+  if (args.json) console.log(JSON.stringify(report, null, 2));
+  else printHuman(report, args.verbose);
+
+  process.exit(report.summary.overall_ok ? 0 : 1);
 }
 
 main().catch((err) => {

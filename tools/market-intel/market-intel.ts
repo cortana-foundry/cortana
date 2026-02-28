@@ -1,21 +1,583 @@
 #!/usr/bin/env npx tsx
-import { spawnSync } from 'node:child_process';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+
+import fs from "fs";
+import path from "path";
+import { spawnSync } from "child_process";
+import { resolveRepoPath } from "../lib/paths.js";
+
+const ROOT = resolveRepoPath();
+const STOCK_ANALYSIS_DIR = path.join(ROOT, "skills", "stock-analysis");
+const MARKET_STATUS_SCRIPT = path.join(ROOT, "skills", "markets", "check_market_status.sh");
+const ALPACA_PORTFOLIO_URL = "http://localhost:3033/alpaca/portfolio";
+const ALPACA_STATS_URL = "http://localhost:3033/alpaca/stats";
+
+const BULLISH_WORDS = new Set([
+  "bullish",
+  "buy",
+  "long",
+  "calls",
+  "breakout",
+  "rally",
+  "beat",
+  "upside",
+  "moon",
+  "rip",
+  "accumulate",
+  "upgrade",
+  "outperform",
+  "strong",
+  "squeeze",
+  "green",
+]);
+
+const BEARISH_WORDS = new Set([
+  "bearish",
+  "sell",
+  "short",
+  "puts",
+  "dump",
+  "crash",
+  "miss",
+  "downside",
+  "rug",
+  "fade",
+  "downgrade",
+  "underperform",
+  "weak",
+  "red",
+  "recession",
+  "overvalued",
+]);
+
+const TICKER_RE = /\$?[A-Z]{2,5}/g;
+let birdOk: boolean | null = null;
+
+type Json = Record<string, any>;
+
+type RunResult = { code: number; stdout: string; stderr: string };
+
+function run(cmd: string[], timeoutSeconds = 30, cwd?: string): RunResult {
+  const proc = spawnSync(cmd[0], cmd.slice(1), {
+    encoding: "utf8",
+    timeout: timeoutSeconds * 1000,
+    cwd,
+  });
+  return { code: proc.status ?? 1, stdout: (proc.stdout ?? "").trim(), stderr: (proc.stderr ?? "").trim() };
+}
+
+async function fetchJson(url: string, timeoutSeconds = 15): Promise<any> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutSeconds * 1000);
+  try {
+    const res = await fetch(url, { headers: { "User-Agent": "market-intel/1.0" }, signal: controller.signal });
+    const body = await res.text();
+    return JSON.parse(body);
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+async function fetchText(url: string, timeoutSeconds = 15): Promise<string> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutSeconds * 1000);
+  try {
+    const res = await fetch(url, { headers: { "User-Agent": "market-intel/1.0" }, signal: controller.signal });
+    return await res.text();
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+function stockQuote(symbol: string): Json {
+  const cmd = ["uv", "run", "src/stock_analysis/main.py", "analyze", symbol.toUpperCase(), "--json"];
+  const { code, stdout, stderr } = run(cmd, 30, STOCK_ANALYSIS_DIR);
+  if (code !== 0 || !stdout) throw new Error(`stock-analysis failed: ${stderr || stdout}`);
+  const data = JSON.parse(stdout) as Json;
+  if (data.error) throw new Error(String(data.error));
+  return data;
+}
+
+function num(v: any): number | null {
+  if (v == null) return null;
+  const n = Number(v);
+  if (Number.isNaN(n)) return null;
+  return n;
+}
+
+async function fromAlphaOverview(symbol: string): Promise<Json> {
+  const q = encodeURIComponent(symbol.toUpperCase());
+  const url = `https://www.alphavantage.co/query?function=OVERVIEW&symbol=${q}&apikey=demo`;
+  const payload = await fetchJson(url);
+  if (!payload || typeof payload !== "object" || payload.Note || payload.Information) {
+    throw new Error("alpha-overview unavailable");
+  }
+
+  const mcap = num(payload.MarketCapitalization);
+  const pe = num(payload.PERatio);
+  const fwdPe = num(payload.ForwardPE);
+  const eps = num(payload.EPS);
+  const divYield = num(payload.DividendYield);
+  const beta = num(payload.Beta);
+  const hi = num(payload["52WeekHigh"]);
+  const lo = num(payload["52WeekLow"]);
+  const revGrowth = num(payload.QuarterlyRevenueGrowthYOY);
+  const profitMargin = num(payload.ProfitMargin);
+
+  if ([mcap, pe, eps, hi, lo, beta].every((v) => v == null)) throw new Error("alpha-overview missing fields");
+
+  return {
+    market_cap: mcap,
+    pe,
+    forward_pe: fwdPe,
+    dividend_yield: divYield,
+    beta,
+    fifty_two_week_high: hi,
+    fifty_two_week_low: lo,
+    eps,
+    revenue_growth: revGrowth,
+    profit_margins: profitMargin,
+    recommendation: null,
+    source: "alpha_vantage_overview",
+  };
+}
+
+async function fromAlphaGlobalQuote(symbol: string): Promise<Json> {
+  const q = encodeURIComponent(symbol.toUpperCase());
+  const url = `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${q}&apikey=demo`;
+  const payload = await fetchJson(url);
+  const quote = payload && typeof payload === "object" ? payload["Global Quote"] : null;
+  if (!quote || typeof quote !== "object") throw new Error("alpha-global-quote unavailable");
+
+  const hi = num(quote["03. high"]);
+  const lo = num(quote["04. low"]);
+  if (hi == null && lo == null) throw new Error("alpha-global-quote missing high/low");
+
+  return {
+    market_cap: null,
+    pe: null,
+    forward_pe: null,
+    dividend_yield: null,
+    beta: null,
+    fifty_two_week_high: hi,
+    fifty_two_week_low: lo,
+    eps: null,
+    revenue_growth: null,
+    profit_margins: null,
+    recommendation: null,
+    source: "alpha_vantage_global_quote",
+  };
+}
+
+function parseCsv(text: string): Array<Record<string, string>> {
+  const lines = text.split(/\r?\n/).filter((l) => l.trim().length > 0);
+  if (!lines.length) return [];
+  const header = lines[0].split(",");
+  const rows: Array<Record<string, string>> = [];
+  for (const line of lines.slice(1)) {
+    const cols = line.split(",");
+    const row: Record<string, string> = {};
+    header.forEach((h, idx) => {
+      row[h] = cols[idx] ?? "";
+    });
+    rows.push(row);
+  }
+  return rows;
+}
+
+async function fromStooq(symbol: string): Promise<Json> {
+  const stooqSymbol = `${symbol.toLowerCase()}.us`;
+  const url = `https://stooq.com/q/d/l/?s=${stooqSymbol}&i=d`;
+  const text = await fetchText(url, 20);
+  const rows = parseCsv(text);
+  if (!rows.length) throw new Error("stooq unavailable");
+
+  const usable = rows.filter((r) => r.Close && r.Close !== "N/D" && r.Close !== "-");
+  if (!usable.length) throw new Error("stooq has no usable rows");
+
+  const recent = usable.length >= 252 ? usable.slice(-252) : usable;
+  const closes = recent
+    .map((r) => num(r.Close))
+    .filter((v): v is number => v != null);
+  if (!closes.length) throw new Error("stooq close parse failed");
+
+  return {
+    market_cap: null,
+    pe: null,
+    forward_pe: null,
+    dividend_yield: null,
+    beta: null,
+    fifty_two_week_high: Math.max(...closes),
+    fifty_two_week_low: Math.min(...closes),
+    eps: null,
+    revenue_growth: null,
+    profit_margins: null,
+    recommendation: null,
+    source: "stooq",
+  };
+}
+
+async function fromAlpacaService(symbol: string): Promise<Json> {
+  const sym = symbol.toUpperCase();
+  const candidates = [
+    `http://localhost:3033/alpaca/snapshot/${sym}`,
+    `http://localhost:3033/alpaca/snapshot?symbol=${sym}`,
+    `http://localhost:3033/alpaca/quote/${sym}`,
+    `http://localhost:3033/alpaca/quote?symbol=${sym}`,
+  ];
+
+  for (const url of candidates) {
+    let payload: any;
+    try {
+      payload = await fetchJson(url, 5);
+    } catch {
+      continue;
+    }
+
+    if (!payload || typeof payload !== "object") continue;
+    const hi = num(payload.high ?? payload.dailyBar?.h ?? payload.bar?.h);
+    const lo = num(payload.low ?? payload.dailyBar?.l ?? payload.bar?.l);
+    if (hi == null && lo == null) continue;
+
+    return {
+      market_cap: null,
+      pe: null,
+      forward_pe: null,
+      dividend_yield: null,
+      beta: null,
+      fifty_two_week_high: hi,
+      fifty_two_week_low: lo,
+      eps: null,
+      revenue_growth: null,
+      profit_margins: null,
+      recommendation: null,
+      source: "alpaca_service",
+    };
+  }
+
+  throw new Error("alpaca market-data endpoint unavailable");
+}
+
+async function stockFundamentals(symbol: string): Promise<Json> {
+  const errors: string[] = [];
+  const sources: Array<[string, (s: string) => Promise<Json>]> = [
+    ["stooq", fromStooq],
+    ["alpha_vantage_overview", fromAlphaOverview],
+    ["alpha_vantage_global_quote", fromAlphaGlobalQuote],
+    ["alpaca_service", fromAlpacaService],
+  ];
+
+  for (const [name, fn] of sources) {
+    try {
+      const data = await fn(symbol);
+      data.provider = name;
+      if (errors.length) data.errors = errors;
+      return data;
+    } catch (e) {
+      errors.push(`${name}: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }
+
+  return {
+    market_cap: null,
+    pe: null,
+    forward_pe: null,
+    dividend_yield: null,
+    beta: null,
+    fifty_two_week_high: null,
+    fifty_two_week_low: null,
+    eps: null,
+    revenue_growth: null,
+    profit_margins: null,
+    recommendation: null,
+    provider: "none",
+    errors,
+  };
+}
+
+function parseBirdJson(raw: string): Array<Record<string, any>> {
+  try {
+    const data = JSON.parse(raw);
+    if (Array.isArray(data)) return data.filter((x) => x && typeof x === "object");
+    if (data && typeof data === "object") {
+      if (Array.isArray(data.tweets)) return data.tweets.filter((x: any) => x && typeof x === "object");
+      return [data];
+    }
+  } catch {
+    return [];
+  }
+  return [];
+}
+
+function pick(obj: Json, ...paths: string[]): any {
+  for (const p of paths) {
+    let cur: any = obj;
+    let ok = true;
+    for (const key of p.split(".")) {
+      if (cur && typeof cur === "object" && key in cur) {
+        cur = cur[key];
+      } else {
+        ok = false;
+        break;
+      }
+    }
+    if (ok && cur != null && cur !== "") return cur;
+  }
+  return null;
+}
+
+function normalizeTweet(t: Json): Json {
+  let text = pick(t, "full_text", "text", "legacy.full_text", "legacy.text") ?? "";
+  text = String(text).replace(/\s+/g, " ").trim();
+  const username = pick(t, "user.screen_name", "user.username", "author.username", "legacy.user.screen_name") ?? "unknown";
+  const created = pick(t, "created_at", "legacy.created_at") ?? "";
+  const tid = pick(t, "id_str", "rest_id", "id");
+  const url = tid ? `https://x.com/${username}/status/${tid}` : "";
+  return { text, username: String(username), created_at: String(created), url };
+}
+
+function ensureBirdReady(): boolean {
+  if (birdOk !== null) return birdOk;
+  const { code, stdout, stderr } = run(["bird", "check"], 20);
+  const merged = `${stdout}\n${stderr}`.toLowerCase();
+  birdOk = code === 0 && merged.includes("ok");
+  if (!birdOk) {
+    console.error("⚠️ bird check failed; skipping X sentiment. Cookie auth likely needs refresh.");
+  }
+  return birdOk;
+}
+
+function birdSearch(query: string, count: number): Json[] {
+  if (!ensureBirdReady()) return [];
+  const cmd = ["bird", "search", "--json", "-n", String(count), query];
+  const { code, stdout } = run(cmd, 45);
+  if (code !== 0) return [];
+  const tweets = parseBirdJson(stdout).map(normalizeTweet);
+  return tweets.filter((t) => t.text);
+}
+
+function sentimentLabel(text: string): string {
+  const words = new Set(String(text).toLowerCase().match(/[a-zA-Z']+/g) ?? []);
+  const bull = Array.from(words).filter((w) => BULLISH_WORDS.has(w)).length;
+  const bear = Array.from(words).filter((w) => BEARISH_WORDS.has(w)).length;
+  if (bull > bear) return "bullish";
+  if (bear > bull) return "bearish";
+  return "neutral";
+}
+
+function sentimentSummary(tweets: Json[]): Json {
+  if (!tweets.length) {
+    return { counts: { bullish: 0, bearish: 0, neutral: 0 }, bearish_pct: 0.0, mood: "unknown" };
+  }
+
+  const labels = tweets.map((t) => sentimentLabel(String(t.text ?? "")));
+  const counts = { bullish: 0, bearish: 0, neutral: 0 };
+  for (const l of labels) {
+    if (l === "bullish") counts.bullish += 1;
+    else if (l === "bearish") counts.bearish += 1;
+    else counts.neutral += 1;
+  }
+  const total = Math.max(labels.length, 1);
+  const bearishPct = (counts.bearish / total) * 100;
+  let mood = "neutral";
+  if (counts.bullish / total >= 0.6) mood = "bullish";
+  else if (bearishPct >= 60) mood = "bearish";
+
+  return {
+    counts,
+    bearish_pct: Math.round(bearishPct * 10) / 10,
+    mood,
+  };
+}
+
+function fmtNum(v: any): string {
+  if (v == null) return "n/a";
+  if (typeof v === "number") {
+    if (Math.abs(v) >= 1_000_000_000) return `${(v / 1_000_000_000).toFixed(2)}B`;
+    if (Math.abs(v) >= 1_000_000) return `${(v / 1_000_000).toFixed(2)}M`;
+    if (Math.abs(v) >= 1_000) return `${(v / 1_000).toFixed(2)}K`;
+    return Number.isInteger(v) ? String(v) : v.toFixed(2);
+  }
+  return String(v);
+}
+
+function topTickerMentions(tweets: Json[], limit = 5): string[] {
+  const bag = new Map<string, number>();
+  for (const t of tweets) {
+    const text = String(t.text ?? "");
+    const matches = text.match(TICKER_RE) ?? [];
+    for (const tok of matches) {
+      const sym = tok.replace(/^\$/, "").toUpperCase();
+      if (sym.length >= 2 && sym.length <= 5) {
+        bag.set(sym, (bag.get(sym) ?? 0) + 1);
+      }
+    }
+  }
+  return Array.from(bag.entries())
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, limit)
+    .map(([k]) => k);
+}
+
+async function modeTicker(symbol: string): Promise<string> {
+  const sym = symbol.toUpperCase();
+  const quote = stockQuote(sym);
+  const fundamentals = await stockFundamentals(sym);
+
+  const cashtagQuery = `\\$${sym}`;
+  const sentimentTweets = birdSearch(cashtagQuery, 20);
+  const keyAccountQ = `(from:unusual_whales OR from:DeItaone) \\${sym}`;
+  const keyMentions = birdSearch(keyAccountQ, 20);
+  const sent = sentimentSummary(sentimentTweets);
+
+  const lines: string[] = [];
+  lines.push(`📊 Market Intel: ${sym}`);
+  lines.push(`Price: $${quote.price} (${quote.change_percent}%) [${quote.signal}]`);
+  lines.push(
+    "Key metrics: " +
+      `MktCap ${fmtNum(fundamentals.market_cap)} | ` +
+      `P/E ${fmtNum(fundamentals.pe)} | ` +
+      `Fwd P/E ${fmtNum(fundamentals.forward_pe)} | ` +
+      `EPS ${fmtNum(fundamentals.eps)}`
+  );
+  lines.push(
+    `Range: 52W High ${fmtNum(fundamentals.fifty_two_week_high)} | 52W Low ${fmtNum(
+      fundamentals.fifty_two_week_low
+    )}`
+  );
+  lines.push(`Fundamentals source: ${fundamentals.provider ?? "unknown"}`);
+  lines.push(
+    "X sentiment (20): " +
+      `${sent.mood} | bullish ${sent.counts.bullish} / bearish ${sent.counts.bearish} / neutral ${sent.counts.neutral}`
+  );
+
+  if (keyMentions.length) {
+    lines.push("Notable account mentions:");
+    for (const t of keyMentions.slice(0, 5)) {
+      const snippet = t.text.slice(0, 180);
+      lines.push(`- @${t.username}: ${snippet}${t.text.length > 180 ? "…" : ""}`);
+    }
+  } else {
+    lines.push("Notable account mentions: none found (or bird auth unavailable).");
+  }
+
+  return lines.join("\n");
+}
+
+async function modePortfolio(): Promise<string> {
+  const data = await fetchJson(ALPACA_PORTFOLIO_URL);
+  const positions = Array.isArray(data?.positions) ? data.positions : [];
+
+  const lines: string[] = ["💼 Portfolio Sentiment Scan"];
+  if (!positions.length) {
+    lines.push("No open positions in Alpaca.");
+    return lines.join("\n");
+  }
+
+  const flagged: string[] = [];
+  for (const p of positions) {
+    const symbol = String(p.symbol ?? "").toUpperCase();
+    const qty = p.qty;
+    const mv = p.market_value;
+    const tweets = birdSearch(`\\$${symbol}`, 5);
+    const sent = sentimentSummary(tweets);
+    if (sent.bearish_pct > 60) flagged.push(symbol);
+    lines.push(
+      `- ${symbol}: qty ${qty}, mv $${mv}, mood ${sent.mood} ` +
+        `(bearish ${sent.bearish_pct}%, n=${sent.counts.bullish + sent.counts.bearish + sent.counts.neutral})`
+    );
+  }
+
+  if (flagged.length) {
+    lines.push("⚠️ Bearish risk flags (>60% bearish): " + flagged.join(", "));
+  } else {
+    lines.push("✅ No bearish sentiment flags above 60%.");
+  }
+
+  return lines.join("\n");
+}
+
+function marketStatus(): string {
+  if (fs.existsSync(MARKET_STATUS_SCRIPT)) {
+    const { code, stdout } = run([MARKET_STATUS_SCRIPT], 10);
+    if (code === 0 && stdout) return stdout;
+  }
+  return "UNKNOWN";
+}
+
+async function modePulse(): Promise<string> {
+  const status = marketStatus();
+  const broad = birdSearch("stock market today OR SPY OR QQQ", 20);
+  const key = birdSearch("from:DeItaone OR from:unusual_whales", 20);
+  const sent = sentimentSummary(broad);
+  const movers = topTickerMentions([...broad, ...key], 6);
+
+  const lines: string[] = ["🌐 Market Pulse"];
+  lines.push(`Market status: ${status}`);
+  lines.push(
+    `Market mood: ${sent.mood} (bullish ${sent.counts.bullish}, bearish ${sent.counts.bearish}, neutral ${sent.counts.neutral})`
+  );
+  lines.push("Top movers mentioned: " + (movers.length ? movers.join(", ") : "none"));
+
+  lines.push("Breaking/news flow (DeItaone + unusual_whales):");
+  if (key.length) {
+    for (const t of key.slice(0, 6)) {
+      const snippet = t.text.slice(0, 180);
+      lines.push(`- @${t.username}: ${snippet}${t.text.length > 180 ? "…" : ""}`);
+    }
+  } else {
+    lines.push("- No key-account pulls (bird auth missing or no fresh posts)." );
+  }
+
+  return lines.join("\n");
+}
+
+type Args = { ticker?: string | null; portfolio: boolean; pulse: boolean };
+
+function parseArgs(argv: string[]): Args {
+  const args: Args = { ticker: null, portfolio: false, pulse: false };
+  for (let i = 0; i < argv.length; i += 1) {
+    const arg = argv[i];
+    switch (arg) {
+      case "--ticker":
+        args.ticker = argv[i + 1] ?? null;
+        i += 1;
+        break;
+      case "--portfolio":
+        args.portfolio = true;
+        break;
+      case "--pulse":
+        args.pulse = true;
+        break;
+      default:
+        break;
+    }
+  }
+  return args;
+}
 
 async function main(): Promise<void> {
-  const py = "#!/usr/bin/env python3\n\"\"\"Unified market intelligence pipeline.\n\nModes:\n  --ticker NVDA   single-ticker deep dive\n  --portfolio     Alpaca portfolio sentiment scan\n  --pulse         broad market pulse\n\"\"\"\n\nfrom __future__ import annotations\n\nimport argparse\nimport csv\nimport datetime as dt\nimport json\nimport re\nimport subprocess\nimport sys\nimport urllib.parse\nimport urllib.request\nfrom collections import Counter\nfrom pathlib import Path\nfrom typing import Any\n\nROOT = Path(\"/Users/hd/openclaw\")\nSTOCK_ANALYSIS_DIR = ROOT / \"skills\" / \"stock-analysis\"\nMARKET_STATUS_SCRIPT = ROOT / \"skills\" / \"markets\" / \"check_market_status.sh\"\nALPACA_PORTFOLIO_URL = \"http://localhost:3033/alpaca/portfolio\"\nALPACA_STATS_URL = \"http://localhost:3033/alpaca/stats\"\n\nBULLISH_WORDS = {\n    \"bullish\", \"buy\", \"long\", \"calls\", \"breakout\", \"rally\", \"beat\", \"upside\", \"moon\", \"rip\",\n    \"accumulate\", \"upgrade\", \"outperform\", \"strong\", \"squeeze\", \"green\",\n}\nBEARISH_WORDS = {\n    \"bearish\", \"sell\", \"short\", \"puts\", \"dump\", \"crash\", \"miss\", \"downside\", \"rug\", \"fade\",\n    \"downgrade\", \"underperform\", \"weak\", \"red\", \"recession\", \"overvalued\",\n}\n\nTICKER_RE = re.compile(r\"\\$?[A-Z]{2,5}\")\nBIRD_OK: bool | None = None\n\n\ndef run(cmd: list[str], timeout: int = 30, cwd: Path | None = None) -> tuple[int, str, str]:\n    p = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, cwd=str(cwd) if cwd else None)\n    return p.returncode, p.stdout.strip(), p.stderr.strip()\n\n\ndef fetch_json(url: str, timeout: int = 15) -> Any:\n    req = urllib.request.Request(url, headers={\"User-Agent\": \"market-intel/1.0\"})\n    with urllib.request.urlopen(req, timeout=timeout) as resp:\n        return json.loads(resp.read().decode(\"utf-8\"))\n\n\ndef fetch_text(url: str, timeout: int = 15) -> str:\n    req = urllib.request.Request(url, headers={\"User-Agent\": \"market-intel/1.0\"})\n    with urllib.request.urlopen(req, timeout=timeout) as resp:\n        return resp.read().decode(\"utf-8\", errors=\"replace\")\n\n\ndef stock_quote(symbol: str) -> dict[str, Any]:\n    cmd = [\n        \"uv\", \"run\", \"src/stock_analysis/main.py\", \"analyze\", symbol.upper(), \"--json\",\n    ]\n    code, out, err = run(cmd, timeout=30, cwd=STOCK_ANALYSIS_DIR)\n    if code != 0 or not out:\n        raise RuntimeError(f\"stock-analysis failed: {err or out}\")\n    data = json.loads(out)\n    if data.get(\"error\"):\n        raise RuntimeError(data[\"error\"])\n    return data\n\n\ndef _num(v: Any) -> float | None:\n    try:\n        if v is None:\n            return None\n        return float(v)\n    except Exception:\n        return None\n\n\ndef _from_alpha_overview(symbol: str) -> dict[str, Any]:\n    q = urllib.parse.quote(symbol.upper())\n    # demo key is rate limited and may return data only for selected symbols.\n    url = f\"https://www.alphavantage.co/query?function=OVERVIEW&symbol={q}&apikey=demo\"\n    payload = fetch_json(url)\n    if not isinstance(payload, dict) or not payload or payload.get(\"Note\") or payload.get(\"Information\"):\n        raise RuntimeError(\"alpha-overview unavailable\")\n\n    mcap = _num(payload.get(\"MarketCapitalization\"))\n    pe = _num(payload.get(\"PERatio\"))\n    fwd_pe = _num(payload.get(\"ForwardPE\"))\n    eps = _num(payload.get(\"EPS\"))\n    div_yield = _num(payload.get(\"DividendYield\"))\n    beta = _num(payload.get(\"Beta\"))\n    hi = _num(payload.get(\"52WeekHigh\"))\n    lo = _num(payload.get(\"52WeekLow\"))\n    rev_growth = _num(payload.get(\"QuarterlyRevenueGrowthYOY\"))\n    profit_margin = _num(payload.get(\"ProfitMargin\"))\n\n    if all(v is None for v in (mcap, pe, eps, hi, lo, beta)):\n        raise RuntimeError(\"alpha-overview missing fields\")\n\n    return {\n        \"market_cap\": mcap,\n        \"pe\": pe,\n        \"forward_pe\": fwd_pe,\n        \"dividend_yield\": div_yield,\n        \"beta\": beta,\n        \"fifty_two_week_high\": hi,\n        \"fifty_two_week_low\": lo,\n        \"eps\": eps,\n        \"revenue_growth\": rev_growth,\n        \"profit_margins\": profit_margin,\n        \"recommendation\": None,\n        \"source\": \"alpha_vantage_overview\",\n    }\n\n\ndef _from_alpha_global_quote(symbol: str) -> dict[str, Any]:\n    q = urllib.parse.quote(symbol.upper())\n    url = f\"https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol={q}&apikey=demo\"\n    payload = fetch_json(url)\n    quote = payload.get(\"Global Quote\") if isinstance(payload, dict) else None\n    if not isinstance(quote, dict) or not quote:\n        raise RuntimeError(\"alpha-global-quote unavailable\")\n\n    hi = _num(quote.get(\"03. high\"))\n    lo = _num(quote.get(\"04. low\"))\n    if hi is None and lo is None:\n        raise RuntimeError(\"alpha-global-quote missing high/low\")\n\n    return {\n        \"market_cap\": None,\n        \"pe\": None,\n        \"forward_pe\": None,\n        \"dividend_yield\": None,\n        \"beta\": None,\n        \"fifty_two_week_high\": hi,\n        \"fifty_two_week_low\": lo,\n        \"eps\": None,\n        \"revenue_growth\": None,\n        \"profit_margins\": None,\n        \"recommendation\": None,\n        \"source\": \"alpha_vantage_global_quote\",\n    }\n\n\ndef _from_stooq(symbol: str) -> dict[str, Any]:\n    stooq_symbol = f\"{symbol.lower()}.us\"\n    url = f\"https://stooq.com/q/d/l/?s={stooq_symbol}&i=d\"\n    text = fetch_text(url, timeout=20)\n    rows = list(csv.DictReader(text.splitlines()))\n    if not rows:\n        raise RuntimeError(\"stooq unavailable\")\n\n    usable = [r for r in rows if r.get(\"Close\") and r.get(\"Close\") not in {\"N/D\", \"-\"}]\n    if not usable:\n        raise RuntimeError(\"stooq has no usable rows\")\n\n    recent = usable[-252:] if len(usable) >= 252 else usable\n    closes = [_num(r.get(\"Close\")) for r in recent]\n    closes = [c for c in closes if c is not None]\n    if not closes:\n        raise RuntimeError(\"stooq close parse failed\")\n\n    return {\n        \"market_cap\": None,\n        \"pe\": None,\n        \"forward_pe\": None,\n        \"dividend_yield\": None,\n        \"beta\": None,\n        \"fifty_two_week_high\": max(closes),\n        \"fifty_two_week_low\": min(closes),\n        \"eps\": None,\n        \"revenue_growth\": None,\n        \"profit_margins\": None,\n        \"recommendation\": None,\n        \"source\": \"stooq\",\n    }\n\n\ndef _from_alpaca_service(symbol: str) -> dict[str, Any]:\n    sym = symbol.upper()\n    candidates = [\n        f\"http://localhost:3033/alpaca/snapshot/{sym}\",\n        f\"http://localhost:3033/alpaca/snapshot?symbol={sym}\",\n        f\"http://localhost:3033/alpaca/quote/{sym}\",\n        f\"http://localhost:3033/alpaca/quote?symbol={sym}\",\n    ]\n\n    for url in candidates:\n        try:\n            payload = fetch_json(url, timeout=5)\n        except Exception:\n            continue\n\n        if not isinstance(payload, dict) or not payload:\n            continue\n\n        hi = _num(payload.get(\"high\") or payload.get(\"dailyBar\", {}).get(\"h\") or payload.get(\"bar\", {}).get(\"h\"))\n        lo = _num(payload.get(\"low\") or payload.get(\"dailyBar\", {}).get(\"l\") or payload.get(\"bar\", {}).get(\"l\"))\n        if hi is None and lo is None:\n            continue\n\n        return {\n            \"market_cap\": None,\n            \"pe\": None,\n            \"forward_pe\": None,\n            \"dividend_yield\": None,\n            \"beta\": None,\n            \"fifty_two_week_high\": hi,\n            \"fifty_two_week_low\": lo,\n            \"eps\": None,\n            \"revenue_growth\": None,\n            \"profit_margins\": None,\n            \"recommendation\": None,\n            \"source\": \"alpaca_service\",\n        }\n\n    raise RuntimeError(\"alpaca market-data endpoint unavailable\")\n\n\ndef stock_fundamentals(symbol: str) -> dict[str, Any]:\n    errors: list[str] = []\n\n    for source_name, fn in (\n        (\"stooq\", _from_stooq),\n        (\"alpha_vantage_overview\", _from_alpha_overview),\n        (\"alpha_vantage_global_quote\", _from_alpha_global_quote),\n        (\"alpaca_service\", _from_alpaca_service),\n    ):\n        try:\n            data = fn(symbol)\n            data[\"provider\"] = source_name\n            if errors:\n                data[\"errors\"] = errors\n            return data\n        except Exception as e:\n            errors.append(f\"{source_name}: {e}\")\n\n    return {\n        \"market_cap\": None,\n        \"pe\": None,\n        \"forward_pe\": None,\n        \"dividend_yield\": None,\n        \"beta\": None,\n        \"fifty_two_week_high\": None,\n        \"fifty_two_week_low\": None,\n        \"eps\": None,\n        \"revenue_growth\": None,\n        \"profit_margins\": None,\n        \"recommendation\": None,\n        \"provider\": \"none\",\n        \"errors\": errors,\n    }\n\n\ndef parse_bird_json(raw: str) -> list[dict[str, Any]]:\n    try:\n        data = json.loads(raw)\n    except Exception:\n        return []\n    if isinstance(data, list):\n        return [x for x in data if isinstance(x, dict)]\n    if isinstance(data, dict):\n        if isinstance(data.get(\"tweets\"), list):\n            return [x for x in data[\"tweets\"] if isinstance(x, dict)]\n        return [data]\n    return []\n\n\ndef _pick(d: dict[str, Any], *paths: str) -> Any:\n    for p in paths:\n        cur: Any = d\n        ok = True\n        for key in p.split(\".\"):\n            if isinstance(cur, dict) and key in cur:\n                cur = cur[key]\n            else:\n                ok = False\n                break\n        if ok and cur not in (None, \"\"):\n            return cur\n    return None\n\n\ndef normalize_tweet(t: dict[str, Any]) -> dict[str, Any]:\n    text = _pick(t, \"full_text\", \"text\", \"legacy.full_text\", \"legacy.text\") or \"\"\n    text = re.sub(r\"\\s+\", \" \", str(text)).strip()\n    username = _pick(t, \"user.screen_name\", \"user.username\", \"author.username\", \"legacy.user.screen_name\") or \"unknown\"\n    created = _pick(t, \"created_at\", \"legacy.created_at\") or \"\"\n    tid = _pick(t, \"id_str\", \"rest_id\", \"id\")\n    url = f\"https://x.com/{username}/status/{tid}\" if tid else \"\"\n    return {\"text\": text, \"username\": str(username), \"created_at\": str(created), \"url\": url}\n\n\ndef ensure_bird_ready() -> bool:\n    global BIRD_OK\n    if BIRD_OK is not None:\n        return BIRD_OK\n\n    code, out, err = run([\"bird\", \"check\"], timeout=20)\n    merged = f\"{out}\\n{err}\".lower()\n    BIRD_OK = code == 0 and \"ok\" in merged\n\n    if not BIRD_OK:\n        print(\"\u26a0\ufe0f bird check failed; skipping X sentiment. Cookie auth likely needs refresh.\", file=sys.stderr)\n    return BIRD_OK\n\n\ndef bird_search(query: str, count: int) -> list[dict[str, Any]]:\n    if not ensure_bird_ready():\n        return []\n\n    cmd = [\"bird\", \"search\", \"--json\", \"-n\", str(count), query]\n    code, out, err = run(cmd, timeout=45)\n    if code != 0:\n        return []\n    tweets = [normalize_tweet(x) for x in parse_bird_json(out)]\n    return [t for t in tweets if t.get(\"text\")]\n\n\ndef sentiment_label(text: str) -> str:\n    words = set(re.findall(r\"[a-zA-Z']+\", text.lower()))\n    bull = len(words & BULLISH_WORDS)\n    bear = len(words & BEARISH_WORDS)\n    if bull > bear:\n        return \"bullish\"\n    if bear > bull:\n        return \"bearish\"\n    return \"neutral\"\n\n\ndef sentiment_summary(tweets: list[dict[str, Any]]) -> dict[str, Any]:\n    if not tweets:\n        return {\"counts\": {\"bullish\": 0, \"bearish\": 0, \"neutral\": 0}, \"bearish_pct\": 0.0, \"mood\": \"unknown\"}\n\n    labels = [sentiment_label(t[\"text\"]) for t in tweets]\n    c = Counter(labels)\n    total = max(len(labels), 1)\n    bearish_pct = (c.get(\"bearish\", 0) / total) * 100\n\n    mood = \"neutral\"\n    if c.get(\"bullish\", 0) / total >= 0.6:\n        mood = \"bullish\"\n    elif bearish_pct >= 60:\n        mood = \"bearish\"\n\n    return {\n        \"counts\": {\"bullish\": c.get(\"bullish\", 0), \"bearish\": c.get(\"bearish\", 0), \"neutral\": c.get(\"neutral\", 0)},\n        \"bearish_pct\": round(bearish_pct, 1),\n        \"mood\": mood,\n    }\n\n\ndef fmt_num(v: Any) -> str:\n    if v is None:\n        return \"n/a\"\n    if isinstance(v, (int, float)):\n        if abs(v) >= 1_000_000_000:\n            return f\"{v/1_000_000_000:.2f}B\"\n        if abs(v) >= 1_000_000:\n            return f\"{v/1_000_000:.2f}M\"\n        if abs(v) >= 1_000:\n            return f\"{v/1_000:.2f}K\"\n        return f\"{v:.2f}\" if isinstance(v, float) else str(v)\n    return str(v)\n\n\ndef top_ticker_mentions(tweets: list[dict[str, Any]], limit: int = 5) -> list[str]:\n    bag: Counter[str] = Counter()\n    for t in tweets:\n        for tok in TICKER_RE.findall(t.get(\"text\", \"\")):\n            sym = tok.lstrip(\"$\").upper()\n            if 2 <= len(sym) <= 5:\n                bag[sym] += 1\n    return [k for k, _ in bag.most_common(limit)]\n\n\ndef mode_ticker(symbol: str) -> str:\n    sym = symbol.upper()\n    quote = stock_quote(sym)\n    fundamentals = stock_fundamentals(sym)\n\n    cashtag_query = f\"\\\\${sym}\"\n    sentiment_tweets = bird_search(cashtag_query, 20)\n    key_account_q = f\"(from:unusual_whales OR from:DeItaone) \\\\${sym}\"\n    key_mentions = bird_search(key_account_q, 20)\n    sent = sentiment_summary(sentiment_tweets)\n\n    lines = []\n    lines.append(f\"\ud83d\udcca Market Intel: {sym}\")\n    lines.append(f\"Price: ${quote.get('price')} ({quote.get('change_percent')}%) [{quote.get('signal')}]\")\n    lines.append(\n        \"Key metrics: \"\n        f\"MktCap {fmt_num(fundamentals.get('market_cap'))} | \"\n        f\"P/E {fmt_num(fundamentals.get('pe'))} | \"\n        f\"Fwd P/E {fmt_num(fundamentals.get('forward_pe'))} | \"\n        f\"EPS {fmt_num(fundamentals.get('eps'))}\"\n    )\n    lines.append(\n        f\"Range: 52W High {fmt_num(fundamentals.get('fifty_two_week_high'))} | 52W Low {fmt_num(fundamentals.get('fifty_two_week_low'))}\"\n    )\n    lines.append(f\"Fundamentals source: {fundamentals.get('provider', 'unknown')}\")\n    lines.append(\n        \"X sentiment (20): \"\n        f\"{sent['mood']} | bullish {sent['counts']['bullish']} / bearish {sent['counts']['bearish']} / neutral {sent['counts']['neutral']}\"\n    )\n\n    if key_mentions:\n        lines.append(\"Notable account mentions:\")\n        for t in key_mentions[:5]:\n            snippet = t['text'][:180]\n            lines.append(f\"- @{t['username']}: {snippet}{'\u2026' if len(t['text'])>180 else ''}\")\n    else:\n        lines.append(\"Notable account mentions: none found (or bird auth unavailable).\")\n\n    return \"\\n\".join(lines)\n\n\ndef mode_portfolio() -> str:\n    data = fetch_json(ALPACA_PORTFOLIO_URL)\n    positions = data.get(\"positions\") or []\n\n    lines = [\"\ud83d\udcbc Portfolio Sentiment Scan\"]\n    if not positions:\n        lines.append(\"No open positions in Alpaca.\")\n        return \"\\n\".join(lines)\n\n    flagged = []\n    for p in positions:\n        symbol = str(p.get(\"symbol\", \"\")).upper()\n        qty = p.get(\"qty\")\n        mv = p.get(\"market_value\")\n        tweets = bird_search(f\"\\\\${symbol}\", 5)\n        sent = sentiment_summary(tweets)\n        if sent[\"bearish_pct\"] > 60:\n            flagged.append(symbol)\n        lines.append(\n            f\"- {symbol}: qty {qty}, mv ${mv}, mood {sent['mood']} \"\n            f\"(bearish {sent['bearish_pct']}%, n={sum(sent['counts'].values())})\"\n        )\n\n    if flagged:\n        lines.append(\"\u26a0\ufe0f Bearish risk flags (>60% bearish): \" + \", \".join(flagged))\n    else:\n        lines.append(\"\u2705 No bearish sentiment flags above 60%.\")\n\n    return \"\\n\".join(lines)\n\n\ndef market_status() -> str:\n    if MARKET_STATUS_SCRIPT.exists():\n        code, out, _ = run([str(MARKET_STATUS_SCRIPT)], timeout=10)\n        if code == 0 and out:\n            return out\n    return \"UNKNOWN\"\n\n\ndef mode_pulse() -> str:\n    status = market_status()\n    broad = bird_search(\"stock market today OR SPY OR QQQ\", 20)\n    key = bird_search(\"from:DeItaone OR from:unusual_whales\", 20)\n    sent = sentiment_summary(broad)\n    movers = top_ticker_mentions(broad + key, limit=6)\n\n    lines = [\"\ud83c\udf10 Market Pulse\"]\n    lines.append(f\"Market status: {status}\")\n    lines.append(\n        f\"Market mood: {sent['mood']} (bullish {sent['counts']['bullish']}, bearish {sent['counts']['bearish']}, neutral {sent['counts']['neutral']})\"\n    )\n    lines.append(\"Top movers mentioned: \" + (\", \".join(movers) if movers else \"none\"))\n\n    lines.append(\"Breaking/news flow (DeItaone + unusual_whales):\")\n    if key:\n        for t in key[:6]:\n            snippet = t['text'][:180]\n            lines.append(f\"- @{t['username']}: {snippet}{'\u2026' if len(t['text']) > 180 else ''}\")\n    else:\n        lines.append(\"- No key-account pulls (bird auth missing or no fresh posts).\")\n\n    return \"\\n\".join(lines)\n\n\ndef parse_args() -> argparse.Namespace:\n    p = argparse.ArgumentParser(description=\"Unified market intelligence pipeline\")\n    g = p.add_mutually_exclusive_group(required=True)\n    g.add_argument(\"--ticker\", help=\"single ticker deep dive, e.g. --ticker NVDA\")\n    g.add_argument(\"--portfolio\", action=\"store_true\", help=\"sentiment overlay for Alpaca portfolio\")\n    g.add_argument(\"--pulse\", action=\"store_true\", help=\"broad market pulse\")\n    return p.parse_args()\n\n\ndef main() -> int:\n    args = parse_args()\n    try:\n        if args.ticker:\n            print(mode_ticker(args.ticker))\n        elif args.portfolio:\n            print(mode_portfolio())\n        elif args.pulse:\n            print(mode_pulse())\n        else:\n            return 2\n        return 0\n    except Exception as e:\n        print(f\"\u274c market-intel failed: {e}\")\n        return 1\n\n\nif __name__ == \"__main__\":\n    sys.exit(main())\n";
-  const dir = mkdtempSync(join(tmpdir(), 'pywrap-'));
-  const script = join(dir, 'script.py');
-  writeFileSync(script, py, 'utf8');
-  const proc = spawnSync('python3', [script, ...process.argv.slice(2)], { stdio: 'inherit' });
-  rmSync(dir, { recursive: true, force: true });
-  if (proc.error) {
-    console.error(String(proc.error));
+  const args = parseArgs(process.argv.slice(2));
+  const selected = [Boolean(args.ticker), args.portfolio, args.pulse].filter(Boolean).length;
+  if (selected !== 1) {
+    console.error("Usage: market-intel.ts --ticker <SYM> | --portfolio | --pulse");
+    process.exit(2);
+  }
+
+  try {
+    if (args.ticker) {
+      console.log(await modeTicker(args.ticker));
+    } else if (args.portfolio) {
+      console.log(await modePortfolio());
+    } else if (args.pulse) {
+      console.log(await modePulse());
+    } else {
+      process.exit(2);
+    }
+    process.exit(0);
+  } catch (e) {
+    console.log(`❌ market-intel failed: ${e instanceof Error ? e.message : String(e)}`);
     process.exit(1);
   }
-  process.exit(proc.status ?? 1);
 }
 
 main().catch((err) => {

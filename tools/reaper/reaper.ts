@@ -1,21 +1,339 @@
 #!/usr/bin/env npx tsx
-import { spawnSync } from 'node:child_process';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+
+import fs from "fs";
+import { spawnSync } from "child_process";
+import { resolveHomePath } from "../lib/paths.js";
+import { readJsonFile, writeJsonFileAtomic } from "../lib/json-file.js";
+
+const RUN_STORE_PATH = process.env.OPENCLAW_SUBAGENT_RUNS_PATH
+  ? process.env.OPENCLAW_SUBAGENT_RUNS_PATH
+  : resolveHomePath(".openclaw", "subagents", "runs.json");
+const DB_NAME = "cortana";
+const ACTIVE_MINUTES = 1440;
+const STALE_STATUSES = new Set(["running", "in_progress"]);
+
+function nowMs(): number {
+  return Math.trunc(Date.now());
+}
+
+function isoFromMs(ms?: number | null): string | null {
+  if (!ms) return null;
+  return new Date(ms).toISOString();
+}
+
+function loadJson(filePath: string, fallback: any): any {
+  if (!fs.existsSync(filePath)) return fallback;
+  const parsed = readJsonFile<any>(filePath);
+  return parsed ?? fallback;
+}
+
+function saveJson(filePath: string, data: any): void {
+  writeJsonFileAtomic(filePath, data, 2);
+}
+
+function resolvePsql(): string {
+  const candidates = [process.env.PSQL_BIN, "/opt/homebrew/opt/postgresql@17/bin/psql", "psql"].filter(
+    Boolean
+  ) as string[];
+  for (const c of candidates) {
+    if (c === "psql") {
+      const proc = spawnSync("/usr/bin/env", ["bash", "-lc", "command -v psql"], { encoding: "utf8" });
+      if (proc.status === 0 && (proc.stdout ?? "").trim()) return "psql";
+      continue;
+    }
+    if (fs.existsSync(c)) return c;
+  }
+  return "psql";
+}
+
+function runSessions(activeMinutes = ACTIVE_MINUTES): any {
+  const cmd = ["openclaw", "sessions", "--json", "--active", String(activeMinutes), "--all-agents"];
+  const proc = spawnSync(cmd[0], cmd.slice(1), { encoding: "utf8" });
+  if (proc.status !== 0) {
+    const msg = (proc.stderr ?? proc.stdout ?? "openclaw sessions failed").trim();
+    throw new Error(msg);
+  }
+  try {
+    return JSON.parse(proc.stdout ?? "");
+  } catch (err) {
+    throw new Error(`Invalid JSON from openclaw sessions: ${err instanceof Error ? err.message : String(err)}`);
+  }
+}
+
+function sqlQuote(value: string | null): string {
+  return (value || "").replace(/'/g, "''");
+}
+
+function collectSessionIds(session: Record<string, any>): Set<string> {
+  const ids = new Set<string>();
+  const cand = [session.sessionId, session.runId, session.run_id, session.key];
+  for (const v of cand) {
+    const s = String(v ?? "").trim();
+    if (s) ids.add(s);
+  }
+  return ids;
+}
+
+function collectRunIds(run: Record<string, any>): Set<string> {
+  const ids = new Set<string>();
+  const cand = [run.childSessionKey, run.runId, run.sessionId];
+  for (const v of cand) {
+    const s = String(v ?? "").trim();
+    if (s) ids.add(s);
+  }
+  return ids;
+}
+
+function logReapedEvent(psqlBin: string, metadata: Record<string, any>, message: string): [boolean, string | null] {
+  const msgSql = message.replace(/'/g, "''");
+  const metaSql = JSON.stringify(metadata).replace(/'/g, "''");
+  const sql =
+    "INSERT INTO cortana_events (event_type, source, severity, message, metadata) VALUES (" +
+    "'subagent_reaped', 'subagent-reaper', 'warning', " +
+    `'${msgSql}', '${metaSql}'::jsonb` +
+    ");";
+
+  try {
+    const proc = spawnSync(psqlBin, [DB_NAME, "-X", "-c", sql], { encoding: "utf8" });
+    if (proc.status !== 0) {
+      return [false, (proc.stderr ?? proc.stdout ?? "psql insert failed").trim()];
+    }
+    return [true, null];
+  } catch (err) {
+    return [false, `psql not found (${psqlBin})`];
+  }
+}
+
+function resetTasks(
+  psqlBin: string,
+  runId: string,
+  label: string | null,
+  childKey: string | null,
+  outcome: string
+): [boolean, string | null, number] {
+  const conditions: string[] = [];
+  const runQ = sqlQuote(runId);
+  const labelQ = sqlQuote(label);
+  const childQ = sqlQuote(childKey);
+
+  if (runId) {
+    conditions.push(`run_id='${runQ}'`);
+    conditions.push(`COALESCE(metadata->>'subagent_run_id','')='${runQ}'`);
+  }
+  if (label) {
+    conditions.push(`assigned_to='${labelQ}'`);
+    conditions.push(`COALESCE(metadata->>'subagent_label','')='${labelQ}'`);
+  }
+  if (childKey) {
+    conditions.push(`assigned_to='${childQ}'`);
+    conditions.push(`COALESCE(metadata->>'subagent_session_key','')='${childQ}'`);
+  }
+
+  if (!conditions.length) return [true, null, 0];
+
+  const outcomeQ = sqlQuote(outcome);
+  const sql =
+    "UPDATE cortana_tasks SET " +
+    `status='ready', outcome='${outcomeQ}', updated_at=NOW() ` +
+    "WHERE status='in_progress' AND (" +
+    conditions.join(" OR ") +
+    ") RETURNING id;";
+
+  const proc = spawnSync(psqlBin, [DB_NAME, "-X", "-t", "-A", "-c", sql], { encoding: "utf8" });
+  if (proc.status !== 0) {
+    return [false, (proc.stderr ?? proc.stdout ?? "task update failed").trim(), 0];
+  }
+
+  const rows = (proc.stdout ?? "")
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter(Boolean);
+  return [true, null, rows.length];
+}
+
+type Args = { maxAgeHours: number; dryRun: boolean; emitJson: boolean };
+
+function parseArgs(argv: string[]): Args {
+  const args: Args = { maxAgeHours: 2.0, dryRun: false, emitJson: false };
+  for (let i = 0; i < argv.length; i += 1) {
+    const arg = argv[i];
+    switch (arg) {
+      case "--max-age-hours":
+        args.maxAgeHours = Number(argv[i + 1]);
+        i += 1;
+        break;
+      case "--dry-run":
+        args.dryRun = true;
+        break;
+      case "--emit-json":
+        args.emitJson = true;
+        break;
+      default:
+        break;
+    }
+  }
+  return args;
+}
 
 async function main(): Promise<void> {
-  const py = "#!/usr/bin/env python3\n\"\"\"Sub-agent reaper: clean stale runs and sync task board.\"\"\"\n\nfrom __future__ import annotations\n\nimport argparse\nimport json\nimport os\nimport subprocess\nimport sys\nimport tempfile\nimport time\nfrom datetime import datetime, timezone\nfrom pathlib import Path\nfrom typing import Any\n\n\nRUN_STORE_PATH = Path(\n    os.environ.get(\"OPENCLAW_SUBAGENT_RUNS_PATH\", os.path.expanduser(\"~/.openclaw/subagents/runs.json\"))\n)\nDB_NAME = \"cortana\"\nACTIVE_MINUTES = 1440\nSTALE_STATUSES = {\"running\", \"in_progress\"}\n\n\ndef now_ms() -> int:\n    return int(time.time() * 1000)\n\n\ndef iso_from_ms(ms: int | None) -> str | None:\n    if not ms:\n        return None\n    return datetime.fromtimestamp(ms / 1000, tz=timezone.utc).isoformat()\n\n\ndef load_json(path: Path, default: Any) -> Any:\n    if not path.exists():\n        return default\n    try:\n        return json.loads(path.read_text())\n    except Exception:\n        return default\n\n\ndef save_json(path: Path, data: Any) -> None:\n    path.parent.mkdir(parents=True, exist_ok=True)\n    payload = json.dumps(data, indent=2) + \"\\n\"\n    with tempfile.NamedTemporaryFile(\"w\", dir=str(path.parent), delete=False) as tmp:\n        tmp.write(payload)\n        tmp.flush()\n        os.fsync(tmp.fileno())\n        tmp_name = tmp.name\n    os.replace(tmp_name, path)\n\n\ndef resolve_psql() -> str:\n    candidates = [\n        os.environ.get(\"PSQL_BIN\"),\n        \"/opt/homebrew/opt/postgresql@17/bin/psql\",\n        \"psql\",\n    ]\n    for c in candidates:\n        if not c:\n            continue\n        if c == \"psql\":\n            proc = subprocess.run([\"/usr/bin/env\", \"bash\", \"-lc\", \"command -v psql\"], capture_output=True, text=True)\n            if proc.returncode == 0 and proc.stdout.strip():\n                return \"psql\"\n            continue\n        if Path(c).exists():\n            return c\n    return \"psql\"\n\n\ndef run_sessions(active_minutes: int = ACTIVE_MINUTES) -> dict[str, Any]:\n    cmd = [\"openclaw\", \"sessions\", \"--json\", \"--active\", str(active_minutes), \"--all-agents\"]\n    proc = subprocess.run(cmd, capture_output=True, text=True)\n    if proc.returncode != 0:\n        raise RuntimeError(proc.stderr.strip() or proc.stdout.strip() or \"openclaw sessions failed\")\n    try:\n        return json.loads(proc.stdout)\n    except json.JSONDecodeError as e:\n        raise RuntimeError(f\"Invalid JSON from openclaw sessions: {e}\") from e\n\n\ndef sql_quote(value: str | None) -> str:\n    return (value or \"\").replace(\"'\", \"''\")\n\n\ndef collect_session_ids(session: dict[str, Any]) -> set[str]:\n    ids = {\n        str(session.get(\"sessionId\") or \"\").strip(),\n        str(session.get(\"runId\") or \"\").strip(),\n        str(session.get(\"run_id\") or \"\").strip(),\n        str(session.get(\"key\") or \"\").strip(),\n    }\n    return {i for i in ids if i}\n\n\ndef collect_run_ids(run: dict[str, Any]) -> set[str]:\n    ids = {\n        str(run.get(\"childSessionKey\") or \"\").strip(),\n        str(run.get(\"runId\") or \"\").strip(),\n        str(run.get(\"sessionId\") or \"\").strip(),\n    }\n    return {i for i in ids if i}\n\n\ndef log_reaped_event(*, psql_bin: str, metadata: dict[str, Any], message: str) -> tuple[bool, str | None]:\n    msg_sql = message.replace(\"'\", \"''\")\n    meta_sql = json.dumps(metadata).replace(\"'\", \"''\")\n    sql = (\n        \"INSERT INTO cortana_events (event_type, source, severity, message, metadata) VALUES (\"\n        \"'subagent_reaped', 'subagent-reaper', 'warning', \"\n        f\"'{msg_sql}', '{meta_sql}'::jsonb\"\n        \");\"\n    )\n    try:\n        proc = subprocess.run([psql_bin, DB_NAME, \"-X\", \"-c\", sql], capture_output=True, text=True)\n    except FileNotFoundError:\n        return False, f\"psql not found ({psql_bin})\"\n    if proc.returncode != 0:\n        return False, (proc.stderr.strip() or proc.stdout.strip() or \"psql insert failed\")\n    return True, None\n\n\ndef reset_tasks(\n    *,\n    psql_bin: str,\n    run_id: str,\n    label: str | None,\n    child_key: str | None,\n    outcome: str,\n) -> tuple[bool, str | None, int]:\n    conditions: list[str] = []\n    run_q = sql_quote(run_id)\n    label_q = sql_quote(label)\n    child_q = sql_quote(child_key)\n\n    if run_id:\n        conditions.append(f\"run_id='{run_q}'\")\n        conditions.append(f\"COALESCE(metadata->>'subagent_run_id','')='{run_q}'\")\n    if label:\n        conditions.append(f\"assigned_to='{label_q}'\")\n        conditions.append(f\"COALESCE(metadata->>'subagent_label','')='{label_q}'\")\n    if child_key:\n        conditions.append(f\"assigned_to='{child_q}'\")\n        conditions.append(f\"COALESCE(metadata->>'subagent_session_key','')='{child_q}'\")\n\n    if not conditions:\n        return True, None, 0\n\n    outcome_q = sql_quote(outcome)\n    sql = (\n        \"UPDATE cortana_tasks SET \"\n        f\"status='ready', outcome='{outcome_q}', updated_at=NOW() \"\n        \"WHERE status='in_progress' AND (\"\n        + \" OR \".join(conditions)\n        + \") RETURNING id;\"\n    )\n    proc = subprocess.run([psql_bin, DB_NAME, \"-X\", \"-t\", \"-A\", \"-c\", sql], capture_output=True, text=True)\n    if proc.returncode != 0:\n        return False, (proc.stderr.strip() or proc.stdout.strip() or \"task update failed\"), 0\n\n    rows = [line.strip() for line in (proc.stdout or \"\").splitlines() if line.strip()]\n    return True, None, len(rows)\n\n\ndef main() -> int:\n    parser = argparse.ArgumentParser(description=\"Reap stale sub-agent runs and sync task board\")\n    parser.add_argument(\"--max-age-hours\", type=float, default=2.0)\n    parser.add_argument(\"--dry-run\", action=\"store_true\", default=False)\n    parser.add_argument(\"--emit-json\", action=\"store_true\", default=False)\n    args = parser.parse_args()\n\n    now = now_ms()\n    max_age_ms = int(args.max_age_hours * 3600 * 1000)\n\n    output: dict[str, Any] = {\n        \"ok\": True,\n        \"timestamp\": iso_from_ms(now),\n        \"config\": {\n            \"maxAgeHours\": args.max_age_hours,\n            \"dryRun\": args.dry_run,\n        },\n        \"summary\": {\n            \"runsScanned\": 0,\n            \"staleCandidates\": 0,\n            \"reapedRuns\": 0,\n            \"eventsLogged\": 0,\n            \"tasksReset\": 0,\n            \"errors\": 0,\n        },\n        \"reaped\": [],\n        \"errors\": [],\n    }\n\n    payload = load_json(RUN_STORE_PATH, {})\n    if not isinstance(payload, dict):\n        output[\"ok\"] = False\n        output[\"error\"] = \"runs.json payload is not an object\"\n        if args.emit_json:\n            print(json.dumps(output, indent=2))\n        else:\n            print(\"reaper: runs.json payload invalid\")\n        return 1\n\n    runs = payload.get(\"runs\")\n    if not isinstance(runs, dict):\n        output[\"ok\"] = False\n        output[\"error\"] = \"runs.json missing runs map\"\n        if args.emit_json:\n            print(json.dumps(output, indent=2))\n        else:\n            print(\"reaper: runs.json missing runs map\")\n        return 1\n\n    output[\"summary\"][\"runsScanned\"] = len(runs)\n\n    try:\n        session_data = run_sessions(ACTIVE_MINUTES)\n        sessions: list[dict[str, Any]] = list(session_data.get(\"sessions\") or [])\n    except Exception as e:\n        output[\"ok\"] = False\n        output[\"error\"] = str(e)\n        if args.emit_json:\n            print(json.dumps(output, indent=2))\n        else:\n            print(f\"reaper: {e}\")\n        return 1\n\n    active_ids: set[str] = set()\n    for session in sessions:\n        if isinstance(session, dict):\n            active_ids.update(collect_session_ids(session))\n\n    psql_bin = resolve_psql()\n    changed = False\n\n    for run_key, run in runs.items():\n        if not isinstance(run, dict):\n            continue\n\n        status = str(run.get(\"status\") or \"\").strip().lower()\n        if status not in STALE_STATUSES:\n            continue\n\n        started_at = run.get(\"startedAt\")\n        if not isinstance(started_at, (int, float)):\n            continue\n\n        age_ms = int(now - int(started_at))\n        if age_ms <= max_age_ms:\n            continue\n\n        output[\"summary\"][\"staleCandidates\"] += 1\n        run_ids = collect_run_ids(run)\n        is_active = any(run_id in active_ids for run_id in run_ids)\n\n        if is_active:\n            continue\n\n        label = run.get(\"label\")\n        run_id = str(run.get(\"runId\") or \"\")\n        child_key = str(run.get(\"childSessionKey\") or \"\")\n        age_hours = round(age_ms / 3600000, 2)\n\n        outcome_text = (\n            \"Reaped stale sub-agent session \"\n            f\"{label or child_key or run_id or run_key} \"\n            f\"after {age_hours}h without activity.\"\n        )\n\n        entry = {\n            \"runKey\": run_key,\n            \"runId\": run_id or None,\n            \"childSessionKey\": child_key or None,\n            \"label\": label,\n            \"startedAt\": iso_from_ms(int(started_at)),\n            \"ageHours\": age_hours,\n            \"endedAt\": iso_from_ms(now),\n        }\n\n        if not args.dry_run:\n            run[\"endedAt\"] = now\n            run[\"endedReason\"] = \"reaped_stale\"\n            run[\"status\"] = \"failed\"\n            outcome = run.get(\"outcome\") if isinstance(run.get(\"outcome\"), dict) else {}\n            outcome[\"status\"] = \"failed\"\n            run[\"outcome\"] = outcome\n            runs[run_key] = run\n            changed = True\n\n            metadata = {\n                \"run_key\": run_key,\n                \"run_id\": run_id or None,\n                \"child_session_key\": child_key or None,\n                \"label\": label,\n                \"started_at\": entry[\"startedAt\"],\n                \"ended_at\": entry[\"endedAt\"],\n                \"age_hours\": age_hours,\n                \"reason\": \"reaped_stale\",\n            }\n\n            event_ok, event_err = log_reaped_event(\n                psql_bin=psql_bin,\n                metadata=metadata,\n                message=f\"Sub-agent run reaped: {label or child_key or run_id or run_key}\",\n            )\n            entry[\"eventLogged\"] = bool(event_ok)\n            if event_ok:\n                output[\"summary\"][\"eventsLogged\"] += 1\n            elif event_err:\n                output[\"summary\"][\"errors\"] += 1\n                output[\"errors\"].append({\"runKey\": run_key, \"error\": f\"event_log_failed: {event_err}\"})\n\n            task_ok, task_err, task_count = reset_tasks(\n                psql_bin=psql_bin,\n                run_id=run_id,\n                label=label,\n                child_key=child_key,\n                outcome=outcome_text,\n            )\n            entry[\"tasksReset\"] = task_count\n            if task_ok:\n                output[\"summary\"][\"tasksReset\"] += task_count\n            else:\n                output[\"summary\"][\"errors\"] += 1\n                output[\"errors\"].append({\"runKey\": run_key, \"error\": f\"task_reset_failed: {task_err}\"})\n        else:\n            entry[\"eventLogged\"] = False\n            entry[\"tasksReset\"] = 0\n\n        output[\"summary\"][\"reapedRuns\"] += 1\n        output[\"reaped\"].append(entry)\n\n    if changed and not args.dry_run:\n        save_json(RUN_STORE_PATH, payload)\n\n    if args.emit_json:\n        print(json.dumps(output, indent=2))\n    else:\n        summary = output[\"summary\"]\n        print(\n            \"reaper: scanned={runsScanned} stale={staleCandidates} reaped={reapedRuns} \"\n            \"tasks_reset={tasksReset} events={eventsLogged} errors={errors}\".format(**summary)\n        )\n\n    return 0 if output.get(\"ok\") else 1\n\n\nif __name__ == \"__main__\":\n    sys.exit(main())\n";
-  const dir = mkdtempSync(join(tmpdir(), 'pywrap-'));
-  const script = join(dir, 'script.py');
-  writeFileSync(script, py, 'utf8');
-  const proc = spawnSync('python3', [script, ...process.argv.slice(2)], { stdio: 'inherit' });
-  rmSync(dir, { recursive: true, force: true });
-  if (proc.error) {
-    console.error(String(proc.error));
+  const args = parseArgs(process.argv.slice(2));
+
+  const now = nowMs();
+  const maxAgeMs = Math.trunc(args.maxAgeHours * 3600 * 1000);
+
+  const output: Record<string, any> = {
+    ok: true,
+    timestamp: isoFromMs(now),
+    config: { maxAgeHours: args.maxAgeHours, dryRun: args.dryRun },
+    summary: {
+      runsScanned: 0,
+      staleCandidates: 0,
+      reapedRuns: 0,
+      eventsLogged: 0,
+      tasksReset: 0,
+      errors: 0,
+    },
+    reaped: [],
+    errors: [],
+  };
+
+  const payload = loadJson(RUN_STORE_PATH, {});
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+    output.ok = false;
+    output.error = "runs.json payload is not an object";
+    if (args.emitJson) console.log(JSON.stringify(output, null, 2));
+    else console.log("reaper: runs.json payload invalid");
     process.exit(1);
   }
-  process.exit(proc.status ?? 1);
+
+  const runs = (payload as any).runs;
+  if (!runs || typeof runs !== "object") {
+    output.ok = false;
+    output.error = "runs.json missing runs map";
+    if (args.emitJson) console.log(JSON.stringify(output, null, 2));
+    else console.log("reaper: runs.json missing runs map");
+    process.exit(1);
+  }
+
+  output.summary.runsScanned = Object.keys(runs).length;
+
+  let sessionData: any;
+  try {
+    sessionData = runSessions(ACTIVE_MINUTES);
+  } catch (e) {
+    output.ok = false;
+    output.error = String(e instanceof Error ? e.message : e);
+    if (args.emitJson) console.log(JSON.stringify(output, null, 2));
+    else console.log(`reaper: ${output.error}`);
+    process.exit(1);
+  }
+
+  const sessions: Record<string, any>[] = Array.isArray(sessionData.sessions) ? sessionData.sessions : [];
+  const activeIds = new Set<string>();
+  for (const session of sessions) {
+    if (session && typeof session === "object") {
+      for (const id of collectSessionIds(session)) activeIds.add(id);
+    }
+  }
+
+  const psqlBin = resolvePsql();
+  let changed = false;
+
+  for (const [runKey, run] of Object.entries(runs)) {
+    if (!run || typeof run !== "object") continue;
+
+    const status = String((run as any).status ?? "").trim().toLowerCase();
+    if (!STALE_STATUSES.has(status)) continue;
+
+    const startedAt = (run as any).startedAt;
+    if (typeof startedAt !== "number") continue;
+
+    const ageMs = now - Math.trunc(startedAt);
+    if (ageMs <= maxAgeMs) continue;
+
+    output.summary.staleCandidates += 1;
+    const runIds = collectRunIds(run as any);
+    const isActive = Array.from(runIds).some((id) => activeIds.has(id));
+    if (isActive) continue;
+
+    const label = (run as any).label ?? null;
+    const runId = String((run as any).runId ?? "");
+    const childKey = String((run as any).childSessionKey ?? "");
+    const ageHours = Math.round((ageMs / 3600000) * 100) / 100;
+
+    const outcomeText =
+      "Reaped stale sub-agent session " +
+      `${label || childKey || runId || runKey} ` +
+      `after ${ageHours}h without activity.`;
+
+    const entry: Record<string, any> = {
+      runKey,
+      runId: runId || null,
+      childSessionKey: childKey || null,
+      label,
+      startedAt: isoFromMs(Math.trunc(startedAt)),
+      ageHours,
+      endedAt: isoFromMs(now),
+    };
+
+    if (!args.dryRun) {
+      (run as any).endedAt = now;
+      (run as any).endedReason = "reaped_stale";
+      (run as any).status = "failed";
+      const outcome = (run as any).outcome && typeof (run as any).outcome === "object" ? (run as any).outcome : {};
+      outcome.status = "failed";
+      (run as any).outcome = outcome;
+      (runs as any)[runKey] = run;
+      changed = true;
+
+      const metadata = {
+        run_key: runKey,
+        run_id: runId || null,
+        child_session_key: childKey || null,
+        label,
+        started_at: entry.startedAt,
+        ended_at: entry.endedAt,
+        age_hours: ageHours,
+        reason: "reaped_stale",
+      };
+
+      const [eventOk, eventErr] = logReapedEvent(psqlBin, metadata, `Sub-agent run reaped: ${label || childKey || runId || runKey}`);
+      entry.eventLogged = Boolean(eventOk);
+      if (eventOk) output.summary.eventsLogged += 1;
+      else if (eventErr) {
+        output.summary.errors += 1;
+        output.errors.push({ runKey, error: `event_log_failed: ${eventErr}` });
+      }
+
+      const [taskOk, taskErr, taskCount] = resetTasks(psqlBin, runId, label, childKey, outcomeText);
+      entry.tasksReset = taskCount;
+      if (taskOk) output.summary.tasksReset += taskCount;
+      else {
+        output.summary.errors += 1;
+        output.errors.push({ runKey, error: `task_reset_failed: ${taskErr}` });
+      }
+    } else {
+      entry.eventLogged = false;
+      entry.tasksReset = 0;
+    }
+
+    output.summary.reapedRuns += 1;
+    output.reaped.push(entry);
+  }
+
+  if (changed && !args.dryRun) saveJson(RUN_STORE_PATH, payload);
+
+  if (args.emitJson) {
+    console.log(JSON.stringify(output, null, 2));
+  } else {
+    const summary = output.summary;
+    console.log(
+      `reaper: scanned=${summary.runsScanned} stale=${summary.staleCandidates} reaped=${summary.reapedRuns} ` +
+        `tasks_reset=${summary.tasksReset} events=${summary.eventsLogged} errors=${summary.errors}`
+    );
+  }
+
+  process.exit(output.ok ? 0 : 1);
 }
 
 main().catch((err) => {
