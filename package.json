@@ -1,8 +1,13 @@
 {
   "name": "openclaw",
   "private": true,
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
   "devDependencies": {
-    "tsx": "^4.6.0"
+    "tsx": "^4.6.0",
+    "vitest": "^4.0.18"
   },
   "dependencies": {
     "@prisma/client": "^7.4.2",
