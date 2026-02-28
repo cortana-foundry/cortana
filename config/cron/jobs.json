@@ -284,7 +284,7 @@
       "id": "a519512a-5fb8-459f-8780-31e53793c1d4",
       "agentId": "main",
       "name": "\ud83c\udfcb\ufe0f Fitness Morning Brief (Hamel)",
-      "enabled": true,
+      "enabled": false,
       "createdAtMs": 1769794739989,
       "updatedAtMs": 1772111049561,
       "schedule": {
@@ -913,7 +913,7 @@
     {
       "id": "dad2a631-8af3-4a8a-aef4-d3450f2f44e0",
       "name": "\ud83e\udde0 SAE Cross-Domain Reasoner",
-      "enabled": true,
+      "enabled": false,
       "createdAtMs": 1771268745562,
       "updatedAtMs": 1772244908662,
       "schedule": {
