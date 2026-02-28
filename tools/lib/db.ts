@@ -1,5 +1,5 @@
-import { execSync } from "child_process";
-import { PSQL_BIN } from "./paths.js";
+import { execSync, spawnSync } from "child_process";
+import { POSTGRES_PATH, PSQL_BIN } from "./paths.js";
 
 function run(sql: string): string {
   try {
@@ -7,10 +7,7 @@ function run(sql: string): string {
     return execSync(`${PSQL_BIN} cortana -v ON_ERROR_STOP=1 -X -q -t -A -c "${escaped}"`, {
       encoding: "utf8",
       stdio: ["ignore", "pipe", "pipe"],
-      env: {
-        ...process.env,
-        PATH: `/opt/homebrew/opt/postgresql@17/bin:${process.env.PATH ?? ""}`,
-      },
+      env: withPostgresPath(process.env),
     });
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
@@ -40,4 +37,28 @@ export function queryJson(sql: string): any[] {
 
 export function execute(sql: string): void {
   void run(sql);
+}
+
+export function withPostgresPath(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+  return {
+    ...env,
+    PATH: `${POSTGRES_PATH}:${env.PATH ?? ""}`,
+  };
+}
+
+type RunPsqlOptions = {
+  db?: string;
+  args?: string[];
+  env?: NodeJS.ProcessEnv;
+  stdio?: "inherit" | "pipe" | "ignore" | ["ignore" | "pipe" | "inherit", "ignore" | "pipe" | "inherit", "ignore" | "pipe" | "inherit"];
+};
+
+export function runPsql(sql: string, options: RunPsqlOptions = {}) {
+  const { db = "cortana", args = [], env = withPostgresPath(process.env), stdio = "pipe" } =
+    options;
+  return spawnSync(PSQL_BIN, [db, ...args, "-c", sql], {
+    encoding: "utf8",
+    stdio,
+    env,
+  });
 }

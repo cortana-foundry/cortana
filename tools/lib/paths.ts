@@ -3,6 +3,9 @@ import path from "path";
 import os from "os";
 import { fileURLToPath } from "url";
 
+export const POSTGRES_PATH = "/opt/homebrew/opt/postgresql@17/bin";
+export const PSQL_BIN = process.env.PSQL_BIN ?? path.join(POSTGRES_PATH, "psql");
+
 export function getScriptDir(importMetaUrl: string): string {
   return path.dirname(fileURLToPath(importMetaUrl));
 }
