@@ -4,6 +4,7 @@ import fs from "fs";
 import os from "os";
 import path from "path";
 import { spawnSync } from "child_process";
+import { HEARTBEAT_MAX_AGE_MS, validateHeartbeatState } from "../lib/heartbeat-schema.js";
 import { PSQL_BIN, resolveRepoPath } from "../lib/paths.js";
 
 type Check = {
@@ -280,10 +281,16 @@ function checkHeartbeatState(): Check {
     return check;
   }
 
-  const version = data && typeof data === "object" ? data.version : null;
-  details.version = version;
-
-  if (typeof version !== "number" || version < 2) fail(check, "heartbeat-state version must be >= 2");
+  try {
+    const validated = validateHeartbeatState(data, Date.now(), HEARTBEAT_MAX_AGE_MS);
+    details.version = validated.version;
+    details.required_keys = Object.keys(validated.lastChecks);
+    details.oldest_check_age_ms = Math.max(
+      ...Object.values(validated.lastChecks).map((v) => Math.max(0, Date.now() - v.lastChecked))
+    );
+  } catch (err) {
+    fail(check, `Invalid heartbeat-state semantics: ${err instanceof Error ? err.message : String(err)}`);
+  }
 
   check.details = details;
   return check;
