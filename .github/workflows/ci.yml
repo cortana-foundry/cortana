@@ -49,11 +49,8 @@ jobs:
       - name: Install PostgreSQL client
         run: sudo apt-get update && sudo apt-get install -y postgresql-client
 
-      - name: Prepare test database and migration path
-        run: |
-          createdb -h "$PGHOST" -p "$PGPORT" -U "$PGUSER" "$DB_NAME" || true
-          sudo mkdir -p /Users/hd/openclaw
-          sudo ln -sfn "$GITHUB_WORKSPACE/migrations" /Users/hd/openclaw/migrations
+      - name: Prepare test database
+        run: createdb -h "$PGHOST" -p "$PGPORT" -U "$PGUSER" "$DB_NAME" || true
 
       - name: Run tests
         run: npx vitest run
