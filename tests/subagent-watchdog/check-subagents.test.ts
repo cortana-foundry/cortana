@@ -100,7 +100,54 @@ describe("check-subagents", () => {
     expect(exitSpy).toHaveBeenCalledWith(0);
   });
 
-  it.skip("logs and alerts on a failed subagent", async () => {
-    // covered by integration runs; unit test currently flaky under mocked process.exit timing.
+  it("logs and alerts on a failed subagent", async () => {
+    const exitSpy = vi.spyOn(process, "exit").mockImplementation(((code?: number) => code as never) as never);
+    const consoleCapture = captureConsole();
+    useFixedTime("2025-01-01T00:00:00Z");
+    setArgv(["--no-emit-terminal"]);
+
+    spawnSync.mockImplementation((cmd: string, args?: string[]) => {
+      if (cmd === "/usr/bin/env") return { status: 0, stdout: "psql" } as any;
+      if (cmd === "openclaw") {
+        return {
+          status: 0,
+          stdout: JSON.stringify({
+            sessions: [
+              {
+                key: "agent:subagent:1",
+                label: "huragok",
+                status: "failed",
+                ageMs: 60000,
+                totalTokensFresh: true,
+                sessionId: "sess-1",
+                updatedAt: Date.now(),
+              },
+            ],
+          }),
+        } as any;
+      }
+      // psql calls for event logging + alert delivery
+      return { status: 0, stdout: "1" } as any;
+    });
+
+    readJsonFile.mockImplementation((filePath: string) => {
+      if (String(filePath).includes("runs.json")) return { runs: [] };
+      // heartbeat state
+      return {
+        version: 2,
+        lastChecks: {},
+        lastRemediationAt: 0,
+        subagentWatchdog: { lastRun: 0, lastLogged: {} },
+      };
+    });
+    fsMock.existsSync.mockImplementation((p: string) => String(p).includes("telegram-delivery-guard"));
+
+    await importFresh("../../tools/subagent-watchdog/check-subagents.ts");
+    // Advance fake timers so any queued setTimeout callbacks fire
+    await vi.advanceTimersByTimeAsync(100);
+    const output = consoleCapture.logs.join("\n");
+    const payload = JSON.parse(output);
+    expect(payload.summary.failedOrTimedOut).toBe(1);
+    expect(exitSpy).toHaveBeenCalledWith(0);
   });
 });
