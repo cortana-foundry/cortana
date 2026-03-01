@@ -96,6 +96,7 @@
 
 - Target bedtime: **21:00–21:30 ET**; target wake: **04:30–04:45 ET**.
 - Actual (Feb 2026 baseline): bedtime ~22:00; wake ~07:30 (stable, including weekends).
+- Nightly sleep check-in pattern is currently consistent around **21:30 ET** (observed Feb 27–28).
 - REM sleep: chronically low (~9.4%); weekend schedule drift is a major issue.
 - Recovery improved from ~40% to 85–93% range; Feb 18 had a 26% red day (HRV 83.4, RHR 57).
 - Weight: **140 lbs** (not 175); protein target 112–140g/day.
@@ -149,3 +150,10 @@
 - **Always use `sessions_spawn`** for coding work — never `exec` + Codex PTY directly. `sessions_spawn` shows up in Mission Control; raw PTY processes are invisible.
 - **OpenClaw update method**: `pnpm update -g openclaw@latest` then `bash ~/openclaw/tools/openclaw/post-update.sh`. Never use npm. Never call it Clawdbot.
 - **LanceDB**: removed. Using OpenClaw built-in memory search (OpenAI text-embedding-3-small). Do not reinstall.
+
+## Weekly Consolidation Notes (2026-03-01)
+
+- **Architecture trend confirmed**: Feb 19–26 reinforced a consistent reliability doctrine — verification gates, reconciliation, guarded self-healing, and protocol validation over "best-effort" automation.
+- **Execution trend confirmed**: Mission Control + task board + heartbeat/cron orchestration are now operating as one integrated execution plane, not separate systems.
+- **Behavioral pattern confirmed**: wake time remains stable around **07:30 ET**; sleep check-ins shifted earlier from ~22:00 toward **21:30 ET** by week end.
+- **Data-quality rule strengthened**: feedback entries should include non-empty `lesson` text; repeated empty-lesson rows reduce the value of correction clustering.
