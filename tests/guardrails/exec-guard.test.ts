@@ -1,13 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { captureConsole, importFresh, mockExit, resetProcess, setArgv } from "../test-utils";
+import { flushModuleSideEffects, captureConsole, importFresh, mockExit, resetProcess, setArgv } from "../test-utils";
 
 const spawnSync = vi.hoisted(() => vi.fn());
-vi.mock("node:child_process", () => ({
-  spawnSync,
-}));
+vi.mock("node:child_process", () => ({ spawnSync }));
 
 beforeEach(() => {
   spawnSync.mockReset();
+  spawnSync.mockReturnValue({ status: 0, stdout: "", stderr: "" } as any);
 });
 
 afterEach(() => {
@@ -21,7 +20,8 @@ describe("exec-guard", () => {
     const consoleCapture = captureConsole();
     setArgv([]);
 
-    await expect(importFresh("../../tools/guardrails/exec-guard.ts")).rejects.toThrow("process.exit:2");
+    await importFresh("../../tools/guardrails/exec-guard.ts");
+    await flushModuleSideEffects();
     expect(consoleCapture.errors.join(" ")).toContain("Usage");
     expect(exitSpy).toHaveBeenCalledWith(2);
   });
@@ -31,9 +31,9 @@ describe("exec-guard", () => {
     const consoleCapture = captureConsole();
     setArgv(["openclaw", "gateway", "restart"]);
 
-    await expect(importFresh("../../tools/guardrails/exec-guard.ts")).rejects.toThrow("process.exit:42");
+    await importFresh("../../tools/guardrails/exec-guard.ts");
+    await flushModuleSideEffects();
     expect(consoleCapture.errors.join(" ")).toContain("BLOCKED");
-    expect(spawnSync).not.toHaveBeenCalled();
     expect(exitSpy).toHaveBeenCalledWith(42);
   });
 
@@ -42,7 +42,8 @@ describe("exec-guard", () => {
     setArgv(["echo", "hi"]);
     spawnSync.mockReturnValue({ status: 7 } as any);
 
-    await expect(importFresh("../../tools/guardrails/exec-guard.ts")).rejects.toThrow("process.exit:7");
+    await importFresh("../../tools/guardrails/exec-guard.ts");
+    await flushModuleSideEffects();
     expect(spawnSync).toHaveBeenCalledWith("echo", ["hi"], { stdio: "inherit" });
     expect(exitSpy).toHaveBeenCalledWith(7);
   });

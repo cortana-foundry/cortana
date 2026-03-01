@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { captureConsole, importFresh, mockExit, resetProcess, setArgv, useFixedTime } from "../test-utils";
+import { flushModuleSideEffects, captureConsole, importFresh, mockExit, resetProcess, setArgv, useFixedTime } from "../test-utils";
 
 const fsMock = vi.hoisted(() => ({
   existsSync: vi.fn(),
@@ -39,7 +39,8 @@ describe("circuit-breaker", () => {
     setArgv(["--record", "opus", "500", "--cooldown", "0"]);
     fsMock.existsSync.mockReturnValue(false);
 
-    await expect(importFresh("../../tools/guardrails/circuit-breaker.ts")).rejects.toThrow("process.exit:0");
+    await importFresh("../../tools/guardrails/circuit-breaker.ts");
+    await flushModuleSideEffects();
     const output = JSON.parse(consoleCapture.logs.join("\n"));
     expect(output.classification).toBe("retryable");
     expect(output.circuit).toBeDefined();
@@ -62,10 +63,13 @@ describe("circuit-breaker", () => {
       },
     });
 
-    await expect(importFresh("../../tools/guardrails/circuit-breaker.ts")).rejects.toThrow("process.exit:0");
+    await importFresh("../../tools/guardrails/circuit-breaker.ts");
+    await flushModuleSideEffects();
     const payload = JSON.parse(consoleCapture.logs.join("\n"));
-    expect(payload.providers[0].name).toBe("opus");
-    expect(payload.providers[1].name).toBe("sonnet");
+    expect(payload.providers[0].name).toBe("codex");
+    expect(payload.providers[1].name).toBe("opus");
+    expect(payload.providers[2].name).toBe("sonnet");
+    expect(payload.recommendation.recommended_provider).toBe("opus");
     expect(exitSpy).toHaveBeenCalledWith(0);
   });
 
@@ -75,9 +79,10 @@ describe("circuit-breaker", () => {
     setArgv([]);
     fsMock.existsSync.mockReturnValue(false);
 
-    await expect(importFresh("../../tools/guardrails/circuit-breaker.ts")).rejects.toThrow("process.exit:0");
+    await importFresh("../../tools/guardrails/circuit-breaker.ts");
+    await flushModuleSideEffects();
     const payload = JSON.parse(consoleCapture.logs.join("\n"));
-    expect(payload.recommended_provider).toBeNull();
+    expect(payload.recommended_provider).toBe("codex");
     expect(exitSpy).toHaveBeenCalledWith(0);
   });
 });

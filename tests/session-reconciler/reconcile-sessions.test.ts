@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { importFresh, mockExit, resetProcess, setArgv } from "../test-utils";
+import { flushModuleSideEffects, importFresh, mockExit, resetProcess, setArgv } from "../test-utils";
 
 const spawnSync = vi.hoisted(() => vi.fn());
 const safeJsonParse = vi.hoisted(() => vi.fn());
@@ -33,9 +33,8 @@ describe("reconcile-sessions", () => {
     setArgv([]);
     spawnSync.mockReturnValue({ status: 0 } as any);
 
-    await expect(importFresh("../../tools/session-reconciler/reconcile-sessions.ts")).rejects.toThrow(
-      "process.exit:0"
-    );
+    await importFresh("../../tools/session-reconciler/reconcile-sessions.ts");
+    await flushModuleSideEffects();
     expect(exitSpy).toHaveBeenCalledWith(0);
   });
 
@@ -44,9 +43,8 @@ describe("reconcile-sessions", () => {
     setArgv([]);
     spawnSync.mockReturnValue({ status: 5 } as any);
 
-    await expect(importFresh("../../tools/session-reconciler/reconcile-sessions.ts")).rejects.toThrow(
-      "process.exit:5"
-    );
+    await importFresh("../../tools/session-reconciler/reconcile-sessions.ts");
+    await flushModuleSideEffects();
     expect(exitSpy).toHaveBeenCalledWith(5);
   });
 
@@ -55,9 +53,8 @@ describe("reconcile-sessions", () => {
     setArgv([]);
     spawnSync.mockReturnValue({} as any);
 
-    await expect(importFresh("../../tools/session-reconciler/reconcile-sessions.ts")).rejects.toThrow(
-      "process.exit:1"
-    );
+    await importFresh("../../tools/session-reconciler/reconcile-sessions.ts");
+    await flushModuleSideEffects();
     expect(exitSpy).toHaveBeenCalledWith(1);
   });
 });

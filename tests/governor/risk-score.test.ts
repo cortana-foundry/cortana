@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { captureConsole, importFresh, mockExit, resetProcess, setArgv } from "../test-utils";
+import { flushModuleSideEffects, captureConsole, importFresh, mockExit, resetProcess, setArgv } from "../test-utils";
 
 const runPsql = vi.hoisted(() => vi.fn());
 vi.mock("../../tools/lib/db.js", () => ({
@@ -21,7 +21,8 @@ describe("risk-score", () => {
     const consoleCapture = captureConsole();
     setArgv([]);
 
-    await expect(importFresh("../../tools/governor/risk_score.ts")).rejects.toThrow("process.exit:2");
+    await importFresh("../../tools/governor/risk_score.ts");
+    await flushModuleSideEffects();
     expect(consoleCapture.errors.join(" ")).toContain("--task-json is required");
     expect(exitSpy).toHaveBeenCalledWith(2);
   });
@@ -32,7 +33,8 @@ describe("risk-score", () => {
     const task = { id: 1, metadata: { action_type: "mystery" } };
     setArgv(["--task-json", JSON.stringify(task)]);
 
-    await expect(importFresh("../../tools/governor/risk_score.ts")).rejects.toThrow("process.exit:0");
+    await importFresh("../../tools/governor/risk_score.ts");
+    await flushModuleSideEffects();
     const payload = JSON.parse(consoleCapture.logs.join("\n"));
     expect(payload.decision).toBe("denied");
     expect(exitSpy).toHaveBeenCalledWith(0);
@@ -44,7 +46,8 @@ describe("risk-score", () => {
     const task = { id: 2, metadata: { action_type: "internal-write" } };
     setArgv(["--task-json", JSON.stringify(task)]);
 
-    await expect(importFresh("../../tools/governor/risk_score.ts")).rejects.toThrow("process.exit:0");
+    await importFresh("../../tools/governor/risk_score.ts");
+    await flushModuleSideEffects();
     const payload = JSON.parse(consoleCapture.logs.join("\n"));
     expect(payload.decision).toBe("approved");
     expect(exitSpy).toHaveBeenCalledWith(0);

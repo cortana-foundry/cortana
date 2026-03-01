@@ -151,7 +151,7 @@ if (modelLc.includes("haiku")) {
   outRate = 0.03;
 }
 
-const currentSpend = Number((((inputTokens / 1000) * inRate + (outputTokens / 1000) * outRate).toFixed(6));
+const currentSpend = Number(((inputTokens / 1000) * inRate + (outputTokens / 1000) * outRate).toFixed(6));
 const now = new Date();
 const nowDay = now.getDate();
 const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();

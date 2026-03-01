@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  flushModuleSideEffects,
   captureConsole,
   captureStdout,
   importFresh,
@@ -37,11 +38,12 @@ describe("emit-alert-intent", () => {
     const exitSpy = mockExit();
     const consoleCapture = captureConsole();
     setArgv(["heartbeat"]);
-    runPsql.mockReturnValueOnce({ status: 1, error: true });
+    runPsql
+      .mockReturnValueOnce({ status: 1, error: true })
+      .mockReturnValue({ status: 1, stderr: "psql missing" });
 
-    await expect(importFresh("../../tools/alerting/emit-alert-intent.ts")).rejects.toThrow(
-      "process.exit:1"
-    );
+    await importFresh("../../tools/alerting/emit-alert-intent.ts");
+    await flushModuleSideEffects();
     expect(consoleCapture.errors.join(" ")).toContain("psql not found");
     expect(exitSpy).toHaveBeenCalledWith(1);
   });

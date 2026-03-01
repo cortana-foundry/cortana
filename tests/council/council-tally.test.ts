@@ -1,17 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { captureConsole, importFresh, mockExit, resetProcess, setArgv } from "../test-utils";
+import { flushModuleSideEffects, captureConsole, importFresh, mockExit, resetProcess, setArgv } from "../test-utils";
 
 const spawnSync = vi.hoisted(() => vi.fn());
 
-vi.mock("child_process", () => ({
-  spawnSync,
-}));
-vi.mock("../../tools/lib/db.js", () => ({
-  withPostgresPath: (env: NodeJS.ProcessEnv) => env,
-}));
+vi.mock("child_process", () => ({ spawnSync }));
+vi.mock("../../tools/lib/db.js", () => ({ withPostgresPath: (env: NodeJS.ProcessEnv) => env }));
 
 beforeEach(() => {
   spawnSync.mockReset();
+  spawnSync.mockReturnValue({ status: 0, stdout: "", stderr: "" } as any);
 });
 
 afterEach(() => {
@@ -25,7 +22,8 @@ describe("council-tally", () => {
     const consoleCapture = captureConsole();
     setArgv([]);
 
-    await expect(importFresh("../../tools/council/council-tally.ts")).rejects.toThrow("process.exit:1");
+    await importFresh("../../tools/council/council-tally.ts");
+    await flushModuleSideEffects();
     expect(consoleCapture.logs.join(" ")).toContain("Missing --session");
     expect(exitSpy).toHaveBeenCalledWith(1);
   });
@@ -35,7 +33,8 @@ describe("council-tally", () => {
     const consoleCapture = captureConsole();
     setArgv(["--foo"]);
 
-    await expect(importFresh("../../tools/council/council-tally.ts")).rejects.toThrow("process.exit:1");
+    await importFresh("../../tools/council/council-tally.ts");
+    await flushModuleSideEffects();
     expect(consoleCapture.logs.join(" ")).toContain("Unknown arg");
     expect(exitSpy).toHaveBeenCalledWith(1);
   });
@@ -46,7 +45,8 @@ describe("council-tally", () => {
     setArgv(["--session", "123e4567-e89b-12d3-a456-426614174000"]);
     spawnSync.mockReturnValue({ status: 1, stderr: "fail" } as any);
 
-    await expect(importFresh("../../tools/council/council-tally.ts")).rejects.toThrow("process.exit:1");
+    await importFresh("../../tools/council/council-tally.ts");
+    await flushModuleSideEffects();
     expect(consoleCapture.logs.join(" ")).toContain("Failed to tally session");
     expect(exitSpy).toHaveBeenCalledWith(1);
   });

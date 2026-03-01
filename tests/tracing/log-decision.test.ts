@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { captureConsole, importFresh, mockExit, resetProcess, setArgv } from "../test-utils";
+import { flushModuleSideEffects, captureConsole, importFresh, mockExit, resetProcess, setArgv } from "../test-utils";
 
 const spawnSync = vi.hoisted(() => vi.fn());
 
@@ -26,7 +26,8 @@ describe("log-decision", () => {
     const consoleCapture = captureConsole();
     setArgv([]);
 
-    await expect(importFresh("../../tools/tracing/log_decision.ts")).rejects.toThrow("process.exit:2");
+    await importFresh("../../tools/tracing/log_decision.ts");
+    await flushModuleSideEffects();
     expect(consoleCapture.errors.join(" ")).toContain("usage: log_decision.ts");
     expect(exitSpy).toHaveBeenCalledWith(2);
   });
@@ -45,7 +46,8 @@ describe("log-decision", () => {
       "2",
     ]);
 
-    await expect(importFresh("../../tools/tracing/log_decision.ts")).rejects.toThrow("process.exit:1");
+    await importFresh("../../tools/tracing/log_decision.ts");
+    await flushModuleSideEffects();
     expect(consoleCapture.errors.join(" ")).toContain("confidence must be between 0 and 1");
     expect(exitSpy).toHaveBeenCalledWith(1);
   });
@@ -71,7 +73,8 @@ describe("log-decision", () => {
     ]);
     spawnSync.mockReturnValue({ status: 0, stdout: "", stderr: "" } as any);
 
-    await expect(importFresh("../../tools/tracing/log_decision.ts")).rejects.toThrow("process.exit:0");
+    await importFresh("../../tools/tracing/log_decision.ts");
+    await flushModuleSideEffects();
     const payload = JSON.parse(consoleCapture.logs.join("\n"));
     expect(payload.ok).toBe(true);
     expect(payload.trace_id).toBe("trace-1");

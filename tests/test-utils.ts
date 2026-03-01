@@ -1,3 +1,5 @@
+import { dirname, resolve } from "node:path";
+import { pathToFileURL } from "node:url";
 import { vi } from "vitest";
 
 const ORIGINAL_ARGV = process.argv.slice();
@@ -17,7 +19,8 @@ export function setArgv(args: string[]): void {
 
 export function mockExit(): ReturnType<typeof vi.spyOn> {
   return vi.spyOn(process, "exit").mockImplementation(((code?: number) => {
-    throw new Error(`process.exit:${code}`);
+    void code;
+    return undefined as never;
   }) as never);
 }
 
@@ -74,9 +77,26 @@ export function captureStderr() {
   };
 }
 
-export async function importFresh(path: string) {
+export async function importFresh(importPath: string) {
   vi.resetModules();
-  return import(path);
+
+  const stack = new Error().stack ?? "";
+  const callerFile = stack.match(/(\/[^\s:]+\/tests\/[^\s:]+\.test\.[cm]?[jt]s)/)?.[1];
+
+  const resolvedImport =
+    importPath.startsWith(".") && callerFile
+      ? pathToFileURL(resolve(dirname(callerFile), importPath)).href
+      : importPath;
+
+  return import(resolvedImport);
+}
+
+export async function flushModuleSideEffects(): Promise<void> {
+  await Promise.resolve();
+  if (vi.isFakeTimers()) {
+    await vi.runAllTimersAsync();
+  }
+  await Promise.resolve();
 }
 
 export function useFixedTime(iso: string): void {

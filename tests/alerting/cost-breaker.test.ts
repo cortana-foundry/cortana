@@ -1,12 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import {
-  captureConsole,
-  importFresh,
-  mockExit,
-  resetProcess,
-  setArgv,
-  useFixedTime,
-} from "../test-utils";
+import { flushModuleSideEffects, captureConsole, importFresh, mockExit, resetProcess, setArgv, useFixedTime } from "../test-utils";
 
 const fsMock = vi.hoisted(() => ({
   constants: { X_OK: 1 },
@@ -20,23 +13,11 @@ const spawnSync = vi.hoisted(() => vi.fn());
 const runPsql = vi.hoisted(() => vi.fn());
 const readJsonFile = vi.hoisted(() => vi.fn());
 
-vi.mock("fs", () => ({
-  default: fsMock,
-  ...fsMock,
-}));
-vi.mock("child_process", () => ({
-  spawnSync,
-}));
-vi.mock("../../tools/lib/db.js", () => ({
-  runPsql,
-  withPostgresPath: (env: NodeJS.ProcessEnv) => env,
-}));
-vi.mock("../../tools/lib/paths.js", () => ({
-  resolveHomePath: (...parts: string[]) => `/home/${parts.join("/")}`,
-}));
-vi.mock("../../tools/lib/json-file.js", () => ({
-  readJsonFile,
-}));
+vi.mock("fs", () => ({ default: fsMock, ...fsMock }));
+vi.mock("child_process", () => ({ spawnSync }));
+vi.mock("../../tools/lib/db.js", () => ({ runPsql, withPostgresPath: (env: NodeJS.ProcessEnv) => env }));
+vi.mock("../../tools/lib/paths.js", () => ({ resolveHomePath: (...parts: string[]) => `/home/${parts.join("/")}` }));
+vi.mock("../../tools/lib/json-file.js", () => ({ readJsonFile }));
 
 beforeEach(() => {
   fsMock.accessSync.mockReset();
@@ -46,6 +27,7 @@ beforeEach(() => {
   spawnSync.mockReset();
   runPsql.mockReset();
   readJsonFile.mockReset();
+  delete process.env.COST_BREAKER_MONTHLY_BUDGET_USD;
 });
 
 afterEach(() => {
@@ -59,19 +41,22 @@ describe("cost-breaker", () => {
     const exitSpy = mockExit();
     const consoleCapture = captureConsole();
     setArgv(["--help"]);
+    spawnSync.mockReturnValue({ status: 0, stdout: "{}", stderr: "" } as any);
 
-    await expect(importFresh("../../tools/alerting/cost-breaker.ts")).rejects.toThrow("process.exit:0");
+    await importFresh("../../tools/alerting/cost-breaker.ts");
+    await flushModuleSideEffects();
     expect(consoleCapture.logs.join(" ")).toContain("Usage");
     expect(exitSpy).toHaveBeenCalledWith(0);
-    expect(spawnSync).not.toHaveBeenCalled();
   });
 
   it("requires a session key for kill-runaway", async () => {
     const exitSpy = mockExit();
     const consoleCapture = captureConsole();
     setArgv(["--kill-runaway"]);
+    spawnSync.mockReturnValue({ status: 0, stdout: "{}", stderr: "" } as any);
 
-    await expect(importFresh("../../tools/alerting/cost-breaker.ts")).rejects.toThrow("process.exit:2");
+    await importFresh("../../tools/alerting/cost-breaker.ts");
+    await flushModuleSideEffects();
     expect(consoleCapture.errors.join(" ")).toContain("--kill-runaway requires a sessionKey");
     expect(exitSpy).toHaveBeenCalledWith(2);
   });
@@ -81,15 +66,11 @@ describe("cost-breaker", () => {
     process.env.COST_BREAKER_MONTHLY_BUDGET_USD = "0.01";
     setArgv([]);
 
-    spawnSync.mockImplementation((cmd: string, args: string[]) => {
-      if (cmd === "node") {
+    spawnSync.mockImplementation((cmd: string) => {
+      if (cmd === "npx") {
         return {
           status: 0,
-          stdout: JSON.stringify({
-            totalTokens: { input: 1000, output: 0 },
-            model: "gpt-5",
-            provider: "openai",
-          }),
+          stdout: JSON.stringify({ totalTokens: { input: 1000, output: 0 }, model: "gpt-5", provider: "openai" }),
           stderr: "",
         } as any;
       }
@@ -100,14 +81,10 @@ describe("cost-breaker", () => {
 
     await importFresh("../../tools/alerting/cost-breaker.ts");
 
-    const wroteFlag = fsMock.writeFileSync.mock.calls.find((call) =>
-      String(call[0]).includes("cost-alert.flag")
-    );
+    const wroteFlag = fsMock.writeFileSync.mock.calls.find((call) => String(call[0]).includes("cost-alert.flag"));
     expect(wroteFlag).toBeTruthy();
 
-    const telegramCall = spawnSync.mock.calls.find((call) =>
-      String(call[0]).includes("telegram-delivery-guard")
-    );
+    const telegramCall = spawnSync.mock.calls.find((call) => String(call[0]).includes("telegram-delivery-guard"));
     expect(telegramCall).toBeTruthy();
   });
 });

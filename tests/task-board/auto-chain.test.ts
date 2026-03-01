@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { importFresh, mockExit, resetProcess, setArgv } from "../test-utils";
+import { flushModuleSideEffects, importFresh, mockExit, resetProcess, setArgv } from "../test-utils";
 
 const spawnSync = vi.hoisted(() => vi.fn());
 const safeJsonParse = vi.hoisted(() => vi.fn());
@@ -33,7 +33,8 @@ describe("auto-chain", () => {
     setArgv(["evaluate", "1"]);
     spawnSync.mockReturnValue({ status: 0 } as any);
 
-    await expect(importFresh("../../tools/task-board/auto-chain.ts")).rejects.toThrow("process.exit:0");
+    await importFresh("../../tools/task-board/auto-chain.ts");
+    await flushModuleSideEffects();
     expect(exitSpy).toHaveBeenCalledWith(0);
   });
 
@@ -42,7 +43,8 @@ describe("auto-chain", () => {
     setArgv(["evaluate", "1"]);
     spawnSync.mockReturnValue({ status: 3 } as any);
 
-    await expect(importFresh("../../tools/task-board/auto-chain.ts")).rejects.toThrow("process.exit:3");
+    await importFresh("../../tools/task-board/auto-chain.ts");
+    await flushModuleSideEffects();
     expect(exitSpy).toHaveBeenCalledWith(3);
   });
 
@@ -51,7 +53,8 @@ describe("auto-chain", () => {
     setArgv(["evaluate", "1"]);
     spawnSync.mockReturnValue({} as any);
 
-    await expect(importFresh("../../tools/task-board/auto-chain.ts")).rejects.toThrow("process.exit:1");
+    await importFresh("../../tools/task-board/auto-chain.ts");
+    await flushModuleSideEffects();
     expect(exitSpy).toHaveBeenCalledWith(1);
   });
 });

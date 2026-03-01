@@ -1,12 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import {
-  captureConsole,
-  captureStderr,
-  importFresh,
-  mockExit,
-  resetProcess,
-  useFixedTime,
-} from "../test-utils";
+import { flushModuleSideEffects, captureConsole, captureStderr, importFresh, mockExit, resetProcess, useFixedTime } from "../test-utils";
 
 const fileStore = new Map<string, string>();
 const dirStore = new Set<string>();
@@ -22,6 +15,7 @@ const fsMock = vi.hoisted(() => ({
   readdirSync: vi.fn(),
   rmSync: vi.fn(),
   accessSync: vi.fn(),
+  mkdtempSync: vi.fn(),
 }));
 
 const execSync = vi.hoisted(() => vi.fn());
@@ -55,6 +49,7 @@ beforeEach(() => {
   fsMock.readdirSync.mockReset();
   fsMock.rmSync.mockReset();
   fsMock.accessSync.mockReset();
+  fsMock.mkdtempSync.mockReset();
   execSync.mockReset();
   runPsql.mockReset();
 
@@ -86,6 +81,7 @@ beforeEach(() => {
     fileStore.delete(p);
     dirStore.delete(p);
   });
+  fsMock.mkdtempSync.mockReturnValue("/tmp/compact-memory-test");
 });
 
 afterEach(() => {
@@ -98,7 +94,8 @@ describe("compact-memory", () => {
   it("exits when MEMORY.md is missing", async () => {
     const exitSpy = mockExit();
     const stderr = captureStderr();
-    await expect(importFresh("../../tools/memory/compact-memory.ts")).rejects.toThrow("process.exit:1");
+    await importFresh("../../tools/memory/compact-memory.ts");
+    await flushModuleSideEffects();
     expect(stderr.writes.join(" ")).toContain("MEMORY.md not found");
     expect(exitSpy).toHaveBeenCalledWith(1);
     stderr.restore();
@@ -116,14 +113,17 @@ describe("compact-memory", () => {
       throw new Error("no psql");
     });
 
+    const exitSpy = mockExit();
     const consoleCapture = captureConsole();
     await importFresh("../../tools/memory/compact-memory.ts");
+    await flushModuleSideEffects();
 
     const archivedPath = "/repo/memory/archive/2024/01/2024-01-01.md";
     expect(fileStore.has(archivedPath)).toBe(true);
     const reportWritten = [...fileStore.keys()].some((p) => p.includes("reports/memory-compaction/compaction-"));
     expect(reportWritten).toBe(true);
     expect(consoleCapture.logs.join(" ")).toContain("Memory compaction complete");
+    expect(exitSpy).toHaveBeenCalledWith(0);
   });
 
   it("skips psql logging when psql is not executable", async () => {
@@ -137,7 +137,10 @@ describe("compact-memory", () => {
       throw new Error("no psql");
     });
 
+    const exitSpy = mockExit();
     await importFresh("../../tools/memory/compact-memory.ts");
+    await flushModuleSideEffects();
     expect(runPsql).not.toHaveBeenCalled();
+    expect(exitSpy).toHaveBeenCalledWith(0);
   });
 });

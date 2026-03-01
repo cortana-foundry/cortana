@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { captureConsole, importFresh, mockExit, resetProcess, setArgv } from "../test-utils";
+import { flushModuleSideEffects, captureConsole, importFresh, mockExit, resetProcess, setArgv } from "../test-utils";
 
 const readJsonFile = vi.hoisted(() => vi.fn());
 vi.mock("../../tools/lib/json-file.js", () => ({
@@ -21,7 +21,8 @@ describe("approval-gate", () => {
     const consoleCapture = captureConsole();
     setArgv(["--action", "do-stuff"]);
 
-    await expect(importFresh("../../tools/guardrails/approval-gate.ts")).rejects.toThrow("process.exit:2");
+    await importFresh("../../tools/guardrails/approval-gate.ts");
+    await flushModuleSideEffects();
     expect(consoleCapture.errors.join(" ")).toContain("--action and --risk are required");
     expect(exitSpy).toHaveBeenCalledWith(2);
   });
@@ -33,7 +34,8 @@ describe("approval-gate", () => {
     vi.stubGlobal("fetch", fetchSpy as any);
     setArgv(["--action", "local build", "--risk", "low"]);
 
-    await expect(importFresh("../../tools/guardrails/approval-gate.ts")).rejects.toThrow("process.exit:0");
+    await importFresh("../../tools/guardrails/approval-gate.ts");
+    await flushModuleSideEffects();
     expect(consoleCapture.logs.join(" ")).toContain("APPROVED");
     expect(fetchSpy).not.toHaveBeenCalled();
     expect(exitSpy).toHaveBeenCalledWith(0);
@@ -51,7 +53,8 @@ describe("approval-gate", () => {
 
     setArgv(["--action", "send email", "--risk", "high"]);
 
-    await expect(importFresh("../../tools/guardrails/approval-gate.ts")).rejects.toThrow("process.exit:1");
+    await importFresh("../../tools/guardrails/approval-gate.ts");
+    await flushModuleSideEffects();
     expect(consoleCapture.logs.join(" ")).toContain("DENIED (no_chat_id)");
     expect(exitSpy).toHaveBeenCalledWith(1);
   });

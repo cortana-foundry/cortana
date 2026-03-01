@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { captureConsole, importFresh, mockExit, resetProcess, setArgv } from "../test-utils";
+import { flushModuleSideEffects, captureConsole, importFresh, mockExit, resetProcess, setArgv } from "../test-utils";
 
 const fsMock = vi.hoisted(() => ({
   constants: { X_OK: 1 },
@@ -53,7 +53,8 @@ describe("cron-preflight", () => {
     const consoleCapture = captureConsole();
     setArgv([]);
 
-    await expect(importFresh("../../tools/alerting/cron-preflight.ts")).rejects.toThrow("process.exit:2");
+    await importFresh("../../tools/alerting/cron-preflight.ts");
+    await flushModuleSideEffects();
     expect(consoleCapture.logs.join(" ")).toContain("usage");
     expect(exitSpy).toHaveBeenCalledWith(2);
   });
@@ -64,7 +65,8 @@ describe("cron-preflight", () => {
     runPsql.mockReturnValue({ status: 0 });
     fsMock.existsSync.mockReturnValue(false);
 
-    await expect(importFresh("../../tools/alerting/cron-preflight.ts")).rejects.toThrow("process.exit:1");
+    await importFresh("../../tools/alerting/cron-preflight.ts");
+    await flushModuleSideEffects();
     expect(fsMock.writeFileSync).toHaveBeenCalled();
     expect(exitSpy).toHaveBeenCalledWith(1);
   });

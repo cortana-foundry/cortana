@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { captureConsole, importFresh, mockExit, resetProcess, setArgv } from "../test-utils";
+import { flushModuleSideEffects, captureConsole, importFresh, mockExit, resetProcess, setArgv } from "../test-utils";
 
 vi.mock("../../tools/lib/paths.js", () => ({
   resolveRepoPath: () => "/repo",
@@ -16,9 +16,8 @@ describe("validate-memory-boundary", () => {
     const consoleCapture = captureConsole();
     setArgv(["agent1"]);
 
-    await expect(importFresh("../../tools/covenant/validate_memory_boundary.ts")).rejects.toThrow(
-      "process.exit:2"
-    );
+    await importFresh("../../tools/covenant/validate_memory_boundary.ts");
+    await flushModuleSideEffects();
     expect(consoleCapture.errors.join(" ")).toContain("Usage");
     expect(exitSpy).toHaveBeenCalledWith(2);
   });
@@ -28,9 +27,8 @@ describe("validate-memory-boundary", () => {
     const consoleCapture = captureConsole();
     setArgv(["agent1", "/outside/file.txt"]);
 
-    await expect(importFresh("../../tools/covenant/validate_memory_boundary.ts")).rejects.toThrow(
-      "process.exit:1"
-    );
+    await importFresh("../../tools/covenant/validate_memory_boundary.ts");
+    await flushModuleSideEffects();
     expect(consoleCapture.errors.join(" ")).toContain("MEMORY_BOUNDARY_VIOLATION");
     expect(exitSpy).toHaveBeenCalledWith(1);
   });

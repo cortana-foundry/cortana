@@ -1,12 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import {
-  captureConsole,
-  importFresh,
-  mockExit,
-  resetProcess,
-  setArgv,
-  useFixedTime,
-} from "../test-utils";
+import { flushModuleSideEffects, captureConsole, importFresh, mockExit, resetProcess, setArgv, useFixedTime } from "../test-utils";
 
 const fsMock = vi.hoisted(() => ({
   constants: { X_OK: 1 },
@@ -51,7 +44,8 @@ describe("check-cron-delivery", () => {
     setArgv([]);
     readJsonFile.mockReturnValue({ jobs: [] });
 
-    await expect(importFresh("../../tools/alerting/check-cron-delivery.ts")).rejects.toThrow("process.exit:0");
+    await importFresh("../../tools/alerting/check-cron-delivery.ts");
+    await flushModuleSideEffects();
     expect(exitSpy).toHaveBeenCalledWith(0);
   });
 
@@ -75,7 +69,8 @@ describe("check-cron-delivery", () => {
       throw new Error("missing");
     });
 
-    await expect(importFresh("../../tools/alerting/check-cron-delivery.ts")).rejects.toThrow("process.exit:1");
+    await importFresh("../../tools/alerting/check-cron-delivery.ts");
+    await flushModuleSideEffects();
     expect(spawnSync).not.toHaveBeenCalled();
     expect(consoleCapture.logs.join(" ")).toContain("daily");
     expect(exitSpy).toHaveBeenCalledWith(1);
@@ -98,7 +93,8 @@ describe("check-cron-delivery", () => {
     fsMock.accessSync.mockImplementation(() => undefined);
     spawnSync.mockReturnValue({ status: 0, stdout: "", stderr: "" } as any);
 
-    await expect(importFresh("../../tools/alerting/check-cron-delivery.ts")).rejects.toThrow("process.exit:1");
+    await importFresh("../../tools/alerting/check-cron-delivery.ts");
+    await flushModuleSideEffects();
     expect(spawnSync).toHaveBeenCalled();
     expect(exitSpy).toHaveBeenCalledWith(1);
   });

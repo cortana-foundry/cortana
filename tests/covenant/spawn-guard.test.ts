@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { captureConsole, importFresh, mockExit, resetProcess, setArgv, useFixedTime } from "../test-utils";
+import { flushModuleSideEffects, captureConsole, importFresh, mockExit, resetProcess, setArgv, useFixedTime } from "../test-utils";
 
 const fileStore = new Map<string, string>();
 const dirStore = new Set<string>();
@@ -64,7 +64,8 @@ describe("spawn-guard", () => {
     useFixedTime("2025-01-01T00:00:00Z");
     setArgv(["claim", "--label", "Test Label", "--run-id", "run-1"]);
 
-    await expect(importFresh("../../tools/covenant/spawn_guard.ts")).rejects.toThrow("process.exit:0");
+    await importFresh("../../tools/covenant/spawn_guard.ts");
+    await flushModuleSideEffects();
     const payload = JSON.parse(consoleCapture.logs.join("\n"));
     expect(payload.action).toBe("claimed");
     expect(exitSpy).toHaveBeenCalledWith(0);
@@ -91,7 +92,8 @@ describe("spawn-guard", () => {
 
     setArgv(["claim", "--label", "My Label", "--run-id", "run-B"]);
 
-    await expect(importFresh("../../tools/covenant/spawn_guard.ts")).rejects.toThrow("process.exit:0");
+    await importFresh("../../tools/covenant/spawn_guard.ts");
+    await flushModuleSideEffects();
     const payload = JSON.parse(consoleCapture.logs.join("\n"));
     expect(payload.action).toBe("deduped");
     expect(exitSpy).toHaveBeenCalledWith(0);
@@ -118,7 +120,8 @@ describe("spawn-guard", () => {
 
     setArgv(["release", "--label", "test", "--run-id", "run-B"]);
 
-    await expect(importFresh("../../tools/covenant/spawn_guard.ts")).rejects.toThrow("process.exit:0");
+    await importFresh("../../tools/covenant/spawn_guard.ts");
+    await flushModuleSideEffects();
     const payload = JSON.parse(consoleCapture.logs.join("\n"));
     expect(payload.action).toBe("noop");
     expect(payload.reason).toBe("run_id_mismatch");

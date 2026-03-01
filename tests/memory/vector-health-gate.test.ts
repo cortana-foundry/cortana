@@ -1,30 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import {
-  captureConsole,
-  importFresh,
-  resetProcess,
-  setArgv,
-  useFixedTime,
-} from "../test-utils";
+import { captureConsole, importFresh, resetProcess, setArgv, useFixedTime } from "../test-utils";
 
 const spawnSync = vi.hoisted(() => vi.fn());
 const readJsonFile = vi.hoisted(() => vi.fn());
 const writeJsonFileAtomic = vi.hoisted(() => vi.fn());
 const query = vi.hoisted(() => vi.fn());
 
-vi.mock("child_process", () => ({
-  spawnSync,
-}));
-vi.mock("../../tools/lib/paths.js", () => ({
-  resolveRepoPath: () => "/repo",
-}));
-vi.mock("../../tools/lib/json-file.js", () => ({
-  readJsonFile,
-  writeJsonFileAtomic,
-}));
-vi.mock("../../tools/lib/db.js", () => ({
-  query,
-}));
+vi.mock("child_process", () => ({ spawnSync }));
+vi.mock("../../tools/lib/paths.js", () => ({ resolveRepoPath: () => "/repo" }));
+vi.mock("../../tools/lib/json-file.js", () => ({ readJsonFile, writeJsonFileAtomic }));
+vi.mock("../../tools/lib/db.js", () => ({ query }));
 
 beforeEach(() => {
   spawnSync.mockReset();
@@ -44,7 +29,8 @@ describe("vector-health-gate", () => {
     const consoleCapture = captureConsole();
     setArgv(["--help"]);
 
-    await importFresh("../../tools/memory/vector-health-gate.ts");
+    const mod = await importFresh("../../tools/memory/vector-health-gate.ts");
+    expect(mod.runCli()).toBe(0);
     expect(consoleCapture.logs.join(" ")).toContain("usage: vector-health-gate.ts");
     expect(spawnSync).not.toHaveBeenCalled();
   });
@@ -55,12 +41,9 @@ describe("vector-health-gate", () => {
     readJsonFile.mockReturnValue({});
     query.mockReturnValue("0");
 
-    spawnSync.mockImplementation((cmd: string, args: string[]) => {
+    spawnSync.mockImplementation((_cmd: string, args: string[]) => {
       if (args[0] === "memory" && args[1] === "status") {
         return { status: 0, stdout: JSON.stringify([{ status: { files: 2, chunks: 0, provider: "x", model: "y" } }]) } as any;
-      }
-      if (args[0] === "memory" && args[1] === "search") {
-        return { status: 0, stdout: "ok", stderr: "" } as any;
       }
       if (args[0] === "memory" && args[1] === "index") {
         return { status: 0, stdout: "reindexed", stderr: "" } as any;
@@ -69,7 +52,8 @@ describe("vector-health-gate", () => {
     });
 
     const consoleCapture = captureConsole();
-    await importFresh("../../tools/memory/vector-health-gate.ts");
+    const mod = await importFresh("../../tools/memory/vector-health-gate.ts");
+    expect(mod.runCli()).toBe(0);
 
     const payload = JSON.parse(consoleCapture.logs.join("\n"));
     expect(payload.reindex_attempted).toBe(true);
@@ -84,7 +68,7 @@ describe("vector-health-gate", () => {
     readJsonFile.mockReturnValue({ consecutive_embedding_429: 2, fallback_mode: false, reindex_queued: false });
     query.mockReturnValue("0");
 
-    spawnSync.mockImplementation((cmd: string, args: string[]) => {
+    spawnSync.mockImplementation((_cmd: string, args: string[]) => {
       if (args[0] === "memory" && args[1] === "status") {
         return { status: 0, stdout: JSON.stringify([{ status: { files: 1, chunks: 5, provider: "x", model: "y" } }]) } as any;
       }
@@ -95,7 +79,8 @@ describe("vector-health-gate", () => {
     });
 
     const consoleCapture = captureConsole();
-    await importFresh("../../tools/memory/vector-health-gate.ts");
+    const mod = await importFresh("../../tools/memory/vector-health-gate.ts");
+    expect(mod.runCli()).toBe(0);
 
     const payload = JSON.parse(consoleCapture.logs.join("\n"));
     expect(payload.fallback_mode).toBe(true);
