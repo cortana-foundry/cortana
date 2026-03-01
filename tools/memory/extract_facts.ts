@@ -9,7 +9,7 @@ const WORKSPACE = resolveRepoPath();
 const PSQL_BIN = "/opt/homebrew/opt/postgresql@17/bin/psql";
 const DB_NAME = "cortana";
 const PROMPT_FILE = path.join(WORKSPACE, "tools", "memory", "prompts", "fact_extraction.txt");
-const EMBED_SCRIPT = path.join(WORKSPACE, "tools", "embeddings", "embed.py");
+const EMBED_SCRIPT = path.join(WORKSPACE, "tools", "embeddings", "embed.ts");
 const EMBED_BIN = path.join(WORKSPACE, "tools", "embeddings", "embed");
 const SESSIONS_GLOB = path.join("~", ".openclaw", "agents", "main", "sessions", "*.jsonl");
 
@@ -158,7 +158,7 @@ function readInput(inputPath: string): [string, string] {
 function embed(text: string): number[] {
   const cmd = fs.existsSync(EMBED_BIN)
     ? [EMBED_BIN, "embed", "--text", text]
-    : ["python3", EMBED_SCRIPT, "embed", "--text", text];
+    : ["npx", "tsx", EMBED_SCRIPT, "embed", "--text", text];
   const proc = sh(cmd, 120000);
   if (proc.status !== 0) {
     throw new Error((proc.stderr || "").trim() || (proc.stdout || "").trim() || "embedding failed");

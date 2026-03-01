@@ -186,7 +186,7 @@ function demo(): number {
 }
 
 function usageError(): never {
-  console.error("usage: spawn_guard.py claim|release|demo");
+  console.error("usage: spawn_guard.ts claim|release|demo");
   process.exit(2);
 }
 

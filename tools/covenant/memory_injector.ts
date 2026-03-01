@@ -344,7 +344,7 @@ function inject(agentRole: string, limit = 5, maxChars = 2000, sinceHours = 168)
 }
 
 function usageError(): never {
-  console.error("usage: memory_injector.py inject <agent_role> [--limit N] [--max-chars N] [--since-hours N]");
+  console.error("usage: memory_injector.ts inject <agent_role> [--limit N] [--max-chars N] [--since-hours N]");
   process.exit(2);
 }
 

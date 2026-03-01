@@ -10,7 +10,7 @@ import { resolveRepoPath } from "../lib/paths.js";
 
 const WORKSPACE_ROOT = resolveRepoPath();
 const REGISTRY_PATH = path.join(WORKSPACE_ROOT, "agents", "identities", "registry.json");
-const HANDSHAKE_VALIDATOR = path.join(WORKSPACE_ROOT, "tools", "covenant", "validate_spawn_handshake.py");
+const HANDSHAKE_VALIDATOR = path.join(WORKSPACE_ROOT, "tools", "covenant", "validate_spawn_handshake.ts");
 const FEEDBACK_COMPILER = path.join(WORKSPACE_ROOT, "tools", "covenant", "feedback_compiler.ts");
 const MEMORY_INJECTOR = path.join(WORKSPACE_ROOT, "tools", "covenant", "memory_injector.ts");
 
@@ -274,8 +274,8 @@ Emit status/completion JSON lines exactly once each (single-line JSON object per
 
 The lines above are parsed by tooling and must be valid JSON. Do not wrap in markdown.
 Use:
-- \`python3 /Users/hd/openclaw/tools/covenant/validate_agent_protocol.py --type status <status.json>\`
-- \`python3 /Users/hd/openclaw/tools/covenant/validate_agent_protocol.py --type completion <completion.json>\`
+- \`npx tsx /Users/hd/openclaw/tools/covenant/validate_agent_protocol.ts --type status <status.json>\`
+- \`npx tsx /Users/hd/openclaw/tools/covenant/validate_agent_protocol.ts --type completion <completion.json>\`
 for pre-flight checks when needed.
 
 If requirements are ambiguous or conflict with contract boundaries, stop and escalate.
@@ -308,7 +308,7 @@ async function main(): Promise<void> {
   }
   const payload = payloadRaw as HandshakePayload;
 
-  const result = spawnSync("python3", [HANDSHAKE_VALIDATOR, payloadPath], { encoding: "utf8" });
+  const result = spawnSync("npx", ["tsx", HANDSHAKE_VALIDATOR, payloadPath], { encoding: "utf8" });
   if (result.status !== 0) {
     const err = (result.stderr || result.stdout || "").toString().trim();
     fail(`handshake validation failed: ${err}`);

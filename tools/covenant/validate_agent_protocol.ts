@@ -197,8 +197,8 @@ async function main(): Promise<void> {
 
   if (!!extract === !!type) {
     console.error(
-      "Usage: validate_agent_protocol.py --type <status|completion> <payload.json>\n" +
-        "   or: validate_agent_protocol.py --extract <agent-output.txt>"
+      "Usage: validate_agent_protocol.ts --type <status|completion> <payload.json>\n" +
+        "   or: validate_agent_protocol.ts --extract <agent-output.txt>"
     );
     process.exit(2);
   }

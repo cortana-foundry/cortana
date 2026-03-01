@@ -326,7 +326,7 @@ ORDER BY delta DESC;
 }
 
 function usageError(): never {
-  console.error("usage: quality_scorecard.py score <task_id> | report [--period 7d] | trends [--period 7d]");
+  console.error("usage: quality_scorecard.ts score <task_id> | report [--period 7d] | trends [--period 7d]");
   process.exit(2);
 }
 

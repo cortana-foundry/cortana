@@ -175,7 +175,7 @@ function maybeAutoRouteIdentity(payload: Json, autoRoute: boolean): [Json, strin
 }
 
 function usageError(): never {
-  console.error("usage: prepare_spawn.py <handshake-or-legacy.json> [--output-dir <dir>] [--legacy-shim] [--auto-route]");
+  console.error("usage: prepare_spawn.ts <handshake-or-legacy.json> [--output-dir <dir>] [--legacy-shim] [--auto-route]");
   process.exit(2);
 }
 

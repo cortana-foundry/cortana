@@ -22,7 +22,7 @@ function inDir(target: string, parent: string): boolean {
 async function main(): Promise<void> {
   const args = process.argv.slice(2);
   if (args.length !== 2) {
-    console.error("Usage: validate_memory_boundary.py <agent_identity_id> <target_path>");
+    console.error("Usage: validate_memory_boundary.ts <agent_identity_id> <target_path>");
     process.exit(2);
   }
 

@@ -184,7 +184,7 @@ function validate(payload: Record<string, any>): void {
 async function main(): Promise<void> {
   const args = process.argv.slice(2);
   if (args.length !== 1) {
-    console.error("Usage: validate_spawn_handshake.py <payload.json>");
+    console.error("Usage: validate_spawn_handshake.ts <payload.json>");
     process.exit(2);
   }
 

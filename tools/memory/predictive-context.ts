@@ -89,8 +89,8 @@ async function main(): Promise<number> {
     return 1;
   }
 
-  const scriptPath = resolveRepoPath("tools/memory/safe-memory-search.py");
-  const searchRes = spawnSync("python3", [scriptPath, query, "--json", "--max-results", String(maxResults)], {
+  const scriptPath = resolveRepoPath("tools/memory/safe-memory-search.ts");
+  const searchRes = spawnSync("npx", ["tsx", scriptPath, query, "--json", "--max-results", String(maxResults)], {
     encoding: "utf8",
     stdio: ["ignore", "pipe", "pipe"],
   });
