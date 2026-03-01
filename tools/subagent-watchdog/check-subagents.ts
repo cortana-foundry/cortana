@@ -4,7 +4,13 @@ import fs from "fs";
 import path from "path";
 import os from "os";
 import { spawnSync } from "child_process";
-import { readJsonFile, writeJsonFileAtomic } from "../lib/json-file.js";
+import { readJsonFile, rotateBackupRing, withFileLock, writeJsonFileAtomic } from "../lib/json-file.js";
+import {
+  defaultHeartbeatState,
+  hashHeartbeatState,
+  HEARTBEAT_MAX_AGE_MS,
+  validateHeartbeatState,
+} from "../lib/heartbeat-schema.js";
 
 const FAIL_STATUSES = new Set(["failed", "error", "aborted", "timeout", "timed_out", "cancelled"]);
 const TELEGRAM_GUARD = "/Users/hd/openclaw/tools/notifications/telegram-delivery-guard.sh";
@@ -29,37 +35,26 @@ function loadJson(filePath: string, fallback: any): any {
   return parsed ?? fallback;
 }
 
-function normalizeHeartbeatState(data: any): Record<string, any> {
-  const base = {
-    version: 2,
-    lastChecks: {},
-    lastRemediationAt: 0,
-    subagentWatchdog: { lastRun: 0, lastLogged: {} },
-  };
-  if (!data || typeof data !== "object") return base;
+function loadHeartbeatStateStrict(filePath: string, now = Date.now()) {
+  const fallback = defaultHeartbeatState(now);
+  if (!fs.existsSync(filePath)) return fallback;
 
-  const out: Record<string, any> = { ...base };
-  out.version = Number(data.version ?? base.version);
-  if (data.lastChecks && typeof data.lastChecks === "object") out.lastChecks = data.lastChecks;
-  if (data.subagentWatchdog && typeof data.subagentWatchdog === "object") {
-    out.subagentWatchdog = {
-      lastRun: Number(data.subagentWatchdog.lastRun ?? 0),
-      lastLogged:
-        data.subagentWatchdog.lastLogged && typeof data.subagentWatchdog.lastLogged === "object"
-          ? data.subagentWatchdog.lastLogged
-          : {},
-    };
+  const parsed = readJsonFile<any>(filePath);
+  try {
+    return validateHeartbeatState(parsed, now, HEARTBEAT_MAX_AGE_MS);
+  } catch {
+    for (const i of [1, 2, 3] as const) {
+      const candidate = `${filePath}.bak.${i}`;
+      if (!fs.existsSync(candidate)) continue;
+      const backupParsed = readJsonFile<any>(candidate);
+      try {
+        return validateHeartbeatState(backupParsed, now, HEARTBEAT_MAX_AGE_MS);
+      } catch {
+        // try next backup
+      }
+    }
+    return fallback;
   }
-  return out;
-}
-
-function saveJsonWithBackup(filePath: string, data: any): void {
-  fs.mkdirSync(path.dirname(filePath), { recursive: true });
-  const backup = `${filePath}.bak`;
-  if (fs.existsSync(filePath)) {
-    fs.copyFileSync(filePath, backup);
-  }
-  writeJsonFileAtomic(filePath, data, 2);
 }
 
 function terminalStatusFromReason(item: Record<string, any>): string {
@@ -167,6 +162,16 @@ function failureReasons(session: Record<string, any>, maxRuntimeMs: number): Arr
 
 function sqlQuote(value: string | null): string {
   return (value || "").replace(/'/g, "''");
+}
+
+function logHeartbeatWrite(psqlBin: string, oldHash: string | null, newHash: string): void {
+  const metaSql = JSON.stringify({ old_hash: oldHash, new_hash: newHash }).replace(/'/g, "''");
+  const sql =
+    "INSERT INTO cortana_events (event_type, source, severity, message, metadata) VALUES (" +
+    "'heartbeat_state_write','subagent-watchdog','info','Heartbeat state updated by subagent watchdog','" +
+    metaSql +
+    "'::jsonb);";
+  spawnSync(psqlBin, [DB_NAME, "-c", sql], { encoding: "utf8" });
 }
 
 function findTaskIdForSession(psqlBin: string, sessionKey: string, label: string | null, runId: string | null):
@@ -359,7 +364,14 @@ async function main(): Promise<void> {
   const now = nowMs();
   const psqlBin = resolvePsql();
   const statePath = args.stateFile;
-  const state = normalizeHeartbeatState(loadJson(statePath, {}));
+  let state;
+  try {
+    state = withFileLock(statePath, 5000, () => loadHeartbeatStateStrict(statePath, now));
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error(`[subagent-watchdog] lock/read failed: ${msg}`);
+    process.exit(1);
+  }
   const watchdogState = state.subagentWatchdog ?? {};
   const lastLogged: Record<string, number> =
     watchdogState.lastLogged && typeof watchdogState.lastLogged === "object" ? watchdogState.lastLogged : {};
@@ -513,10 +525,23 @@ async function main(): Promise<void> {
     output.failedAgents.push(item);
   }
 
-  state.subagentWatchdog = state.subagentWatchdog ?? {};
-  state.subagentWatchdog.lastRun = now;
-  state.subagentWatchdog.lastLogged = prunedLastLogged;
-  saveJsonWithBackup(statePath, state);
+  try {
+    withFileLock(statePath, 5000, () => {
+      const current = loadHeartbeatStateStrict(statePath, now);
+      const oldHash = hashHeartbeatState(current);
+      current.subagentWatchdog = current.subagentWatchdog ?? { lastRun: now, lastLogged: {} };
+      current.subagentWatchdog.lastRun = now;
+      current.subagentWatchdog.lastLogged = prunedLastLogged;
+      validateHeartbeatState(current, now, HEARTBEAT_MAX_AGE_MS);
+      rotateBackupRing(statePath, 3);
+      writeJsonFileAtomic(statePath, current, 2);
+      logHeartbeatWrite(psqlBin, oldHash, hashHeartbeatState(current));
+    });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error(`[subagent-watchdog] lock/write failed: ${msg}`);
+    process.exit(1);
+  }
 
   const [syncOk, syncErr] = runCompletionSync();
   output.taskBoardSync = { ok: Boolean(syncOk), error: syncErr };

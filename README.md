@@ -304,6 +304,7 @@ Heartbeat rules live in `HEARTBEAT.md` and related docs/scripts:
   - Market/news: stock market open/close, CANSLIM scans, earnings
   - Memory consolidation, reflection, and learning
   - Cron health, tool health, budget, and proprioception
+  - SAE Cross-Domain Reasoner re-enabled as a scheduled layer 15 minutes after World State Builder (7:15am, 1:15pm, 9:15pm ET) to connect sleep/work/markets into actionable insights
 - Quiet‑hours aware; only pings when signal clears thresholds
 
 ### 4.2 Task board (PostgreSQL‑backed)
@@ -482,6 +483,7 @@ Rules:
 
 Representative highlights that are already live:
 
+- **[Mar 2026] Cron audit & optimization** – re-enabled SAE Cross-Domain Reasoner + Fitness Morning Brief, disabled redundant/low-ROI jobs, rescheduled bedtime/mission checks earlier in the evening, and relaxed newsletter/immune scan cadence.
 - **[Feb 2026] Task board hygiene enforcement** – mandatory heartbeat sweep for ghost/stale tasks (zero tolerance for dashboard ghosts; see `HEARTBEAT.md`).
 - **[Feb 2026] Task lifecycle ledger hardening** – status enum freeze + run lifecycle ledger migrations (`migrations/001-freeze-status-enum.sql`, `migrations/002-run-lifecycle-ledger.sql`) plus normalized run event emission (`tools/task-board/emit-run-event.sh`).
 - **[Feb 2026] Fitness Service Hybrid Migration epic completed** – Mission Control fitness dashboard + alerting, backed by typed client packages.
@@ -537,4 +539,4 @@ This repo is a **personal Cortana setup for one human on one machine**. It assum
 
 It is **not** a generic framework or turnkey product. You can read it for ideas, but expect to adapt heavily if you try to replicate it elsewhere.
 
-Last refreshed: **2026-02-27**
+Last refreshed: **2026-03-01**
