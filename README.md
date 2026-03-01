@@ -542,3 +542,4 @@ This repo is a **personal Cortana setup for one human on one machine**. It assum
 It is **not** a generic framework or turnkey product. You can read it for ideas, but expect to adapt heavily if you try to replicate it elsewhere.
 
 Last refreshed: **2026-03-01**
+
