@@ -10,6 +10,29 @@ jobs:
   test:
     runs-on: ubuntu-latest
 
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      PGHOST: localhost
+      PGPORT: 5432
+      PGUSER: postgres
+      PGPASSWORD: postgres
+      DB_NAME: cortana
+      PSQL_BIN: psql
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -22,6 +45,15 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Install PostgreSQL client
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+
+      - name: Prepare test database and migration path
+        run: |
+          createdb -h "$PGHOST" -p "$PGPORT" -U "$PGUSER" "$DB_NAME" || true
+          sudo mkdir -p /Users/hd/openclaw
+          sudo ln -sfn "$GITHUB_WORKSPACE/migrations" /Users/hd/openclaw/migrations
 
       - name: Run tests
         run: npx vitest run
