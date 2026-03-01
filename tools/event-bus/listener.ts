@@ -38,7 +38,7 @@ function parseArgs(argv: string[]): Args {
     pollSeconds: 1.0,
     fromId: null,
     fromBeginning: false,
-    logFile: path.join(os.homedir(), "clawd", "tmp", "event-bus-listener.log"),
+    logFile: path.join(os.homedir(), "openclaw", "tmp", "event-bus-listener.log"),
     markDelivered: false,
   };
 

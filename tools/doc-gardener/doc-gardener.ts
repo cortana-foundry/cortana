@@ -3,7 +3,7 @@ import { spawnSync } from "child_process";
 
 const script = String.raw`# Doc Gardener
 #
-# Weekly documentation hygiene sweep for the clawd repo.
+# Weekly documentation hygiene sweep for the openclaw repo.
 # Intended to be run by a Librarian-style agent or manually.
 #
 # Responsibilities:
@@ -81,8 +81,8 @@ expand_path() {
     ./*)
       printf '%s\n' "$REPO_ROOT/\${raw#./}"
       ;;
-    */clawd/*)
-      # Already absolute or includes clawd path
+    */openclaw/*)
+      # Already absolute or includes openclaw path
       printf '%s\n' "$raw"
       ;;
     tools/*|docs/*|skills/*)
@@ -233,7 +233,7 @@ scan_tools() {
   echo
   echo "Paths that appear to be missing on disk:"  
 
-  # Grep for backticked paths and anything containing /clawd/
+  # Grep for backticked paths and anything containing /openclaw/
   awk '
     {
       match($0, /\`([^\`]+)\`/, m)
@@ -244,7 +244,7 @@ scan_tools() {
   ' "$TOOLS_FILE" |
   while read -r lineno rawpath; do
     fullpath=$(expand_path "$rawpath")
-    if [[ "$fullpath" == *"clawd"* ]]; then
+    if [[ "$fullpath" == *"openclaw"* ]]; then
       if [[ ! -e "$fullpath" ]]; then
         printf "  line %s: %s (expanded: %s)\n" "$lineno" "$rawpath" "$fullpath"
       fi
@@ -316,7 +316,7 @@ apply_auto_fixes() {
         while (match(line, /\`([^\`]+)\`/, m)) {
           raw=m[1]
           full=expand_path(raw)
-          if (full ~ /clawd/ && system("[ -e "full" ]") != 0) {
+          if (full ~ /openclaw/ && system("[ -e "full" ]") != 0) {
             # Broken path candidate
             if (index(line, "BROKEN?") == 0) {
               sub("\`"raw"\`", "\`"raw"\` (BROKEN? doc-gardener "strftime("%Y-%m-%d")")", line)

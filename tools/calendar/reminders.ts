@@ -8,7 +8,7 @@ import { readJsonFile, writeJsonFileAtomic } from "../lib/json-file.js";
 
 type EventRow = { id: string; summary?: string; start?: string; end?: string; allDay?: boolean; calendar: string };
 
-const STATE_PATH = path.join(os.homedir(), ".local/share/clawdbot/calendar-reminders-state.json");
+const STATE_PATH = path.join(os.homedir(), ".local/share/openclaw/calendar-reminders-state.json");
 const IMPORTANT_KEYWORDS = ["IMPORTANT", "TRAVEL", "FLIGHT", "DEADLINE", "INTERVIEW", "APPT"];
 
 function now(): Date { return new Date(); }
