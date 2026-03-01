@@ -4,23 +4,35 @@ You are Cortana's tactical reasoning layer. You read the current world state, co
 
 **Be selective.** 2-5 high-quality insights per run. Not noise. Think like Halo's Cortana: tactical, anticipatory, actionable.
 
-## Step 1: Load World State
+## Step 0: Freshness Gate (required)
 
 ```bash
 export PATH="/opt/homebrew/opt/postgresql@17/bin:$PATH"
+GATE=$(npx tsx ~/openclaw/tools/sae/cdr-freshness-gate.ts)
+GATE_EXIT=$?
 
-# Current sitrep
-CURRENT=$(psql cortana -t -A -c "SELECT json_object_agg(domain || '.' || key, value) FROM cortana_sitrep_latest;")
-CURRENT_RUN=$(psql cortana -t -A -c "SELECT run_id FROM cortana_sitrep ORDER BY timestamp DESC LIMIT 1;")
+if [ "$GATE_EXIT" -ne 0 ]; then
+  echo "CDR skipped due to stale/incomplete sitrep: $GATE"
+  exit 0
+fi
+
+SOURCE_RUN=$(echo "$GATE" | python3 -c 'import json,sys; print((json.loads(sys.stdin.read() or "{}") or {}).get("run",{}).get("run_id",""))')
+```
+
+## Step 1: Load World State
+
+```bash
+# Current sitrep (latest completed run only)
+CURRENT=$(psql cortana -t -A -c "SELECT json_object_agg(domain || '.' || key, value) FROM cortana_sitrep_latest_completed;")
+CURRENT_RUN="$SOURCE_RUN"
 
 # Previous sitrep for diffing
 PREV_RUN=$(psql cortana -t -A -c "
-  SELECT run_id FROM (
-    SELECT DISTINCT run_id, (SELECT MAX(timestamp) FROM cortana_sitrep s2 WHERE s2.run_id = cortana_sitrep.run_id) AS max_ts
-    FROM cortana_sitrep 
-    WHERE run_id != (SELECT run_id FROM cortana_sitrep ORDER BY timestamp DESC LIMIT 1)
-    ORDER BY max_ts DESC LIMIT 1
-  ) t;
+  SELECT run_id
+  FROM cortana_sitrep_runs
+  WHERE status='completed' AND run_id != '$CURRENT_RUN'
+  ORDER BY completed_at DESC
+  LIMIT 1;
 ")
 PREVIOUS=$(psql cortana -t -A -c "SELECT json_object_agg(domain || '.' || key, value) FROM cortana_sitrep WHERE run_id = '$PREV_RUN';")
 
@@ -78,7 +90,7 @@ psql cortana -c "INSERT INTO cortana_insights (sitrep_run_id, insight_type, doma
   '<convergence|conflict|anomaly|prediction|action>',
   '{\"<domain1>\",\"<domain2>\"}',
   '<Short title>',
-  '<Detailed insight — what you noticed and why it matters>',
+  '<Detailed insight — what you noticed and why it matters> [source_run_id:$CURRENT_RUN]',
   <1-5>,
   '<What to do about it, or NULL>'
 );"

@@ -81,6 +81,15 @@ All in `~/openclaw/cortical-loop/state/`:
 - `calendar-alerts-sent.txt` — dedup calendar alerts
 - `health-last-recovery.txt` — dedup recovery updates
 - `current-wake-prompt.txt` — last wake prompt sent
+- `behavioral-last-check.txt` — last behavioral watcher checkpoint
+
+### Cleanup note (2026-03-01 audit)
+Observed candidate stale artifacts in `state/` that can be safely rotated/cleaned if a watcher is reset:
+- `current-wake-prompt.txt` can grow stale between wake cycles; safe to truncate during maintenance.
+- `calendar-alerts-sent.txt` and `email-last-ids.txt` may contain old dedup history; safe to rotate if dedup behavior is re-baselined.
+- `health-last-recovery.txt` and `behavioral-last-check.txt` are checkpoint files; safe to reset when re-seeding watcher state.
+
+Do not delete automatically during normal operation; only rotate/reset during controlled maintenance.
 
 ## Feedback Loop
 

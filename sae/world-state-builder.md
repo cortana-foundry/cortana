@@ -6,15 +6,17 @@ You are a background data-gathering agent. Collect world state data and write it
 ```bash
 export PATH="/opt/homebrew/opt/postgresql@17/bin:$PATH"
 RUN_ID=$(uuidgen | tr '[:upper:]' '[:lower:]')
+EXPECTED_DOMAINS="calendar,email,weather,health,finance,tasks,patterns,watchlist,system"
+npx tsx ~/openclaw/tools/sae/wsb-run-tracker.ts startRun "$RUN_ID" "$EXPECTED_DOMAINS"
 ```
 
 For EACH source below, gather data and INSERT into cortana_sitrep with the same `$RUN_ID`. If any source fails, insert an error row and continue.
 
 **JSON handling rule (critical):** when pulling JSON from `psql`, always use `-t -A` and `COALESCE(..., '[]'::json)::text` so output is raw JSON only (no headers/formatting noise).
 
-Error row format:
+Error row format (always use `error_` key prefix for consistency):
 ```sql
-INSERT INTO cortana_sitrep (run_id, domain, key, value) VALUES ('$RUN_ID', '<domain>', 'error', '{"message": "<what failed>"}');
+INSERT INTO cortana_sitrep (run_id, domain, key, value) VALUES ('$RUN_ID', '<domain>', 'error_<source>', '{"message": "<what failed>"}');
 ```
 
 ## Sources
@@ -85,5 +87,6 @@ Insert: domain=`system`, key=`recent_errors`.
 After all inserts, verify:
 ```bash
 psql cortana -c "SELECT domain, key, substring(value::text, 1, 80) FROM cortana_sitrep WHERE run_id='$RUN_ID' ORDER BY domain;"
+npx tsx ~/openclaw/tools/sae/wsb-run-tracker.ts completeRun "$RUN_ID"
 ```
 Report any failures silently (no user notification unless critical).
