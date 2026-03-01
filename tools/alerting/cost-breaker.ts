@@ -13,7 +13,7 @@ const env = {
 };
 
 const DB = process.env.CORTANA_DB ?? "cortana";
-const USAGE_CMD = ["node", "/Users/hd/openclaw/skills/telegram-usage/handler.js", "json"];
+const USAGE_CMD = ["npx", "tsx", "/Users/hd/openclaw/skills/telegram-usage/handler.ts", "json"];
 const SESSIONS_FILE = process.env.OPENCLAW_SESSIONS_FILE ?? resolveHomePath(".openclaw/agents/main/sessions/sessions.json");
 const FLAG_FILE = process.env.COST_ALERT_FLAG_FILE ?? resolveHomePath(".openclaw/cost-alert.flag");
 let MONTHLY_BUDGET_USD = Number(process.env.COST_BREAKER_MONTHLY_BUDGET_USD ?? "200");
