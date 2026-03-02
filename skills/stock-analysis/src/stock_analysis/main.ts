@@ -21,7 +21,7 @@ async function fetchQuoteYahoo(symbol: string) {
 }
 
 async function fetchQuoteStooq(symbol: string) {
-  const stooqSymbol = `${symbol.toLowerCase()}.us`;
+  const stooqSymbol = `${symbol.toLowerCase().replace(/\./g, "-")}.us`;
   const res = await fetch(`https://stooq.com/q/l/?s=${stooqSymbol}&i=d`);
   const text = (await res.text()).trim();
   const row = text.split(/\r?\n/).filter(Boolean)[0]?.split(',').map((x) => x.trim()) ?? [];
@@ -30,6 +30,8 @@ async function fetchQuoteStooq(symbol: string) {
 }
 
 async function fetchQuote(symbol: string) { try { return await fetchQuoteYahoo(symbol); } catch { return fetchQuoteStooq(symbol); } }
+
+export { fetchQuote, fetchQuoteYahoo, fetchQuoteStooq };
 
 async function main() {
   const args = process.argv.slice(2);

@@ -89,7 +89,7 @@ async function fetchText(url: string, timeoutSeconds = 15): Promise<string> {
 }
 
 function stockQuote(symbol: string): Json {
-  const cmd = ["uv", "run", "src/stock_analysis/main.py", "analyze", symbol.toUpperCase(), "--json"];
+  const cmd = ["npx", "tsx", "src/stock_analysis/main.ts", "analyze", symbol.toUpperCase(), "--json"];
   const { code, stdout, stderr } = run(cmd, 30, STOCK_ANALYSIS_DIR);
   if (code !== 0 || !stdout) throw new Error(`stock-analysis failed: ${stderr || stdout}`);
   const data = JSON.parse(stdout) as Json;
