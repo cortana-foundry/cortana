@@ -9,6 +9,9 @@ import {
   defaultHeartbeatState,
   hashHeartbeatState,
   HEARTBEAT_MAX_AGE_MS,
+  isHeartbeatQuietHours,
+  shouldSendHeartbeatAlert,
+  touchHeartbeat,
   validateHeartbeatState,
 } from "../lib/heartbeat-schema.js";
 
@@ -277,7 +280,12 @@ function logEvent(reasonItem: Record<string, any>, psqlBin: string): [boolean, s
   }
 }
 
-function sendFailureAlert(reasonItem: Record<string, any>): [boolean, string | null] {
+function sendFailureAlert(reasonItem: Record<string, any>, now = new Date()): [boolean, string | null] {
+  const isUrgent = String(reasonItem.reasonCode ?? "").toLowerCase() === "failed_status";
+  if (!shouldSendHeartbeatAlert(isUrgent, now)) {
+    return [true, "suppressed_during_quiet_hours"];
+  }
+
   if (!fs.existsSync(TELEGRAM_GUARD)) return [false, `telegram guard missing: ${TELEGRAM_GUARD}`];
 
   const key = reasonItem.key;
@@ -379,6 +387,7 @@ async function main(): Promise<void> {
   const output: Record<string, any> = {
     ok: true,
     timestamp: isoFromMs(now),
+    quietHours: isHeartbeatQuietHours(new Date(now)),
     config: {
       maxRuntimeSeconds: args.maxRuntimeSeconds,
       activeMinutes: args.activeMinutes,
@@ -532,6 +541,7 @@ async function main(): Promise<void> {
       current.subagentWatchdog = current.subagentWatchdog ?? { lastRun: now, lastLogged: {} };
       current.subagentWatchdog.lastRun = now;
       current.subagentWatchdog.lastLogged = prunedLastLogged;
+      touchHeartbeat(current, now);
       validateHeartbeatState(current, now, HEARTBEAT_MAX_AGE_MS);
       rotateBackupRing(statePath, 3);
       writeJsonFileAtomic(statePath, current, 2);

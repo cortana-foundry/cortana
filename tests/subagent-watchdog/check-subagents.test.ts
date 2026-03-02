@@ -25,6 +25,9 @@ const defaultHeartbeatState = vi.hoisted(() => vi.fn(() => ({
   subagentWatchdog: { lastRun: 0, lastLogged: {} },
 })));
 const hashHeartbeatState = vi.hoisted(() => vi.fn(() => "mock-hash"));
+const touchHeartbeat = vi.hoisted(() => vi.fn((state: any, nowMs: number) => ({ ...state, lastHeartbeat: nowMs })));
+const isHeartbeatQuietHours = vi.hoisted(() => vi.fn(() => false));
+const shouldSendHeartbeatAlert = vi.hoisted(() => vi.fn(() => true));
 
 vi.mock("fs", () => ({ default: fsMock, ...fsMock }));
 vi.mock("child_process", () => ({ spawnSync }));
@@ -38,6 +41,9 @@ vi.mock("../../tools/lib/heartbeat-schema.js", () => ({
   validateHeartbeatState,
   defaultHeartbeatState,
   hashHeartbeatState,
+  touchHeartbeat,
+  isHeartbeatQuietHours,
+  shouldSendHeartbeatAlert,
   HEARTBEAT_REQUIRED_CHECKS: ["email", "calendar", "watchlist", "tasks", "portfolio", "marketIntel", "techNews", "weather", "fitness", "apiBudget", "mission", "cronDelivery"],
   HEARTBEAT_MAX_AGE_MS: 7 * 24 * 60 * 60 * 1000,
 }));
