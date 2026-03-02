@@ -31,6 +31,8 @@ async function fetchQuoteStooq(symbol: string) {
 
 async function fetchQuote(symbol: string) { try { return await fetchQuoteYahoo(symbol); } catch { return fetchQuoteStooq(symbol); } }
 
+export { fetchQuote, fetchQuoteYahoo, fetchQuoteStooq };
+
 async function main() {
   const args = process.argv.slice(2);
   if (args[0] !== 'analyze' || !args[1]) { console.error('Usage: main.ts analyze <symbol> [--json]'); process.exit(1); }
