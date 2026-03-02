@@ -1,6 +1,6 @@
 # Cortana Workspace (`~/openclaw`)
 
-[![CI](https://github.com/hd719/cortana/actions/workflows/ci.yml/badge.svg)](https://github.com/hd719/cortana/actions/workflows/ci.yml)
+[![CI](https://github.com/hd719/cortana/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/hd719/cortana/actions/workflows/ci.yml)
 
 This repo is **Cortana’s command brain** – memory, policy, orchestration, cron prompts, and internal automation.
 
