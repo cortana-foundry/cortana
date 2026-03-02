@@ -24,7 +24,20 @@ function esc(v: string): string {
 }
 
 beforeAll(() => {
-  const migration = "/Users/hd/openclaw/migrations/001_sae_sitrep_run_consistency.sql";
+  const path = require("node:path");
+  const migrationsDir = path.resolve(__dirname, "../../migrations");
+
+  // Apply base table first
+  const base = path.join(migrationsDir, "000_cortana_sitrep.sql");
+  const baseProc = spawnSync(PSQL_BIN, [DB_NAME, "-X", "-v", "ON_ERROR_STOP=1", "-f", base], {
+    encoding: "utf8",
+    env: { ...process.env, PATH: `/opt/homebrew/opt/postgresql@17/bin:${process.env.PATH ?? ""}` },
+  });
+  if ((baseProc.status ?? 1) !== 0) {
+    throw new Error((baseProc.stderr || baseProc.stdout || "base migration failed").trim());
+  }
+
+  const migration = path.join(migrationsDir, "001_sae_sitrep_run_consistency.sql");
   const proc = spawnSync(PSQL_BIN, [DB_NAME, "-X", "-v", "ON_ERROR_STOP=1", "-f", migration], {
     encoding: "utf8",
     env: {
@@ -73,6 +86,18 @@ describe("wsb-run-tracker", () => {
   });
 
   it("getLatestCompletedRun returns most recent completed metadata", () => {
+    // Insert a clean completed run (no errors, all domains present)
+    const suffix = Date.now().toString().slice(-12);
+    const runId = `22222222-2222-4222-8222-${suffix}`;
+    startRun(runId, ["calendar", "email"]);
+    psql(`
+      INSERT INTO cortana_sitrep (run_id, domain, key, value)
+      VALUES
+        ('${esc(runId)}'::uuid, 'calendar', 'events_48h', '{"count":2}'::jsonb),
+        ('${esc(runId)}'::uuid, 'email', 'inbox', '{"count":5}'::jsonb);
+    `);
+    completeRun(runId);
+
     const run = getLatestCompletedRun();
     expect(run).not.toBeNull();
     expect(run?.status).toBe("completed");

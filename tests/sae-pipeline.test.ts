@@ -21,7 +21,20 @@ function psql(sql: string): string {
 }
 
 function applyMigration(): void {
-  const migration = "/Users/hd/openclaw/migrations/001_sae_sitrep_run_consistency.sql";
+  const path = require("node:path");
+  const migrationsDir = path.resolve(__dirname, "../migrations");
+
+  // Apply base table first
+  const base = path.join(migrationsDir, "000_cortana_sitrep.sql");
+  const baseProc = spawnSync(PSQL_BIN, [DB_NAME, "-X", "-v", "ON_ERROR_STOP=1", "-f", base], {
+    encoding: "utf8",
+    env: { ...process.env, PATH: `/opt/homebrew/opt/postgresql@17/bin:${process.env.PATH ?? ""}` },
+  });
+  if ((baseProc.status ?? 1) !== 0) {
+    throw new Error((baseProc.stderr || baseProc.stdout || "base migration failed").trim());
+  }
+
+  const migration = path.join(migrationsDir, "001_sae_sitrep_run_consistency.sql");
   const proc = spawnSync(PSQL_BIN, [DB_NAME, "-X", "-v", "ON_ERROR_STOP=1", "-f", migration], {
     encoding: "utf8",
     env: {
