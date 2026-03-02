@@ -21,7 +21,7 @@ describe("heartbeat schema", () => {
   it("rejects missing required checks", () => {
     const now = Date.now();
     const state = defaultHeartbeatState(now);
-    delete (state.lastChecks as any).weather;
+    delete state.lastChecks.weather;
     expect(() => validateHeartbeatState(state, now, HEARTBEAT_MAX_AGE_MS)).toThrow(/missing required check/);
   });
 

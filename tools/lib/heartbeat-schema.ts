@@ -119,7 +119,7 @@ export function validateHeartbeatState(raw: unknown, nowMs = Date.now(), maxAgeM
   for (const key of HEARTBEAT_REQUIRED_CHECKS) {
     if (!(key in (checksRaw as Record<string, unknown>))) throw new Error(`missing required check: ${key}`);
     const val = (checksRaw as Record<string, unknown>)[key];
-    const tsSrc = val && typeof val === "object" && !Array.isArray(val) ? (val as any).lastChecked : val;
+    const tsSrc = val && typeof val === "object" && !Array.isArray(val) ? (val as Record<string, unknown>).lastChecked : val;
     const ts = parseTs(tsSrc);
     assertTimestampSanity(key, ts, nowMs, maxAgeMs);
     normalizedChecks[key] = { lastChecked: ts };
