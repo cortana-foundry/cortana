@@ -6,5 +6,5 @@ Fetches live stock quote data and outputs JSON for sitrep pipelines.
 
 ```bash
 cd ~/openclaw/skills/stock-analysis
-uv run src/stock_analysis/main.py analyze TSLA --json
+npx tsx src/stock_analysis/main.ts analyze TSLA --json
 ```
