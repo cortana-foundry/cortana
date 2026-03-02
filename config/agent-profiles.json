@@ -1,5 +1,10 @@
 [
   {
+    "id": "main",
+    "workspace": "/Users/hd/openclaw",
+    "model": "opus"
+  },
+  {
     "id": "cron-health",
     "workspace": "/Users/hd/.openclaw/workspaces/cron-health",
     "model": "openai-codex/gpt-5.1"
