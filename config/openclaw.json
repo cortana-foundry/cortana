@@ -29,7 +29,7 @@
   "agents": {
     "defaults": {
       "model": {
-        "primary": "opus",
+        "primary": "anthropic/claude-opus-4-6",
         "fallbacks": [
           "anthropic/claude-sonnet-4-20250514",
           "openai-codex/gpt-5.3-codex",
@@ -89,7 +89,7 @@
         "id": "main",
         "workspace": "/Users/hd/openclaw",
         "model": {
-          "primary": "opus",
+          "primary": "anthropic/claude-opus-4-6",
           "fallbacks": [
             "openai-codex/gpt-5.3-codex"
           ]
