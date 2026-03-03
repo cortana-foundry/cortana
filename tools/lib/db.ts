@@ -42,11 +42,9 @@ export function getPrismaClient(): PrismaClient {
   return prismaClient;
 }
 
-export const prisma: PrismaClient = new Proxy({} as PrismaClient, {
-  get(_target, prop, receiver) {
-    return Reflect.get(getPrismaClient() as object, prop, receiver);
-  },
-});
+// Backward-compat: many scripts/tests import `prisma` directly and expect an
+// actual PrismaClient instance.
+export const prisma: PrismaClient = getPrismaClient();
 
 function waitFor<T>(promise: Promise<T>): T {
   const sab = new SharedArrayBuffer(4);
