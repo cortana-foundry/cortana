@@ -1399,6 +1399,48 @@
       "delivery": {
         "mode": "none"
       }
+    },
+    {
+      "id": "session-lifecycle-policy-daily",
+      "agentId": "cron-maintenance",
+      "name": "🗂️ Session Lifecycle Policy Check (daily)",
+      "enabled": true,
+      "schedule": {
+        "kind": "cron",
+        "expr": "30 8 * * *",
+        "tz": "America/New_York"
+      },
+      "sessionTarget": "isolated",
+      "wakeMode": "now",
+      "payload": {
+        "kind": "agentTurn",
+        "timeoutSeconds": 60,
+        "message": "Run: npx --yes tsx /Users/hd/Developer/cortana/tools/session/session-lifecycle-policy.ts\nIf output is NO_REPLY, stay silent. Otherwise send concise alert to Telegram target 8171372724 via message tool and include counts + breaches."
+      },
+      "delivery": {
+        "mode": "none"
+      }
+    },
+    {
+      "id": "repo-drift-autopr-daily",
+      "agentId": "cron-maintenance",
+      "name": "🧭 Repo Drift Watchdog + AutoPR (daily)",
+      "enabled": true,
+      "schedule": {
+        "kind": "cron",
+        "expr": "45 8 * * *",
+        "tz": "America/New_York"
+      },
+      "sessionTarget": "isolated",
+      "wakeMode": "now",
+      "payload": {
+        "kind": "agentTurn",
+        "timeoutSeconds": 90,
+        "message": "Run DRIFT_AUTO_PR=1 /Users/hd/Developer/cortana/tools/repo/drift-watchdog.sh\nIf no drift: NO_REPLY. If drift: send concise Telegram alert to 8171372724, and if auto-PR opened include URL."
+      },
+      "delivery": {
+        "mode": "none"
+      }
     }
   ]
 }

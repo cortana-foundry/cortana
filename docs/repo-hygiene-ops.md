@@ -58,3 +58,25 @@ If a subagent run returns empty output or aborts:
   2. Retry once on failure.
   3. If second attempt fails, emit `fallback_manual_required=true` for operator intervention.
 - This improves resilience against transient aborted/empty subagent runs.
+
+## Deploy-time drift warning
+
+Run before deploy/restart to warn (non-blocking) if runtime and repo differ:
+
+```bash
+/Users/hd/Developer/cortana/tools/release/deploy-drift-warning.sh
+```
+
+## Session lifecycle policy by type
+
+Policy file: `config/session-lifecycle-policy.json`
+
+- `chat`: keep more (default 40)
+- `subagent`: keep less (default 20)
+- `cron`: keep very little (default 10)
+
+Check policy drift and emit alert text only on breach:
+
+```bash
+npx --yes tsx /Users/hd/Developer/cortana/tools/session/session-lifecycle-policy.ts
+```

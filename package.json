@@ -6,7 +6,9 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "smoke:post-merge": "npx vitest run tests/qa/validate-system.test.ts --no-file-parallelism",
-    "release:done-gates": "npx tsx tools/release/done-gates.ts"
+    "release:done-gates": "npx tsx tools/release/done-gates.ts",
+    "session:lifecycle": "npx --yes tsx tools/session/session-lifecycle-policy.ts",
+    "deploy:drift-warning": "bash tools/release/deploy-drift-warning.sh"
   },
   "devDependencies": {
     "tsx": "^4.6.0",
