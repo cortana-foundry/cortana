@@ -338,7 +338,7 @@
         "kind": "agentTurn",
         "message": "Fitness Evening Recap for Hamel (8:30 PM ET).\nPrefix: 🏋️ Fitness - Evening Recap. Delivery: send via message tool to telegram target 8171372724.\nFormatting: 12-hour AM/PM only.\n\n0) Tonal health check first:\ncurl -s http://localhost:3033/tonal/health\nIf not healthy: note \"Tonal auth issue - skipping Tonal details\" and proceed with Whoop.\n\n1) Baseline from sitrep:\nexport PATH=\"/opt/homebrew/opt/postgresql@17/bin:$PATH\"\nBASELINE_RECOVERY=$(psql cortana -t -A -c \"SELECT value FROM cortana_sitrep_latest WHERE domain = 'health' AND key = 'whoop_recovery';\")\n\n2) Fetch fresh evening data:\nWhoop: curl -s http://localhost:3033/whoop/data\nTonal (if healthy): curl -s http://localhost:3033/tonal/data\n\n3) Mandatory TODAY-only filtering:\nTODAY=$(date +%Y-%m-%d)\nWhoop workouts: .start[:10] == TODAY\nTonal workouts: .beginTime[:10] == TODAY\nIf endpoints return data but no workouts today: \"Rest day — no workout logged today.\"\nIf endpoint fails: \"<Service> data unavailable right now\" (not rest day).\n\n4) Pull health insights:\nINSIGHTS=$(psql cortana -t -A -c \"SELECT json_agg(t) FROM (SELECT id, title, description, action_suggested FROM cortana_insights WHERE acted_on = FALSE AND 'health' = ANY(domains) ORDER BY priority ASC) t;\")\n\n5) Recap sections:\nA) Today strain summary (strain, kJ, max HR, activity)\nB) Tonal details only if Tonal healthy + TODAY workout exists; else \"No Tonal workout logged today\"\nC) Weekly progress (days trained, muscle frequency, weekly strain avg, weekly sleep avg)\nD) Tomorrow Tonal workout from programEnrollmentId for program 12 Weeks to Jacked (ID 7d4d1d3d-9da9-4722-9e8c-fb65e45845a8), skip if Tonal unhealthy\nE) Tomorrow outlook from strain + sleep\nF) Sleep recommendation\nG) Health insights\n\n6) Mark insights delivered:\npsql cortana -c \"UPDATE cortana_insights SET acted_on = TRUE, acted_at = NOW() WHERE acted_on = FALSE AND 'health' = ANY(domains);\"\n7) Update ~/openclaw/memory/fitness/YYYY-MM-DD.json with evening key.",
         "model": "openai-codex/gpt-5.2-codex",
-        "timeoutSeconds": 120
+        "timeoutSeconds": 180
       },
       "state": {
         "nextRunAtMs": 1772587800000,
@@ -375,7 +375,7 @@
         "kind": "agentTurn",
         "message": "Weekly Fitness Insights for Hamel (Sunday 8 PM ET).\nPrefix: 🏋️ Fitness - Weekly Insights. Delivery: send via message tool to telegram target 8171372724.\nGoal: coach-style analysis (no raw data tables), max 300 words.\n\n0) Check Tonal health:\ncurl -s http://localhost:3033/tonal/health\nIf unhealthy: note Tonal auth issue and provide Whoop-only analysis.\n\n1) Fetch minimal data only:\nWhoop:\ncurl -s http://localhost:3033/whoop/data | jq '{recovery: [.recovery[0:7][] | {date: .created_at[0:10], score: .score.recovery_score, hrv: .score.hrv_rmssd_milli}], workouts: [.workouts[0:10][] | {date: .start[0:10], type: .sport_name, strain: .score.strain}]}'\nTonal (if healthy):\ncurl -s http://localhost:3033/tonal/data | jq '{profile: .profile, recent: [.workouts | to_entries | sort_by(.value.beginTime) | reverse | .[0:7][] | {date: .value.beginTime[0:10], volume: .value.totalVolume}]}'\n\n2) Output sections:\n- What happened this week (3-4 sentences)\n- Wins (2-3 bullets)\n- Watch-outs (2-3 bullets)\n- Next-week focus (2-3 actionable items)\n\n3) Save to ~/openclaw/memory/fitness/weekly/YYYY-WXX.md.",
         "model": "openai-codex/gpt-5.2-codex",
-        "timeoutSeconds": 120
+        "timeoutSeconds": 180
       },
       "state": {
         "nextRunAtMs": 1773014400000,
@@ -410,7 +410,7 @@
         "kind": "agentTurn",
         "message": "⚠️ DELIVERY: Do NOT rely on announce delivery. You MUST use the `message` tool (action=send, target=8171372724, channel=telegram) to send your final output. This is required because announce delivery is broken (openclaw/openclaw#16925).\n\n🔧 **Fitness Service Health Check** — verify service and remediate safely.\n\n1) Check `http://127.0.0.1:3033/tonal/health`.\n2) If unhealthy, restart ONLY via launchd (so .env is loaded):\n   `launchctl kickstart -k gui/$(id -u)/com.cortana.fitness-service`\n3) Re-check `/tonal/health` and report result.\n\n🚫 Do NOT run `go run main.go` or `./fitness-services` directly.\n🚫 Do NOT bypass launchd-run.sh.\nIf credentials appear missing, note that launchd wrapper sources `/Users/hd/Developer/cortana-external/.env`.",
         "model": "openai-codex/gpt-5.1",
-        "timeoutSeconds": 90
+        "timeoutSeconds": 120
       },
       "state": {
         "nextRunAtMs": 1772571960000,
@@ -1179,7 +1179,7 @@
         "kind": "agentTurn",
         "message": "Weekly Monday Market Brief for Hamel.\nDelivery: send via message tool to telegram target 8171372724.\n\nGoal: concise actionable brief covering (1) weekly portfolio performance, (2) earnings in next 7-10 days, (3) major U.S. economic events this week.\nRules: compact; use tools/portfolio/config.md; TSLA/NVDA forever holds; continue with partial data on failures.\n\nData:\n1) Portfolio snapshot + weekly change:\ncurl -s http://localhost:3033/alpaca/portfolio\ncurl -s http://localhost:3033/alpaca/stats\nExtract equity, cash, top weights, 1-week P/L (%/$).\n\n2) Earnings watch (next 7-10d):\nTSLA NVDA GOOGL AAPL MSFT META AMZN BA DIS BRK.B COIN + current holdings; include date + pre-market/after-close when known.\n\n3) Econ calendar (high-impact only): CPI, PPI, NFP/jobs, unemployment, retail sales, FOMC/Fed speakers, GDP, ISM, consumer sentiment; include ET time and portfolio relevance.\n\nOutput format:\n📊 Monday Market Brief\n1) Portfolio Weekly Snapshot\n2) Earnings Watch (Next 7-10 Days)\n3) Econ Calendar (This Week)\n4) Action Plan This Week (3-5 recommendations; no execution commands)\nTone: sharp, calm, non-hype. Length 250-450 words.",
         "model": "openai-codex/gpt-5.2-codex",
-        "timeoutSeconds": 120
+        "timeoutSeconds": 240
       },
       "delivery": {
         "mode": "announce",
