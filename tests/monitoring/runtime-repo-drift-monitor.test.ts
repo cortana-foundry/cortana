@@ -1,0 +1,162 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { captureConsole, flushModuleSideEffects, importFresh, resetProcess, setArgv, useFixedTime } from "../test-utils";
+
+const execSync = vi.hoisted(() => vi.fn());
+const readFileSync = vi.hoisted(() => vi.fn());
+const copyFileSync = vi.hoisted(() => vi.fn());
+const homedir = vi.hoisted(() => vi.fn(() => "/home/test"));
+
+vi.mock("node:child_process", () => ({ execSync }));
+vi.mock("node:fs", () => ({
+  default: {
+    readFileSync,
+    copyFileSync,
+  },
+}));
+vi.mock("node:os", () => ({ default: { homedir } }));
+
+describe("runtime-repo-drift-monitor", () => {
+  beforeEach(() => {
+    execSync.mockReset();
+    readFileSync.mockReset();
+    copyFileSync.mockReset();
+    useFixedTime("2026-03-03T11:00:00.000Z");
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+    resetProcess();
+  });
+
+  function seedFiles(entries: Record<string, string>) {
+    readFileSync.mockImplementation((file: string) => {
+      if (!(file in entries)) throw new Error(`missing: ${file}`);
+      return Buffer.from(entries[file]);
+    });
+  }
+
+  async function runMonitor(args: string[] = [], env: Record<string, string | undefined> = {}) {
+    for (const [k, v] of Object.entries(env)) {
+      if (v === undefined) delete process.env[k];
+      else process.env[k] = v;
+    }
+    setArgv(args);
+    const consoleSpy = captureConsole();
+    await importFresh("../../tools/monitoring/runtime-repo-drift-monitor.ts");
+    await flushModuleSideEffects();
+    consoleSpy.restore();
+    return consoleSpy.logs.join("\n");
+  }
+
+  it("uses vitest-style module side-effect execution and is non-destructive by default", async () => {
+    seedFiles({
+      "/home/test/.openclaw/cron/jobs.json": "runtime-jobs",
+      "/home/test/.openclaw/agent-profiles.json": "same-profiles",
+      "/repo/config/cron/jobs.json": "repo-jobs",
+      "/repo/config/agent-profiles.json": "same-profiles",
+    });
+
+    const output = await runMonitor(["--repo-root", "/repo"]);
+
+    expect(output).toContain("🧭 Runtime/Repo Drift Detected");
+    expect(output).toContain("cron/jobs.json: checksum mismatch");
+    expect(execSync).not.toHaveBeenCalled();
+    expect(copyFileSync).not.toHaveBeenCalled();
+  });
+
+  it("enables auto-pr when --auto-pr is passed", async () => {
+    seedFiles({
+      "/home/test/.openclaw/cron/jobs.json": "runtime-jobs",
+      "/home/test/.openclaw/agent-profiles.json": "same-profiles",
+      "/repo/config/cron/jobs.json": "repo-jobs",
+      "/repo/config/agent-profiles.json": "same-profiles",
+    });
+
+    execSync.mockImplementation((cmd: string) => {
+      if (cmd === "git diff --cached --name-only") return "config/cron/jobs.json";
+      if (cmd.startsWith("gh pr create ")) return "https://github.com/acme/repo/pull/999";
+      return "";
+    });
+
+    const output = await runMonitor(["--auto-pr", "--repo-root", "/repo"]);
+
+    expect(execSync).toHaveBeenCalled();
+    expect(copyFileSync).toHaveBeenCalledWith(
+      "/home/test/.openclaw/cron/jobs.json",
+      "/repo/config/cron/jobs.json",
+    );
+    expect(output).toContain("auto-pr opened: https://github.com/acme/repo/pull/999");
+  });
+
+  it("enables auto-pr when DRIFT_AUTO_PR=1", async () => {
+    seedFiles({
+      "/home/test/.openclaw/cron/jobs.json": "runtime-jobs",
+      "/home/test/.openclaw/agent-profiles.json": "same-profiles",
+      "/repo/config/cron/jobs.json": "repo-jobs",
+      "/repo/config/agent-profiles.json": "same-profiles",
+    });
+
+    execSync.mockImplementation((cmd: string) => {
+      if (cmd === "git diff --cached --name-only") return "config/cron/jobs.json";
+      if (cmd.startsWith("gh pr create ")) return "https://github.com/acme/repo/pull/1000";
+      return "";
+    });
+
+    const output = await runMonitor(["--repo-root", "/repo"], { DRIFT_AUTO_PR: "1" });
+
+    expect(execSync).toHaveBeenCalled();
+    expect(output).toContain("auto-pr opened: https://github.com/acme/repo/pull/1000");
+  });
+
+  it("supports dry-run auto-pr mode without mutating files or running git/gh", async () => {
+    seedFiles({
+      "/home/test/.openclaw/cron/jobs.json": "runtime-jobs",
+      "/home/test/.openclaw/agent-profiles.json": "same-profiles",
+      "/repo/config/cron/jobs.json": "repo-jobs",
+      "/repo/config/agent-profiles.json": "same-profiles",
+    });
+
+    const output = await runMonitor(["--auto-pr", "--dry-run", "--repo-root", "/repo"]);
+
+    expect(execSync).not.toHaveBeenCalled();
+    expect(copyFileSync).not.toHaveBeenCalled();
+    expect(output).toContain("DRY_RUN auto-pr: would create chore/runtime-repo-drift-sync-202603031100");
+  });
+
+  it("parses repo-root/base/branch-prefix arguments for git/gh commands", async () => {
+    seedFiles({
+      "/home/test/.openclaw/cron/jobs.json": "runtime-jobs",
+      "/home/test/.openclaw/agent-profiles.json": "same-profiles",
+      "/custom/repo/config/cron/jobs.json": "repo-jobs",
+      "/custom/repo/config/agent-profiles.json": "same-profiles",
+    });
+
+    const commands: string[] = [];
+    execSync.mockImplementation((cmd: string) => {
+      commands.push(cmd);
+      if (cmd === "git diff --cached --name-only") return "config/cron/jobs.json";
+      if (cmd.startsWith("gh pr create ")) return "https://github.com/acme/repo/pull/1001";
+      return "";
+    });
+
+    await runMonitor([
+      "--auto-pr",
+      "--repo-root",
+      "/custom/repo",
+      "--base",
+      "develop",
+      "--branch-prefix",
+      "chore/custom-drift",
+    ]);
+
+    expect(commands).toContain("git checkout develop");
+    expect(commands).toContain("git pull --ff-only origin develop");
+    expect(commands).toContain("git checkout -b chore/custom-drift-202603031100");
+    expect(commands.some((c) => c.includes("gh pr create --base develop --head chore/custom-drift-202603031100"))).toBe(true);
+    expect(copyFileSync).toHaveBeenCalledWith(
+      "/home/test/.openclaw/cron/jobs.json",
+      "/custom/repo/config/cron/jobs.json",
+    );
+  });
+});
