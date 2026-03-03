@@ -31,10 +31,7 @@
         "lastDeliveryStatus": "not-delivered"
       },
       "delivery": {
-        "mode": "announce",
-        "channel": "telegram",
-        "to": "8171372724",
-        "bestEffort": true
+        "mode": "none"
       }
     },
     {
@@ -67,10 +64,7 @@
         "lastDeliveryStatus": "delivered"
       },
       "delivery": {
-        "mode": "announce",
-        "channel": "telegram",
-        "to": "8171372724",
-        "bestEffort": true
+        "mode": "none"
       }
     },
     {
@@ -104,12 +98,8 @@
         "lastDeliveryStatus": "delivered"
       },
       "delivery": {
-        "mode": "announce",
-        "channel": "telegram",
-        "to": "8171372724",
-        "bestEffort": true
-      },
-      "prompt": "\n\nAfter generating your digest, use the message tool to send it to Telegram (channel: telegram, target: 8171372724). Do NOT rely on automatic delivery."
+        "mode": "none"
+      }
     },
     {
       "id": "40c14439-9166-4727-86be-eec867ef04d5",
@@ -140,10 +130,7 @@
         "lastDeliveryStatus": "delivered"
       },
       "delivery": {
-        "mode": "announce",
-        "channel": "telegram",
-        "to": "8171372724",
-        "bestEffort": true
+        "mode": "none"
       }
     },
     {
@@ -178,8 +165,7 @@
       },
       "delivery": {
         "mode": "none"
-      },
-      "prompt": "\n\nIf there are upcoming events to remind about, use the message tool to send reminders to Telegram (channel: telegram, target: 8171372724). If nothing to report, respond with NO_REPLY and do NOT send a message."
+      }
     },
     {
       "id": "37e128e9-e698-40b6-b5a9-3e7c355edea7",
@@ -205,10 +191,7 @@
         "lastDurationMs": 8582
       },
       "delivery": {
-        "mode": "announce",
-        "channel": "telegram",
-        "to": "8171372724",
-        "bestEffort": true
+        "mode": "none"
       }
     },
     {
@@ -243,8 +226,7 @@
       },
       "delivery": {
         "mode": "none"
-      },
-      "prompt": "\n\nAfter checking health, use the message tool to send results to Telegram (channel: telegram, target: 8171372724). If everything is healthy, respond with NO_REPLY."
+      }
     },
     {
       "id": "a86ca3f9-38af-4672-ba3f-1911352f0319",
@@ -262,7 +244,7 @@
       "wakeMode": "now",
       "payload": {
         "kind": "agentTurn",
-        "message": "Stock Market Brief for Hamel.\nPrefix: 💹 Markets - Stock Market Brief. Delivery: send via message tool to telegram target 8171372724.\nRead ~/openclaw/tools/portfolio/config.md.\nConstraints: TSLA/NVDA forever holds (never sell/trim). Diversify for concentration risk. Long-term horizon.\n\n1) Check market status:\nMARKET_STATUS=$(~/openclaw/skills/markets/check_market_status.sh)\nIf CLOSED, focus on after-hours/pre-market impact.\n\n2) Pull finance sitrep + freshness:\nexport PATH=\"/opt/homebrew/opt/postgresql@17/bin:$PATH\"\nFINANCE=$(psql cortana -t -A -c \"SELECT value FROM cortana_sitrep_latest WHERE domain = 'finance';\")\nFINANCE_AGE=$(psql cortana -t -A -c \"SELECT EXTRACT(EPOCH FROM (NOW() - MAX(timestamp)))/3600 FROM cortana_sitrep WHERE domain = 'finance';\")\nIf missing/stale (>4h), fetch fresh prices.\n\n3) Pull finance insights:\nINSIGHTS=$(psql cortana -t -A -c \"SELECT json_agg(t) FROM (SELECT id, title, description, priority, action_suggested FROM cortana_insights WHERE acted_on = FALSE AND 'finance' = ANY(domains) ORDER BY priority ASC) t;\")\n\n4) Fresh prices when needed:\ncd ~/openclaw/skills/stock-analysis && npx tsx src/stock_analysis/main.ts analyze <TICKER> --json\nTickers: TSLA, NVDA, GOOGL, AAPL, MSFT, BA, META, DIS, AMZN, QQQ, BRK.B, COIN, AWAY, GLD.\n\n5) Use web_search for material 24h news only: earnings/filings/regulatory, major launches/deliveries, >3% moves.\n\n6) Compose concise plain-text brief:\n- Include MARKET_STATUS and GLD section (price/%/hedge context)\n- Beginner Corner (required): market health GOOD/SHAKY/BAD; BUY/WATCH/NO-BUY reason; one concept of day\n- For each material event: what happened, why it matters, thesis impact (CONFIRMING/NEUTRAL/WARNING/THESIS RISK), sizing relevance (HIGH/MEDIUM/LOW), action (HOLD/WATCH/ADD CANDIDATE/PAUSE ADDING/DIVERSIFY ELSEWHERE), what to watch\n- If none: \"No material events today. All positions steady.\"\n- Include portfolio values + weights and finance insights\n\n7) Mark finance insights delivered:\npsql cortana -c \"UPDATE cortana_insights SET acted_on = TRUE, acted_at = NOW() WHERE acted_on = FALSE AND 'finance' = ANY(domains);\"\nWeekday only.",
+        "message": "Stock Market Brief summarizer for Hamel.\nPrefix: 💹 Markets - Stock Market Brief. Delivery: send via message tool to telegram target 8171372724.\n\nUse pre-collected data first:\n- Preferred artifact: /tmp/cron-stock-market-brief.json\n- If artifact exists and is fresh (<3h), use it as primary source.\n- If missing/stale/invalid, run fallback collection steps inline and continue.\n\nFallback collection steps (only if needed):\n1) MARKET_STATUS=$(~/openclaw/skills/markets/check_market_status.sh)\n2) export PATH=\"/opt/homebrew/opt/postgresql@17/bin:$PATH\"\n3) FINANCE + FINANCE_AGE from cortana_sitrep(_latest)\n4) INSIGHTS from cortana_insights where domain includes finance and acted_on=FALSE\n5) For stale/missing pricing, use: npx tsx src/stock_analysis/main.ts analyze <TICKER> --json (TSLA,NVDA,GOOGL,AAPL,MSFT,BA,META,DIS,AMZN,QQQ,BRK.B,COIN,AWAY,GLD)\n6) web_search only for material 24h events\n\nCompose concise plain-text brief equivalent to prior output:\n- Include MARKET_STATUS and GLD section (price/%/hedge context)\n- Beginner Corner (required): market health GOOD/SHAKY/BAD; BUY/WATCH/NO-BUY reason; one concept of day\n- For each material event: what happened, why it matters, thesis impact (CONFIRMING/NEUTRAL/WARNING/THESIS RISK), sizing relevance (HIGH/MEDIUM/LOW), action (HOLD/WATCH/ADD CANDIDATE/PAUSE ADDING/DIVERSIFY ELSEWHERE), what to watch\n- If none: \"No material events today. All positions steady.\"\n- Include portfolio values + weights and finance insights\n\nAfter successful summary, mark finance insights delivered:\npsql cortana -c \"UPDATE cortana_insights SET acted_on = TRUE, acted_at = NOW() WHERE acted_on = FALSE AND 'finance' = ANY(domains);\"\nWeekday only.",
         "model": "openai-codex/gpt-5.2-codex",
         "timeoutSeconds": 120
       },
@@ -277,10 +259,7 @@
         "lastDelivered": true
       },
       "delivery": {
-        "mode": "announce",
-        "channel": "telegram",
-        "to": "8171372724",
-        "bestEffort": true
+        "mode": "none"
       }
     },
     {
@@ -314,10 +293,7 @@
         "nextRunAtMs": 1772542980000
       },
       "delivery": {
-        "mode": "announce",
-        "channel": "telegram",
-        "to": "8171372724",
-        "bestEffort": true
+        "mode": "none"
       }
     },
     {
@@ -336,7 +312,7 @@
       "wakeMode": "now",
       "payload": {
         "kind": "agentTurn",
-        "message": "Fitness Evening Recap for Hamel (8:30 PM ET).\nPrefix: 🏋️ Fitness - Evening Recap. Delivery: send via message tool to telegram target 8171372724.\nFormatting: 12-hour AM/PM only.\n\n0) Tonal health check first:\ncurl -s http://localhost:3033/tonal/health\nIf not healthy: note \"Tonal auth issue - skipping Tonal details\" and proceed with Whoop.\n\n1) Baseline from sitrep:\nexport PATH=\"/opt/homebrew/opt/postgresql@17/bin:$PATH\"\nBASELINE_RECOVERY=$(psql cortana -t -A -c \"SELECT value FROM cortana_sitrep_latest WHERE domain = 'health' AND key = 'whoop_recovery';\")\n\n2) Fetch fresh evening data:\nWhoop: curl -s http://localhost:3033/whoop/data\nTonal (if healthy): curl -s http://localhost:3033/tonal/data\n\n3) Mandatory TODAY-only filtering:\nTODAY=$(date +%Y-%m-%d)\nWhoop workouts: .start[:10] == TODAY\nTonal workouts: .beginTime[:10] == TODAY\nIf endpoints return data but no workouts today: \"Rest day — no workout logged today.\"\nIf endpoint fails: \"<Service> data unavailable right now\" (not rest day).\n\n4) Pull health insights:\nINSIGHTS=$(psql cortana -t -A -c \"SELECT json_agg(t) FROM (SELECT id, title, description, action_suggested FROM cortana_insights WHERE acted_on = FALSE AND 'health' = ANY(domains) ORDER BY priority ASC) t;\")\n\n5) Recap sections:\nA) Today strain summary (strain, kJ, max HR, activity)\nB) Tonal details only if Tonal healthy + TODAY workout exists; else \"No Tonal workout logged today\"\nC) Weekly progress (days trained, muscle frequency, weekly strain avg, weekly sleep avg)\nD) Tomorrow Tonal workout from programEnrollmentId for program 12 Weeks to Jacked (ID 7d4d1d3d-9da9-4722-9e8c-fb65e45845a8), skip if Tonal unhealthy\nE) Tomorrow outlook from strain + sleep\nF) Sleep recommendation\nG) Health insights\n\n6) Mark insights delivered:\npsql cortana -c \"UPDATE cortana_insights SET acted_on = TRUE, acted_at = NOW() WHERE acted_on = FALSE AND 'health' = ANY(domains);\"\n7) Update ~/openclaw/memory/fitness/YYYY-MM-DD.json with evening key.",
+        "message": "Fitness Evening Recap summarizer for Hamel (8:30 PM ET).\nPrefix: 🏋️ Fitness - Evening Recap. Delivery: send via message tool to telegram target 8171372724.\nFormatting: 12-hour AM/PM only.\n\nUse pre-collected data first:\n- Preferred artifact: /tmp/cron-fitness-evening-recap.json\n- If artifact exists and is fresh (<3h), use it as primary source.\n- If missing/stale/invalid, run fallback collection inline and continue.\n\nFallback collection (only if needed):\n0) Tonal health check: curl -s http://localhost:3033/tonal/health\n1) Baseline from sitrep (whoop_recovery)\n2) Fetch fresh evening data: whoop + tonal (when healthy)\n3) TODAY-only filtering:\n   Whoop workouts .start[:10] == TODAY\n   Tonal workouts .beginTime[:10] == TODAY\n4) Pull health insights from cortana_insights where acted_on=FALSE and domain includes health\n\nRecap sections (keep output equivalent):\nA) Today strain summary (strain, kJ, max HR, activity)\nB) Tonal details only if Tonal healthy + TODAY workout exists; else \"No Tonal workout logged today\"\nC) Weekly progress (days trained, muscle frequency, weekly strain avg, weekly sleep avg)\nD) Tomorrow Tonal workout from programEnrollmentId for 12 Weeks to Jacked (7d4d1d3d-9da9-4722-9e8c-fb65e45845a8), skip if Tonal unhealthy\nE) Tomorrow outlook from strain + sleep\nF) Sleep recommendation\nG) Health insights\n\nAfter successful summary:\n- Mark health insights delivered in cortana_insights\n- Update ~/openclaw/memory/fitness/YYYY-MM-DD.json with evening key.",
         "model": "openai-codex/gpt-5.2-codex",
         "timeoutSeconds": 180
       },
@@ -351,10 +327,7 @@
         "lastDeliveryStatus": "delivered"
       },
       "delivery": {
-        "mode": "announce",
-        "channel": "telegram",
-        "to": "8171372724",
-        "bestEffort": true
+        "mode": "none"
       }
     },
     {
@@ -385,12 +358,8 @@
         "consecutiveErrors": 0
       },
       "delivery": {
-        "mode": "announce",
-        "channel": "telegram",
-        "to": "8171372724",
-        "bestEffort": true
-      },
-      "prompt": "\n\nAfter generating insights, use the message tool to send them to Telegram (channel: telegram, target: 8171372724). Do NOT rely on automatic delivery."
+        "mode": "none"
+      }
     },
     {
       "id": "661b21f1-741e-41a1-b41e-f413abeb2cdd",
@@ -423,10 +392,7 @@
         "lastDeliveryStatus": "delivered"
       },
       "delivery": {
-        "mode": "announce",
-        "channel": "telegram",
-        "to": "8171372724",
-        "bestEffort": true
+        "mode": "none"
       }
     },
     {
@@ -462,8 +428,7 @@
       },
       "delivery": {
         "mode": "none"
-      },
-      "prompt": "\n\nIf newsletters are found, use the message tool to send the alert to Telegram (channel: telegram, target: 8171372724). If none found, respond with NO_REPLY."
+      }
     },
     {
       "id": "f478d19f-d3ff-4649-87e0-3170560f618f",
@@ -485,10 +450,7 @@
         "model": "openai-codex/gpt-5.1"
       },
       "delivery": {
-        "mode": "announce",
-        "channel": "telegram",
-        "to": "8171372724",
-        "bestEffort": true
+        "mode": "none"
       },
       "state": {
         "nextRunAtMs": 1772590500000,
@@ -578,10 +540,7 @@
         "model": "openai-codex/gpt-5.1"
       },
       "delivery": {
-        "mode": "announce",
-        "channel": "telegram",
-        "to": "8171372724",
-        "bestEffort": true
+        "mode": "none"
       },
       "state": {
         "nextRunAtMs": 1772550840000,
@@ -592,8 +551,7 @@
         "lastRunStatus": "ok",
         "lastDeliveryStatus": "delivered",
         "lastDelivered": true
-      },
-      "prompt": "\n\nAfter generating the upgrade proposal, use the message tool to send it to Telegram (channel: telegram, target: 8171372724). Do NOT rely on automatic delivery."
+      }
     },
     {
       "id": "58db9015-b3bd-4be8-83ff-45ec5377b735",
@@ -682,18 +640,14 @@
         "model": "openai-codex/gpt-5.2-codex"
       },
       "delivery": {
-        "mode": "announce",
-        "channel": "telegram",
-        "to": "8171372724",
-        "bestEffort": true
+        "mode": "none"
       },
       "state": {
         "lastRunAtMs": 1771747200020,
         "lastStatus": "ok",
         "lastDurationMs": 66730,
         "consecutiveErrors": 0
-      },
-      "prompt": "\n\nAfter completing consolidation, use the message tool to send a brief summary to Telegram (channel: telegram, target: 8171372724). If nothing notable, respond with NO_REPLY."
+      }
     },
     {
       "id": "e2d5451c-4fc3-455a-b7e0-4cbc6da7b745",
@@ -716,10 +670,7 @@
         "model": "openai-codex/gpt-5.1"
       },
       "delivery": {
-        "mode": "announce",
-        "channel": "telegram",
-        "to": "8171372724",
-        "bestEffort": true
+        "mode": "none"
       },
       "state": {
         "nextRunAtMs": 1772590320000,
@@ -764,8 +715,7 @@
         "lastRunStatus": "ok",
         "lastDelivered": false,
         "lastDeliveryStatus": "not-delivered"
-      },
-      "prompt": "\n\nAfter cleanup, use the message tool to send a brief summary to Telegram (channel: telegram, target: 8171372724). If nothing cleaned, respond with NO_REPLY."
+      }
     },
     {
       "id": "060be4f9-190a-4942-9ded-b34a95e46088",
@@ -788,10 +738,7 @@
         "model": "openai-codex/gpt-5.2-codex"
       },
       "delivery": {
-        "mode": "announce",
-        "channel": "telegram",
-        "to": "8171372724",
-        "bestEffort": true
+        "mode": "none"
       },
       "state": {
         "nextRunAtMs": 1773007200000,
@@ -799,8 +746,7 @@
         "lastStatus": "ok",
         "lastDurationMs": 33220,
         "consecutiveErrors": 0
-      },
-      "prompt": "\n\nAfter generating the status report, use the message tool to send it to Telegram (channel: telegram, target: 8171372724). Do NOT rely on automatic delivery."
+      }
     },
     {
       "id": "b45d6452-71ea-44ab-bd70-ed3d2c2f5f82",
@@ -822,10 +768,7 @@
         "model": "openai-codex/gpt-5.3-codex"
       },
       "delivery": {
-        "mode": "announce",
-        "channel": "telegram",
-        "to": "8171372724",
-        "bestEffort": true
+        "mode": "none"
       },
       "state": {
         "nextRunAtMs": 1772850600000,
@@ -836,8 +779,7 @@
         "lastRunStatus": "ok",
         "lastDelivered": true,
         "lastDeliveryStatus": "delivered"
-      },
-      "prompt": "\n\nUse the message tool to send the bedtime reminder to Telegram (channel: telegram, target: 8171372724). Do NOT rely on automatic delivery."
+      }
     },
     {
       "id": "9d2f7f92-b9e9-48bc-87b0-a5859bb83927",
@@ -861,10 +803,7 @@
         "timeoutSeconds": 240
       },
       "delivery": {
-        "mode": "announce",
-        "channel": "telegram",
-        "to": "8171372724",
-        "bestEffort": true
+        "mode": "none"
       },
       "state": {
         "nextRunAtMs": 1772548200000,
@@ -1182,9 +1121,7 @@
         "timeoutSeconds": 240
       },
       "delivery": {
-        "mode": "announce",
-        "channel": "telegram",
-        "to": "8171372724"
+        "mode": "none"
       },
       "state": {
         "nextRunAtMs": 1773018000000,
@@ -1216,9 +1153,7 @@
         "model": "openai-codex/gpt-5.2-codex"
       },
       "delivery": {
-        "mode": "announce",
-        "channel": "last",
-        "bestEffort": true
+        "mode": "none"
       },
       "state": {
         "nextRunAtMs": 1772625600000,
@@ -1251,10 +1186,7 @@
         "model": "openai-codex/gpt-5.2-codex"
       },
       "delivery": {
-        "mode": "announce",
-        "channel": "telegram",
-        "to": "8171372724",
-        "bestEffort": true
+        "mode": "none"
       },
       "state": {
         "nextRunAtMs": 1773010800000
@@ -1311,6 +1243,94 @@
       "payload": {
         "kind": "agentTurn",
         "message": "PREFIX: 🧹 System - Weekly session cleanup enforce\nRun: openclaw sessions cleanup --all-agents --enforce --json\nIf no sessions changed, return NO_REPLY.\nDo not use message tool."
+      },
+      "delivery": {
+        "mode": "none"
+      }
+    },
+    {
+      "id": "a86ca3f9-38af-4672-ba3f-1911352f0319-collect",
+      "agentId": "cron-market",
+      "name": "📈 Stock Market Brief (collect)",
+      "enabled": true,
+      "schedule": {
+        "kind": "cron",
+        "expr": "30 7 * * 1-5",
+        "tz": "America/New_York"
+      },
+      "sessionTarget": "isolated",
+      "wakeMode": "now",
+      "payload": {
+        "kind": "agentTurn",
+        "model": "openai-codex/gpt-5.2-codex",
+        "timeoutSeconds": 150,
+        "message": "Collect data for Stock Market Brief and write JSON artifact to /tmp/cron-stock-market-brief.json.\nDo not send Telegram messages.\n\nSteps:\n1) MARKET_STATUS=$(~/openclaw/skills/markets/check_market_status.sh)\n2) export PATH=\"/opt/homebrew/opt/postgresql@17/bin:$PATH\"\n3) Query FINANCE, FINANCE_AGE, and pending finance INSIGHTS from postgres.\n4) If missing/stale (>4h), fetch fresh prices using standard command only:\n   npx tsx src/stock_analysis/main.ts analyze <TICKER> --json\n   Tickers: TSLA NVDA GOOGL AAPL MSFT BA META DIS AMZN QQQ BRK.B COIN AWAY GLD\n5) Pull material 24h events with web_search.\n6) Persist one JSON artifact with timestamp + all collected fields.\n\nOutput policy:\n- Success: return NO_REPLY\n- Failure: one-line error only."
+      },
+      "delivery": {
+        "mode": "none"
+      }
+    },
+    {
+      "id": "e4db8a8d-945c-4af2-a8d5-e54f2fb4e792-collect",
+      "agentId": "cron-fitness",
+      "name": "🌙 Fitness Evening Recap (collect)",
+      "enabled": true,
+      "schedule": {
+        "kind": "cron",
+        "expr": "20 20 * * *",
+        "tz": "America/New_York"
+      },
+      "sessionTarget": "isolated",
+      "wakeMode": "now",
+      "payload": {
+        "kind": "agentTurn",
+        "model": "openai-codex/gpt-5.2-codex",
+        "timeoutSeconds": 150,
+        "message": "Collect data for Fitness Evening Recap and write JSON artifact to /tmp/cron-fitness-evening-recap.json.\nDo not send Telegram messages.\n\nSteps:\n1) Tonal health: curl -s http://localhost:3033/tonal/health\n2) Baseline recovery from sitrep.\n3) Fetch whoop data and tonal data (if healthy).\n4) Filter TODAY-only workouts for Whoop and Tonal.\n5) Pull pending health insights from postgres.\n6) Save artifact with timestamp and structured fields.\n\nOutput policy:\n- Success: return NO_REPLY\n- Failure: one-line error only."
+      },
+      "delivery": {
+        "mode": "none"
+      }
+    },
+    {
+      "id": "cron-slo-daily-monitor-20260303",
+      "agentId": "cron-health",
+      "name": "📏 Cron SLO Monitor (daily)",
+      "enabled": true,
+      "schedule": {
+        "kind": "cron",
+        "expr": "15 8 * * *",
+        "tz": "America/New_York"
+      },
+      "sessionTarget": "isolated",
+      "wakeMode": "now",
+      "payload": {
+        "kind": "agentTurn",
+        "model": "openai-codex/gpt-5.3-codex",
+        "timeoutSeconds": 120,
+        "message": "Run: npx tsx /Users/hd/openclaw/tools/monitoring/cron-slo-monitor.ts\nPolicy:\n- If script outputs NO_REPLY, return NO_REPLY.\n- If script outputs alert text, send it via message tool to telegram target 8171372724 exactly once.\n- Keep concise."
+      },
+      "delivery": {
+        "mode": "none"
+      }
+    },
+    {
+      "id": "cron-runtime-repo-drift-monitor-20260303",
+      "agentId": "cron-health",
+      "name": "🧭 Runtime vs Repo Drift Monitor (daily)",
+      "enabled": true,
+      "schedule": {
+        "kind": "cron",
+        "expr": "20 8 * * *",
+        "tz": "America/New_York"
+      },
+      "sessionTarget": "isolated",
+      "wakeMode": "now",
+      "payload": {
+        "kind": "agentTurn",
+        "model": "openai-codex/gpt-5.3-codex",
+        "timeoutSeconds": 120,
+        "message": "Run: npx tsx /Users/hd/openclaw/tools/monitoring/runtime-repo-drift-monitor.ts\nPolicy:\n- If script outputs NO_REPLY, return NO_REPLY.\n- If drift exists, send output via message tool to telegram target 8171372724 exactly once."
       },
       "delivery": {
         "mode": "none"
