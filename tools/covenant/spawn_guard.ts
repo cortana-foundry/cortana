@@ -6,6 +6,7 @@ import fs from "fs";
 import path from "path";
 import { runPsql, withPostgresPath } from "../lib/db.js";
 import { resolveRepoPath } from "../lib/paths.js";
+import { runDoneGates } from "../release/done-gates.js";
 
 const WORKSPACE_ROOT = resolveRepoPath();
 const REGISTRY_PATH = path.join(WORKSPACE_ROOT, "tmp", "spawn_guard_registry.json");
@@ -149,7 +150,13 @@ function claim(
   return result;
 }
 
-function release(label: string, taskId: number | null, runId: string, finalState = "completed"): Record<string, any> {
+function release(
+  label: string,
+  taskId: number | null,
+  runId: string,
+  finalState = "completed",
+  doneGateParams?: { buildCmd?: string; testCmd?: string }
+): Record<string, any> {
   const key = dedupeKey(label, taskId);
   const now = Math.floor(Date.now() / 1000);
 
@@ -163,6 +170,21 @@ function release(label: string, taskId: number | null, runId: string, finalState
 
   if (existing.run_id !== runId) {
     return { action: "noop", reason: "run_id_mismatch", key, existing };
+  }
+
+  const terminalState = ["completed", "done", "success", "succeeded"].includes(finalState.toLowerCase());
+  if (terminalState) {
+    const doneGates = runDoneGates(doneGateParams);
+    if (!doneGates.ok) {
+      const result = {
+        action: "blocked",
+        reason: "release_done_gates_failed",
+        key,
+        failures: doneGates.failures,
+      };
+      logDecision("release_blocked", result);
+      return result;
+    }
   }
 
   existing.state = finalState;
@@ -246,10 +268,12 @@ async function main(): Promise<void> {
 
     const taskId = get("--task-id") ? Number(get("--task-id")) : null;
     const state = get("--state") || "completed";
+    const buildCmd = get("--build-cmd");
+    const testCmd = get("--test-cmd");
 
-    const result = release(label, taskId, runId, state);
+    const result = release(label, taskId, runId, state, { buildCmd, testCmd });
     console.log(JSON.stringify(result, null, 2));
-    process.exit(0);
+    process.exit(result.action === "blocked" ? 1 : 0);
   }
 
   usageError();
