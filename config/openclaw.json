@@ -87,7 +87,13 @@
     "list": [
       {
         "id": "main",
-        "workspace": "/Users/hd/openclaw"
+        "workspace": "/Users/hd/openclaw",
+        "model": {
+          "primary": "opus",
+          "fallbacks": [
+            "openai-codex/gpt-5.3-codex"
+          ]
+        }
       },
       {
         "id": "cron-health",
