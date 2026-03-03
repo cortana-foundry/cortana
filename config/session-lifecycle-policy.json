@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "description": "Type-aware session lifecycle targets. Chat keeps more context, subagent less, cron least.",
+  "targets": {
+    "chat": {
+      "maxEntries": 40,
+      "pruneAfter": "3d"
+    },
+    "subagent": {
+      "maxEntries": 20,
+      "pruneAfter": "1d"
+    },
+    "cron": {
+      "maxEntries": 10,
+      "pruneAfter": "12h"
+    },
+    "other": {
+      "maxEntries": 20,
+      "pruneAfter": "1d"
+    }
+  }
+}

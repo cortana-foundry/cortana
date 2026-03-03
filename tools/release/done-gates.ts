@@ -33,7 +33,7 @@ function runStep(name: string, command: string): GateResult {
   };
 }
 
-export function runDoneGates(params?: { buildCmd?: string; testCmd?: string }): { ok: boolean; failures: GateResult[] } {
+export function runDoneGates(params?: { buildCmd?: string; testCmd?: string }): { ok: boolean; failures: GateResult[]; warnings: string[] } {
   const buildCmd = params?.buildCmd ?? process.env.DONE_GATES_BUILD_CMD ?? "npm run build";
   const testCmd = params?.testCmd ?? process.env.DONE_GATES_TEST_CMD;
 
@@ -84,7 +84,15 @@ export function runDoneGates(params?: { buildCmd?: string; testCmd?: string }): 
   }
 
   const failures = checks.filter((check) => !check.ok);
-  return { ok: failures.length === 0, failures };
+  const warnings: string[] = [];
+
+  const driftWarning = runShell("/Users/hd/Developer/cortana/tools/release/deploy-drift-warning.sh");
+  const combinedWarn = `${driftWarning.stdout}\n${driftWarning.stderr}`.trim();
+  if (combinedWarn.includes("DEPLOY WARNING")) {
+    warnings.push(combinedWarn);
+  }
+
+  return { ok: failures.length === 0, failures, warnings };
 }
 
 function parseFlag(name: string): string | undefined {
@@ -103,6 +111,10 @@ async function main(): Promise<void> {
   const result = runDoneGates({ buildCmd, testCmd });
   if (result.ok) {
     console.log("✅ release done-gates passed");
+    if (result.warnings.length) {
+      console.log("⚠️ non-blocking warnings:");
+      for (const w of result.warnings) console.log(w);
+    }
     process.exit(0);
   }
 

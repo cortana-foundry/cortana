@@ -43,4 +43,12 @@ echo "[repo-drift-watchdog] drift detected:"
 for a in "${alerts[@]}"; do
   echo " - $a"
 done
+
+# Optional automation: open a drift PR if enabled.
+if [[ "${DRIFT_AUTO_PR:-0}" == "1" ]]; then
+  if command -v npx >/dev/null 2>&1; then
+    npx --yes tsx /Users/hd/Developer/cortana/tools/monitoring/runtime-repo-drift-monitor.ts --auto-pr --repo-root /Users/hd/Developer/cortana || true
+  fi
+fi
+
 exit 1
