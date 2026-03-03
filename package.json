@@ -2,8 +2,11 @@
   "name": "openclaw",
   "private": true,
   "scripts": {
+    "build": "npm ls --depth=0 > /dev/null",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "smoke:post-merge": "npx vitest run tests/qa/validate-system.test.ts --no-file-parallelism",
+    "release:done-gates": "npx tsx tools/release/done-gates.ts"
   },
   "devDependencies": {
     "tsx": "^4.6.0",

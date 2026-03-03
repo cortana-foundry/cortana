@@ -1,0 +1,38 @@
+name: Post-merge smoke
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run post-merge smoke
+        run: npm run smoke:post-merge
+
+      - name: Rollback hint on smoke failure
+        if: failure()
+        run: |
+          echo "::error title=Post-merge smoke failed::Smoke checks failed on main."
+          echo "Rollback hint:"
+          echo "  git checkout main"
+          echo "  git pull --ff-only"
+          echo "  git revert --no-edit $GITHUB_SHA"
+          echo "  git push origin main"
+          echo "Or rollback to previous good SHA: ${GITHUB_EVENT_BEFORE:-unknown}"
