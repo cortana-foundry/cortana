@@ -63,7 +63,8 @@
         "consecutiveErrors": 0,
         "lastRunStatus": "ok",
         "lastDelivered": true,
-        "lastDeliveryStatus": "delivered"
+        "lastDeliveryStatus": "delivered",
+        "runningAtMs": 1772529720023
       },
       "delivery": {
         "mode": "announce",
@@ -150,7 +151,7 @@
       "name": "📅 Calendar reminders → Telegram (ALL calendars)",
       "enabled": true,
       "createdAtMs": 1769585938649,
-      "updatedAtMs": 1772492827699,
+      "updatedAtMs": 1772510836180,
       "schedule": {
         "kind": "cron",
         "expr": "7 6-23 * * *",
@@ -164,14 +165,15 @@
         "model": "openai-codex/gpt-5.1"
       },
       "state": {
-        "nextRunAtMs": 1772496420000,
-        "lastRunAtMs": 1772492820032,
-        "lastStatus": "ok",
-        "lastDurationMs": 7667,
-        "consecutiveErrors": 0,
-        "lastRunStatus": "ok",
-        "lastDelivered": false,
-        "lastDeliveryStatus": "not-delivered"
+        "nextRunAtMs": 1772536020000,
+        "lastRunAtMs": 1772510820027,
+        "lastStatus": "error",
+        "lastDurationMs": 16153,
+        "consecutiveErrors": 1,
+        "lastRunStatus": "error",
+        "lastDelivered": true,
+        "lastDeliveryStatus": "delivered",
+        "lastError": "⚠️ ✉️ Message failed"
       },
       "delivery": {
         "mode": "announce",
@@ -217,7 +219,7 @@
       "name": "🐦 X session healthcheck (bird)",
       "enabled": true,
       "createdAtMs": 1769615191317,
-      "updatedAtMs": 1772485207109,
+      "updatedAtMs": 1772528412435,
       "schedule": {
         "kind": "cron",
         "expr": "0 4,16 * * *",
@@ -231,10 +233,10 @@
         "model": "openai-codex/gpt-5.1"
       },
       "state": {
-        "nextRunAtMs": 1772528400000,
-        "lastRunAtMs": 1772485200015,
+        "nextRunAtMs": 1772571600000,
+        "lastRunAtMs": 1772528400030,
         "lastStatus": "ok",
-        "lastDurationMs": 7094,
+        "lastDurationMs": 12405,
         "consecutiveErrors": 0,
         "lastRunStatus": "ok",
         "lastDelivered": false,
@@ -326,7 +328,7 @@
       "name": "🌙 Fitness Evening Recap (Hamel)",
       "enabled": true,
       "createdAtMs": 1769794739997,
-      "updatedAtMs": 1772242508557,
+      "updatedAtMs": 1772501564728,
       "schedule": {
         "kind": "cron",
         "expr": "30 20 * * *",
@@ -340,10 +342,10 @@
         "model": "openai-codex/gpt-5.2-codex"
       },
       "state": {
-        "nextRunAtMs": 1772501400000,
-        "lastRunAtMs": 1772242251943,
+        "nextRunAtMs": 1772587800000,
+        "lastRunAtMs": 1772501400027,
         "lastStatus": "ok",
-        "lastDurationMs": 256614,
+        "lastDurationMs": 164701,
         "consecutiveErrors": 0,
         "lastRunStatus": "ok",
         "lastDelivered": true,
@@ -396,7 +398,7 @@
       "name": "🔧 Fitness service healthcheck",
       "enabled": true,
       "createdAtMs": 1769794825944,
-      "updatedAtMs": 1772485576029,
+      "updatedAtMs": 1772528773436,
       "schedule": {
         "kind": "cron",
         "expr": "6 4,16 * * *",
@@ -410,10 +412,10 @@
         "model": "openai-codex/gpt-5.1"
       },
       "state": {
-        "nextRunAtMs": 1772528760000,
-        "lastRunAtMs": 1772485560018,
+        "nextRunAtMs": 1772571960000,
+        "lastRunAtMs": 1772528760025,
         "lastStatus": "ok",
-        "lastDurationMs": 16011,
+        "lastDurationMs": 13411,
         "consecutiveErrors": 0,
         "lastRunStatus": "ok",
         "lastDelivered": true,
@@ -469,7 +471,7 @@
       "name": "🌙 Bedtime Check (10pm ET)",
       "enabled": true,
       "createdAtMs": 1770599536224,
-      "updatedAtMs": 1772248692009,
+      "updatedAtMs": 1772504118038,
       "schedule": {
         "kind": "cron",
         "expr": "15 21 * * *",
@@ -489,10 +491,10 @@
         "bestEffort": true
       },
       "state": {
-        "nextRunAtMs": 1772504100000,
-        "lastRunAtMs": 1772248680022,
+        "nextRunAtMs": 1772590500000,
+        "lastRunAtMs": 1772504100029,
         "lastStatus": "ok",
-        "lastDurationMs": 11987,
+        "lastDurationMs": 18009,
         "consecutiveErrors": 0,
         "lastRunStatus": "ok",
         "lastDelivered": true,
@@ -699,7 +701,7 @@
       "name": "🔍 Daily System Health Summary",
       "enabled": true,
       "createdAtMs": 1770940327751,
-      "updatedAtMs": 1772244788492,
+      "updatedAtMs": 1772503969781,
       "schedule": {
         "kind": "cron",
         "expr": "12 21 * * *",
@@ -720,10 +722,10 @@
         "bestEffort": true
       },
       "state": {
-        "nextRunAtMs": 1772503920000,
-        "lastRunAtMs": 1772244720023,
+        "nextRunAtMs": 1772590320000,
+        "lastRunAtMs": 1772503920029,
         "lastStatus": "ok",
-        "lastDurationMs": 68469,
+        "lastDurationMs": 49752,
         "consecutiveErrors": 0,
         "lastRunStatus": "ok",
         "lastDeliveryStatus": "delivered",
@@ -736,7 +738,7 @@
       "name": "🧹 Cron Session Cleanup",
       "enabled": true,
       "createdAtMs": 1770984376271,
-      "updatedAtMs": 1772262084764,
+      "updatedAtMs": 1772521208046,
       "schedule": {
         "kind": "cron",
         "expr": "0 2 * * *",
@@ -757,10 +759,10 @@
         "bestEffort": true
       },
       "state": {
-        "nextRunAtMs": 1772521200000,
-        "lastRunAtMs": 1772262075675,
+        "nextRunAtMs": 1772607600000,
+        "lastRunAtMs": 1772521200024,
         "lastStatus": "ok",
-        "lastDurationMs": 9089,
+        "lastDurationMs": 8022,
         "consecutiveErrors": 0,
         "lastRunStatus": "ok",
         "lastDelivered": false,
@@ -882,7 +884,7 @@
       "name": "🌐 SAE World State Builder",
       "enabled": true,
       "createdAtMs": 1771268247494,
-      "updatedAtMs": 1772474452995,
+      "updatedAtMs": 1772503204799,
       "schedule": {
         "kind": "cron",
         "expr": "0 7,13,21 * * *"
@@ -899,10 +901,10 @@
         "channel": "last"
       },
       "state": {
-        "nextRunAtMs": 1772503200000,
-        "lastRunAtMs": 1772474446798,
+        "nextRunAtMs": 1772539200000,
+        "lastRunAtMs": 1772503200024,
         "lastStatus": "ok",
-        "lastDurationMs": 6197,
+        "lastDurationMs": 4775,
         "consecutiveErrors": 0,
         "lastRunStatus": "ok",
         "lastDelivered": false,
@@ -915,7 +917,7 @@
       "name": "🧠 SAE Cross-Domain Reasoner",
       "enabled": true,
       "createdAtMs": 1771268745562,
-      "updatedAtMs": 1772475306630,
+      "updatedAtMs": 1772504123781,
       "schedule": {
         "kind": "cron",
         "expr": "15 7,13,21 * * *",
@@ -934,14 +936,14 @@
         "channel": "last"
       },
       "state": {
-        "lastRunAtMs": 1772475300032,
+        "lastRunAtMs": 1772504118038,
         "lastStatus": "ok",
-        "lastDurationMs": 6598,
+        "lastDurationMs": 5743,
         "consecutiveErrors": 0,
         "lastRunStatus": "ok",
         "lastDelivered": false,
         "lastDeliveryStatus": "not-delivered",
-        "nextRunAtMs": 1772504100000
+        "nextRunAtMs": 1772540100000
       },
       "agentId": "cron-health"
     },
@@ -950,7 +952,7 @@
       "name": "🧠 Memory Consolidation",
       "enabled": true,
       "createdAtMs": 1771322310876,
-      "updatedAtMs": 1772266416821,
+      "updatedAtMs": 1772525595299,
       "schedule": {
         "kind": "cron",
         "expr": "12 3 * * *",
@@ -969,14 +971,14 @@
         "channel": "last"
       },
       "state": {
-        "nextRunAtMs": 1772525520000,
-        "lastRunAtMs": 1772266320025,
-        "lastStatus": "ok",
-        "lastDurationMs": 96796,
-        "consecutiveErrors": 0,
-        "lastRunStatus": "ok",
-        "lastDelivered": true,
-        "lastDeliveryStatus": "delivered"
+        "nextRunAtMs": 1772611920000,
+        "lastRunAtMs": 1772525520028,
+        "lastStatus": "error",
+        "lastDurationMs": 75271,
+        "consecutiveErrors": 1,
+        "lastRunStatus": "error",
+        "lastDeliveryStatus": "unknown",
+        "lastError": "No delivery target resolved for channel \"telegram\". Set delivery.to."
       },
       "agentId": "cron-maintenance"
     },
@@ -985,7 +987,7 @@
       "name": "🔍 Proprioception: Cron & Tool Health",
       "enabled": true,
       "createdAtMs": 1771323577113,
-      "updatedAtMs": 1772495385678,
+      "updatedAtMs": 1772527783237,
       "schedule": {
         "kind": "every",
         "everyMs": 3600000,
@@ -1004,10 +1006,10 @@
         "channel": "last"
       },
       "state": {
-        "nextRunAtMs": 1772498977605,
-        "lastRunAtMs": 1772495377605,
+        "nextRunAtMs": 1772531377901,
+        "lastRunAtMs": 1772527777901,
         "lastStatus": "ok",
-        "lastDurationMs": 8073,
+        "lastDurationMs": 5336,
         "consecutiveErrors": 0,
         "lastRunStatus": "ok",
         "lastDeliveryStatus": "not-delivered",
@@ -1020,7 +1022,7 @@
       "name": "📊 Proprioception: Budget & Self-Model",
       "enabled": true,
       "createdAtMs": 1771323590473,
-      "updatedAtMs": 1772488970731,
+      "updatedAtMs": 1772528203153,
       "schedule": {
         "kind": "every",
         "everyMs": 14400000,
@@ -1039,14 +1041,14 @@
         "channel": "last"
       },
       "state": {
-        "nextRunAtMs": 1772503190677,
-        "lastRunAtMs": 1772488790677,
-        "lastStatus": "error",
-        "lastDurationMs": 180054,
-        "consecutiveErrors": 1,
-        "lastRunStatus": "error",
-        "lastDeliveryStatus": "not-requested",
-        "lastError": "cron: job execution timed out"
+        "nextRunAtMs": 1772542510323,
+        "lastRunAtMs": 1772528110323,
+        "lastStatus": "ok",
+        "lastDurationMs": 92830,
+        "consecutiveErrors": 0,
+        "lastRunStatus": "ok",
+        "lastDeliveryStatus": "not-delivered",
+        "lastDelivered": false
       },
       "agentId": "cron-health"
     },
@@ -1089,7 +1091,7 @@
       "description": "Immune System: threat detection and auto-healing scan",
       "enabled": true,
       "createdAtMs": 1771324082626,
-      "updatedAtMs": 1772493157778,
+      "updatedAtMs": 1772514775017,
       "schedule": {
         "kind": "cron",
         "expr": "11 */6 * * *",
@@ -1111,11 +1113,11 @@
         "bestEffort": true
       },
       "state": {
-        "lastRunAtMs": 1772493149650,
+        "lastRunAtMs": 1772514749651,
         "lastStatus": "ok",
-        "lastDurationMs": 8128,
+        "lastDurationMs": 25366,
         "consecutiveErrors": 0,
-        "nextRunAtMs": 1772514749622,
+        "nextRunAtMs": 1772536349622,
         "lastRunStatus": "ok",
         "lastDeliveryStatus": "not-delivered",
         "lastDelivered": false
@@ -1127,7 +1129,7 @@
       "name": "🎯 Mission Advancement (Nightly)",
       "enabled": true,
       "createdAtMs": 1771499531391,
-      "updatedAtMs": 1772247693822,
+      "updatedAtMs": 1772501636250,
       "schedule": {
         "kind": "cron",
         "expr": "30 20 * * *",
@@ -1145,10 +1147,10 @@
         "channel": "last"
       },
       "state": {
-        "nextRunAtMs": 1772501400000,
-        "lastRunAtMs": 1772247644250,
+        "nextRunAtMs": 1772587800000,
+        "lastRunAtMs": 1772501564728,
         "lastStatus": "ok",
-        "lastDurationMs": 49572,
+        "lastDurationMs": 71522,
         "consecutiveErrors": 0,
         "lastRunStatus": "ok",
         "lastDeliveryStatus": "delivered",
@@ -1177,7 +1179,8 @@
       },
       "delivery": {
         "mode": "announce",
-        "channel": "telegram"
+        "channel": "telegram",
+        "to": "8171372724"
       },
       "state": {
         "nextRunAtMs": 1773018000000,
@@ -1265,12 +1268,21 @@
       },
       "delivery": {
         "mode": "announce",
-        "channel": "telegram"
+        "channel": "telegram",
+        "to": "8171372724"
       },
       "state": {
-        "nextRunAtMs": 1772503200000
+        "nextRunAtMs": 1772589600000,
+        "lastRunAtMs": 1772503204799,
+        "lastRunStatus": "error",
+        "lastStatus": "error",
+        "lastDurationMs": 6554,
+        "lastError": "No delivery target resolved for channel \"telegram\". Set delivery.to.",
+        "lastDeliveryStatus": "unknown",
+        "consecutiveErrors": 1
       },
-      "agentId": "cron-maintenance"
+      "agentId": "cron-maintenance",
+      "updatedAtMs": 1772503211353
     }
   ]
 }
