@@ -11,7 +11,15 @@ function usage(): void {
 }
 
 function normalize(value: string): string {
-  return value.toLowerCase().replace(/[ -]/g, "_");
+  return value.toLowerCase().replace(/[\s-]+/g, "_");
+}
+
+function normalizeOutcome(raw: string): "success" | "skipped" | "fail" {
+  const v = normalize(raw);
+  if (["success", "ok", "pass", "passed", "healthy", "info"].includes(v)) return "success";
+  if (["skip", "skipped", "noop", "no_op", "n_a", "na"].includes(v)) return "skipped";
+  if (["fail", "failed", "failure", "error", "warning", "warn", "critical"].includes(v)) return "fail";
+  return "skipped";
 }
 
 async function main(): Promise<number> {
@@ -44,92 +52,73 @@ async function main(): Promise<number> {
     return 1;
   }
 
-  if (!/^(success|skipped|fail)$/.test(outcome)) {
-    process.stderr.write("Error: outcome must be one of: success, skipped, fail\n");
-    return 1;
-  }
-
+  const normalizedOutcome = normalizeOutcome(outcome);
   const checkName = normalize(checkNameRaw);
 
-  let actionType = "";
-  let actionName = "";
+  const taxonomy: Record<string, { actionType: string; actionName: string }> = {
+    email: { actionType: "email_triage", actionName: "heartbeat_email_triage" },
+    email_triage: { actionType: "email_triage", actionName: "heartbeat_email_triage" },
+    feedback_triage: { actionType: "email_triage", actionName: "heartbeat_email_triage" },
+    feedback_pipeline: { actionType: "email_triage", actionName: "heartbeat_email_triage" },
 
-  switch (checkName) {
-    case "email":
-    case "email_triage":
-      actionType = "email_triage";
-      actionName = "heartbeat_email_triage";
-      break;
-    case "calendar":
-    case "calendar_check":
-    case "calendar_lookahead":
-      actionType = "calendar_check";
-      actionName = "heartbeat_calendar_lookahead";
-      break;
-    case "portfolio":
-    case "portfolio_check":
-    case "portfolio_alerts":
-      actionType = "portfolio_check";
-      actionName = "heartbeat_portfolio_alerts";
-      break;
-    case "fitness":
-    case "fitness_check":
-    case "fitness_checkin":
-      actionType = "fitness_check";
-      actionName = "heartbeat_fitness_checkin";
-      break;
-    case "weather":
-    case "weather_check":
-      actionType = "weather_check";
-      actionName = "heartbeat_weather";
-      break;
-    case "budget":
-    case "budget_check":
-    case "api_budget":
-    case "api_budget_check":
-      actionType = "budget_check";
-      actionName = "heartbeat_api_budget_check";
-      break;
-    case "tech_news":
-    case "news":
-    case "tech":
-      actionType = "tech_news";
-      actionName = "heartbeat_tech_news";
-      break;
-    case "mission":
-    case "mission_task":
-    case "mission_advancement":
-      actionType = "mission_task";
-      actionName = "heartbeat_mission_advancement";
-      break;
-    case "task_execution":
-    case "task_queue_execution":
-    case "task_queue":
-      actionType = "task_execution";
-      actionName = "heartbeat_task_queue_execution";
-      break;
-    case "system_health":
-    case "health":
-    case "watchlist":
-    case "proactive_intelligence":
-      actionType = "system_health";
-      actionName = "heartbeat_system_health";
-      break;
-    default:
-      process.stderr.write(`Error: unsupported check_name '${checkNameRaw}'\n`);
-      process.stderr.write(
-        "Supported: email_triage, calendar, portfolio, fitness, weather, budget, tech_news, mission_advancement, task_queue_execution, system_health\n"
-      );
-      return 1;
+    calendar: { actionType: "calendar_check", actionName: "heartbeat_calendar_lookahead" },
+    calendar_check: { actionType: "calendar_check", actionName: "heartbeat_calendar_lookahead" },
+    calendar_lookahead: { actionType: "calendar_check", actionName: "heartbeat_calendar_lookahead" },
+
+    portfolio: { actionType: "portfolio_check", actionName: "heartbeat_portfolio_alerts" },
+    portfolio_check: { actionType: "portfolio_check", actionName: "heartbeat_portfolio_alerts" },
+    portfolio_alerts: { actionType: "portfolio_check", actionName: "heartbeat_portfolio_alerts" },
+
+    fitness: { actionType: "fitness_check", actionName: "heartbeat_fitness_checkin" },
+    fitness_check: { actionType: "fitness_check", actionName: "heartbeat_fitness_checkin" },
+    fitness_checkin: { actionType: "fitness_check", actionName: "heartbeat_fitness_checkin" },
+
+    weather: { actionType: "weather_check", actionName: "heartbeat_weather" },
+    weather_check: { actionType: "weather_check", actionName: "heartbeat_weather" },
+
+    budget: { actionType: "budget_check", actionName: "heartbeat_api_budget_check" },
+    budget_check: { actionType: "budget_check", actionName: "heartbeat_api_budget_check" },
+    api_budget: { actionType: "budget_check", actionName: "heartbeat_api_budget_check" },
+    api_budget_check: { actionType: "budget_check", actionName: "heartbeat_api_budget_check" },
+
+    tech_news: { actionType: "tech_news", actionName: "heartbeat_tech_news" },
+    news: { actionType: "tech_news", actionName: "heartbeat_tech_news" },
+    tech: { actionType: "tech_news", actionName: "heartbeat_tech_news" },
+
+    mission: { actionType: "mission_task", actionName: "heartbeat_mission_advancement" },
+    mission_task: { actionType: "mission_task", actionName: "heartbeat_mission_advancement" },
+    mission_advancement: { actionType: "mission_task", actionName: "heartbeat_mission_advancement" },
+
+    task_execution: { actionType: "task_execution", actionName: "heartbeat_task_queue_execution" },
+    task_queue_execution: { actionType: "task_execution", actionName: "heartbeat_task_queue_execution" },
+    task_queue: { actionType: "task_execution", actionName: "heartbeat_task_queue_execution" },
+    task_board: { actionType: "task_execution", actionName: "heartbeat_task_queue_execution" },
+
+    system_health: { actionType: "system_health", actionName: "heartbeat_system_health" },
+    health: { actionType: "system_health", actionName: "heartbeat_system_health" },
+    proactive_intelligence: { actionType: "system_health", actionName: "heartbeat_system_health" },
+    watchlist: { actionType: "system_health", actionName: "heartbeat_system_health" },
+    heartbeat_state: { actionType: "system_health", actionName: "heartbeat_system_health" },
+    cron_delivery: { actionType: "system_health", actionName: "heartbeat_system_health" },
+    cron_auto_retry: { actionType: "system_health", actionName: "heartbeat_system_health" },
+    commitments: { actionType: "system_health", actionName: "heartbeat_system_health" },
+    subagent_reaper: { actionType: "system_health", actionName: "heartbeat_system_health" },
+  };
+
+  const mapped = taxonomy[checkName];
+  if (!mapped) {
+    process.stderr.write(`Error: unsupported check_name '${checkNameRaw}'\n`);
+    process.stderr.write("Supported via taxonomy map; add new aliases in tools/log-heartbeat-decision.ts\n");
+    return 1;
   }
 
   const res = spawnSync(
     logDecisionScript,
     [
       "heartbeat",
-      actionType,
-      actionName,
-      outcome,
+      mapped.actionType,
+      mapped.actionName,
+      normalizedOutcome,
       reasoning,
       confidence,
       "",

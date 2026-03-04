@@ -25,7 +25,7 @@ MARKET_TXT="$TMP_DIR/market.txt"
 PORTFOLIO_JSON="$TMP_DIR/portfolio.json"
 
 # 1) Calendar load + deadlines (requested command first)
-if ! gog cal list "Clawdbot-Calendar" --from today --to +7d --plain >"$CAL_OUT" 2>/dev/null; then
+if ! gog cal list "Clawdbot-Calendar" --from today --to "$WEEK_END" --plain >"$CAL_OUT" 2>/dev/null; then
   CAL_ID="60e1d0b7ca7586249ee94341d65076f28d9b9f3ec67d89b0709371c0ff82d517@group.calendar.google.com"
   gog calendar events "$CAL_ID" --from "$TODAY" --to "$WEEK_END" --json >"$CAL_OUT" 2>/dev/null || echo "(calendar unavailable)" >"$CAL_OUT"
 fi

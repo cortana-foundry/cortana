@@ -140,15 +140,18 @@ function run(): number {
   };
   const db = process.env.CORTANA_DATABASE_URL || process.env.DATABASE_URL || "cortana";
 
+  const q = (value: string): string => `'${String(value).replace(/'/g, "''")}'`;
   const sql = `
     INSERT INTO cortana_decision_traces (
       trace_id,event_id,task_id,run_id,trigger_type,action_type,action_name,
       reasoning,confidence,outcome,data_inputs,metadata
     ) VALUES (
-      :'trace_id', NULLIF(:'event_id','')::bigint, NULLIF(:'task_id','')::bigint,
-      NULLIF(:'run_id',''), :'trigger', :'action_type', :'action_name',
-      NULLIF(:'reasoning',''), NULLIF(:'confidence','')::numeric, :'outcome',
-      :'data_inputs'::jsonb, :'metadata'::jsonb
+      ${q(args.traceId)}, NULLIF(${q(args.eventId == null ? "" : String(args.eventId))},'')::bigint,
+      NULLIF(${q(args.taskId == null ? "" : String(args.taskId))},'')::bigint,
+      NULLIF(${q(args.runId == null ? "" : args.runId)},''), ${q(args.trigger)}, ${q(args.actionType)}, ${q(args.actionName)},
+      NULLIF(${q(args.reasoning == null ? "" : args.reasoning)},''), NULLIF(${q(args.confidence == null ? "" : String(args.confidence))},'')::numeric,
+      ${q(args.outcome)},
+      ${q(dataInputs)}::jsonb, ${q(metadata)}::jsonb
     )
     ON CONFLICT (trace_id) DO UPDATE SET
       event_id = EXCLUDED.event_id,
@@ -164,36 +167,7 @@ function run(): number {
       metadata = EXCLUDED.metadata;
     `;
 
-  const cmd = [
-    PSQL_BIN,
-    db,
-    "-v",
-    `trace_id=${args.traceId}`,
-    "-v",
-    `event_id=${args.eventId == null ? "" : args.eventId}`,
-    "-v",
-    `task_id=${args.taskId == null ? "" : args.taskId}`,
-    "-v",
-    `run_id=${args.runId == null ? "" : args.runId}`,
-    "-v",
-    `trigger=${args.trigger}`,
-    "-v",
-    `action_type=${args.actionType}`,
-    "-v",
-    `action_name=${args.actionName}`,
-    "-v",
-    `reasoning=${args.reasoning == null ? "" : args.reasoning}`,
-    "-v",
-    `confidence=${args.confidence == null ? "" : args.confidence}`,
-    "-v",
-    `outcome=${args.outcome}`,
-    "-v",
-    `data_inputs=${dataInputs}`,
-    "-v",
-    `metadata=${metadata}`,
-    "-c",
-    sql,
-  ];
+  const cmd = [PSQL_BIN, db, "-v", "ON_ERROR_STOP=1", "-c", sql];
 
   const proc = spawnSync(cmd[0], cmd.slice(1), { encoding: "utf8", env });
   if (proc.status !== 0) {
