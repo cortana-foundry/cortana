@@ -212,6 +212,15 @@ After each check, log a decision trace so Mission Control reflects what ran and 
 4. Always run proactive watchlist scan and task detection/queue execution.
 5. If nothing urgent → reply `HEARTBEAT_OK`.
 6. If something needs attention → alert with concise context; auto-heal silently when safe.
+
+### Output Format (STRICT)
+
+**Keep heartbeat results to 1–2 sentences max.** Hamel reads these on Telegram — walls of text get ignored.
+
+- **All green:** `HEARTBEAT_OK`
+- **Issues found:** One sentence per issue, e.g.: `⚠️ Email triage script broken (missing PSQL_BIN export). Calendar lookahead failed (bad --to syntax).`
+- **Never include:** check-by-check logs, raw counts, epoch timestamps, JSON, task board row counts, "0 tasks created / 0 triaged", or any nominal/passing check details.
+- **Rule of thumb:** If a check passed, don't mention it. Only surface what's broken or needs attention.
 7. Run Anthropic budget guard every 4h during business hours; alert when remaining credits < $20 or projected burn > $25/day.
 8. Enforce spend controls:
    - Heavy sessions (>120k total tokens) should be compacted/reset and moved off Opus where possible.
