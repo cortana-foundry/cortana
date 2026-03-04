@@ -263,11 +263,13 @@ function checkCriticalTools(): Check {
 
 function checkHeartbeatState(): Check {
   const check = makeCheck("heartbeat_state");
-  const filePath = path.join(REPO_ROOT, "memory", "heartbeat-state.json");
-  const details: Json = { path: filePath };
+  const runtimePath = path.join(os.homedir(), ".openclaw", "memory", "heartbeat-state.json");
+  const repoPath = path.join(REPO_ROOT, "memory", "heartbeat-state.json");
+  const filePath = fs.existsSync(runtimePath) ? runtimePath : repoPath;
+  const details: Json = { path: filePath, runtime_path: runtimePath, repo_path: repoPath };
 
   if (!fs.existsSync(filePath)) {
-    fail(check, "heartbeat-state.json is missing");
+    fail(check, "heartbeat-state.json is missing (runtime + repo)");
     check.details = details;
     return check;
   }

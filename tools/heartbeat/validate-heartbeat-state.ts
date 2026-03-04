@@ -38,7 +38,7 @@ function logWriteTelemetry(source: string, dbName: string, oldHash: string | nul
 }
 
 async function main(): Promise<void> {
-  const stateFile = process.env.HEARTBEAT_STATE_FILE || path.join(os.homedir(), "openclaw/memory/heartbeat-state.json");
+  const stateFile = process.env.HEARTBEAT_STATE_FILE || path.join(os.homedir(), ".openclaw", "memory", "heartbeat-state.json");
   const dbName = process.env.DB_NAME || "cortana";
   const snapshotIntervalSec = Number(process.env.SNAPSHOT_INTERVAL_SEC || "21600");
   const nowMs = Date.now();
