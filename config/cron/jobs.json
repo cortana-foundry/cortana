@@ -1204,9 +1204,9 @@
       "wakeMode": "now",
       "payload": {
         "kind": "agentTurn",
-        "message": "Run the token optimizer usage report and output the results:\n\ncd /Users/hd/Developer/cortana-external/skills/token-optimizer && npx tsx src/index.ts --usage\n\nIf estimated daily cost exceeds $5, flag it as a warning. Otherwise just output the report.",
+        "message": "Run the token optimizer usage report:\ncd /Users/hd/Developer/cortana-external/skills/token-optimizer && npx tsx src/index.ts --usage\n\nReturn a SHORT Telegram-friendly summary only (max 8 lines), format:\n💰 Token Usage Daily\nCost: $X today\nThresholds: soft $2 | hard $5\nStatus: OK / SOFT WARNING / HARD WARNING\nSessions: total + main + cron-isolated + cron-main\nTop spender: <session> <tokens> <$>\n\nRules:\n- If cost >= $5 => HARD WARNING\n- Else if cost >= $2 => SOFT WARNING\n- Else => OK\n- Do not include full top-10 table or long breakdown unless HARD WARNING.",
         "model": "openai-codex/gpt-5.1",
-        "timeoutSeconds": 60
+        "timeoutSeconds": 120
       },
       "delivery": {
         "mode": "announce",
