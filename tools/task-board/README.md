@@ -49,11 +49,12 @@ tools/task-board/state-enforcer.sh spawn-start <task_id> <assigned_to>
 ```
 
 Rules:
-- Allowed only when task status is `pending`
+- Allowed only when task status is `ready`
 - Sets:
   - `status = 'in_progress'`
   - `assigned_to = <assigned_to>`
   - `updated_at = CURRENT_TIMESTAMP`
+- **Hard requirement:** run this in the same action block as sub-agent spawn. If it returns `ok=false`, abort the spawn.
 
 ### 2) complete
 
@@ -64,7 +65,7 @@ tools/task-board/state-enforcer.sh complete <task_id> "<outcome>"
 Rules:
 - Allowed only when task status is `in_progress`
 - Sets:
-  - `status = 'done'`
+  - `status = 'completed'`
   - `completed_at = NOW()`
   - `outcome = <outcome>`
   - `updated_at = CURRENT_TIMESTAMP`
@@ -105,10 +106,10 @@ tools/task-board/state-enforcer.sh reset-stale
 ```
 
 Finds tasks that are:
-- `status = 'pending'`
+- `status = 'ready'`
 - stale for more than 7 days (`updated_at`/`created_at`)
 
-Touches them back to `pending` and appends a staleness note into `metadata.stale_reset` with timestamp and note.
+Touches them back to `ready` and appends a staleness note into `metadata.stale_reset` with timestamp and note.
 
 Logs `task_stale_reset` and returns all touched task rows in JSON.
 
