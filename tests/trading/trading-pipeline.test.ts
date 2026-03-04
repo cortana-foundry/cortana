@@ -84,4 +84,59 @@ describe("trading pipeline orchestration", () => {
 
     expect(council).toHaveBeenCalledTimes(2);
   });
+
+  it("limits correction shadow watchlist to top 5 by score across both scanners", async () => {
+    const canslimWatchHeavy = `📈 Trading Advisor - CANSLIM Scan
+Market: correction | Position Sizing: 0%
+Summary: 4 candidates | BUY 0 | WATCH 4 | NO_BUY 0
+• AAA (6/12) → WATCH
+  Watch setup
+• BBB (11/12) → WATCH
+  Watch setup
+• CCC (8/12) → WATCH
+  Watch setup
+• DDD (5/12) → WATCH
+  Watch setup`;
+
+    const dipWatchHeavy = `📉 Trading Advisor - Dip Buyer Scan
+Market: correction | Position Sizing: 50%
+Summary: 4 candidates | BUY 0 | WATCH 4 | NO_BUY 0
+• EEE (10/12) → WATCH
+  Watch setup
+• FFF (9/12) → WATCH
+  Watch setup
+• GGG (7/12) → WATCH
+  Watch setup
+• HHH (4/12) → WATCH
+  Watch setup`;
+
+    const report = await runTradingPipeline({
+      runCommand: (_cmd, args) => (args[0] === "canslim_alert.py" ? canslimWatchHeavy : dipWatchHeavy),
+      council: async () => ({ verdicts: [] }),
+    });
+
+    expect(report).toContain("👁️ Shadow Mode (Correction): top WATCH only, no execution changes");
+    const shadowSection = report.split("👁️ Shadow Mode (Correction): top WATCH only, no execution changes")[1] ?? "";
+
+    expect(shadowSection).toContain("BBB (11/12) → WATCH");
+    expect(shadowSection).toContain("EEE (10/12) → WATCH");
+    expect(shadowSection).toContain("FFF (9/12) → WATCH");
+    expect(shadowSection).toContain("CCC (8/12) → WATCH");
+    expect(shadowSection).toContain("GGG (7/12) → WATCH");
+    expect(shadowSection).not.toContain("AAA (6/12) → WATCH");
+    expect(shadowSection).not.toContain("DDD (5/12) → WATCH");
+    expect(shadowSection).not.toContain("HHH (4/12) → WATCH");
+  });
+
+  it("passes scanner-specific raw alert output to council", async () => {
+    const council = vi.fn(async () => ({ verdicts: [] }));
+
+    await runTradingPipeline({
+      runCommand: (_cmd, args) => (args[0] === "canslim_alert.py" ? CANSLIM_BUY : DIP_BUY),
+      council,
+    });
+
+    expect(council).toHaveBeenNthCalledWith(1, CANSLIM_BUY);
+    expect(council).toHaveBeenNthCalledWith(2, DIP_BUY);
+  });
 });
