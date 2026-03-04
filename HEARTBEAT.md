@@ -121,6 +121,12 @@ Use `memory/heartbeat-state.json` to pick the stalest 1–2 checks per heartbeat
   - Auto-logs violations to `cortana_immune_incidents` and `cortana_feedback`.
   - Alert Hamel on repeat violations.
 
+- **Session size guardrail (every heartbeat)**
+  - Run `npx tsx ~/openclaw/tools/guardrails/session-size-guard.ts`
+  - Monitors session file sizes across all agents.
+  - Warns at 1MB, alerts at 2MB.
+  - Auto-cleanup available via `--cleanup` flag.
+
 - **Cron delivery monitoring (every heartbeat)**
   - Run `npx tsx tools/alerting/check-cron-delivery.ts` every heartbeat.
 

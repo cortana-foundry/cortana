@@ -1,0 +1,69 @@
+import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+import { captureStdout, resetProcess } from "../test-utils";
+
+const execSync = vi.hoisted(() => vi.fn());
+vi.mock("node:child_process", () => ({ execSync }));
+
+afterEach(() => {
+  vi.restoreAllMocks();
+  resetProcess();
+  execSync.mockReset();
+});
+
+function makeSessionFile(base: string, agent: string, fileName: string, sizeBytes: number): string {
+  const sessionsDir = join(base, agent, "sessions");
+  mkdirSync(sessionsDir, { recursive: true });
+  const file = join(sessionsDir, fileName);
+  writeFileSync(file, "x".repeat(sizeBytes));
+  return file;
+}
+
+describe("session-size-guard", () => {
+  it("finds oversized files", async () => {
+    const root = mkdtempSync(join(tmpdir(), "session-size-guard-"));
+    makeSessionFile(root, "alpha", "small.jsonl", 200 * 1024);
+    const oversized = makeSessionFile(root, "alpha", "big.jsonl", 1300 * 1024);
+
+    const mod = await import("../../tools/guardrails/session-size-guard");
+    const files = mod.getSessionFiles(root);
+    const results = mod.evaluateFiles(files, { warningThresholdKb: 1024, alertThresholdKb: 2048 });
+
+    expect(results).toHaveLength(1);
+    expect(results[0]?.sessionFile).toBe(oversized);
+    expect(results[0]?.severity).toBe("warning");
+  });
+
+  it("applies warning/alert threshold logic", async () => {
+    const root = mkdtempSync(join(tmpdir(), "session-size-guard-"));
+    makeSessionFile(root, "alpha", "warn.jsonl", 1200 * 1024);
+    makeSessionFile(root, "beta", "alert.jsonl", 2500 * 1024);
+
+    const mod = await import("../../tools/guardrails/session-size-guard");
+    const files = mod.getSessionFiles(root);
+    const results = mod.evaluateFiles(files, { warningThresholdKb: 1024, alertThresholdKb: 2048 });
+
+    expect(results.map((r: any) => r.severity).sort()).toEqual(["alert", "warning"]);
+  });
+
+  it("prints JSON summary when oversized sessions exist", async () => {
+    const root = mkdtempSync(join(tmpdir(), "session-size-guard-"));
+    makeSessionFile(root, "gamma", "oversized.jsonl", 1100 * 1024);
+
+    const mod = await import("../../tools/guardrails/session-size-guard");
+    const stdout = captureStdout();
+
+    const code = mod.run([], root);
+
+    expect(code).toBe(0);
+    expect(stdout.writes.length).toBe(1);
+    const payload = JSON.parse(stdout.writes[0] ?? "{}");
+    expect(payload.source).toBe("session-size-guard");
+    expect(payload.totalOversized).toBe(1);
+    expect(payload.sessions[0].agent).toBe("gamma");
+    expect(payload.sessions[0].severity).toBe("warning");
+  });
+});
