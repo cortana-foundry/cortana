@@ -1,0 +1,66 @@
+{
+  "repo": "openclaw/openclaw",
+  "last_reviewed_at": "2026-03-04T11:25:00-05:00",
+  "issues": [
+    {
+      "key": "subagent-aborted-runs",
+      "title": "Sub-agent runs intermittently abort/time out",
+      "url": "https://github.com/openclaw/openclaw/issues",
+      "local_workarounds": [
+        {
+          "name": "watchdog retry wrapper",
+          "path": "tools/subagent-watchdog/check-subagents-with-retry.ts"
+        },
+        {
+          "name": "reaper stale-run recovery",
+          "path": "tools/reaper/reaper.ts"
+        }
+      ]
+    },
+    {
+      "key": "provider-failover-rate-limit",
+      "title": "Provider failover/rate-limit escalation behavior",
+      "url": "https://github.com/openclaw/openclaw/issues",
+      "local_workarounds": [
+        {
+          "name": "task-board retry budget guardrail task",
+          "path": "tools/task-board/auto-executor.ts"
+        },
+        {
+          "name": "subagent reliability runbook",
+          "path": "docs/subagent-reliability-runbook.md"
+        }
+      ]
+    },
+    {
+      "key": "codex-routing-profile-quirks",
+      "title": "openai-codex routing/profile quirks",
+      "url": "https://github.com/openclaw/openclaw/issues",
+      "local_workarounds": [
+        {
+          "name": "model/profile pinning",
+          "path": "config/agent-profiles.json"
+        },
+        {
+          "name": "openclaw model aliases",
+          "path": "config/openclaw.json"
+        }
+      ]
+    },
+    {
+      "key": "runtime-repo-drift",
+      "title": "Runtime/repo drift and deploy warning gaps",
+      "url": "https://github.com/openclaw/openclaw/issues",
+      "local_workarounds": [
+        {
+          "name": "runtime-repo drift monitor",
+          "path": "tools/monitoring/runtime-repo-drift-monitor.ts"
+        },
+        {
+          "name": "deploy drift warning",
+          "path": "tools/release/deploy-drift-warning.sh"
+        }
+      ]
+    }
+  ]
+}
