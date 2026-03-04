@@ -84,6 +84,23 @@ describe("trading pipeline orchestration", () => {
     expect(report).toContain("NVDA: APPROVED");
   });
 
+  it("preserves CANSLIM correction hard gate even if scanner emits BUY", async () => {
+    const correctionCanslimBuy = `📈 Trading Advisor - CANSLIM Scan
+Market: correction | Position Sizing: 0%
+Status: risk-off
+Summary: scanned 120 | evaluated 1 | threshold-passed 1 | BUY 1 | WATCH 0 | NO_BUY 0
+• NVDA (9/12) → BUY
+  Entry $900.00 | Stop $855.00`;
+
+    const report = await runTradingPipeline({
+      runCommand: (_cmd, args) => (args[0] === "canslim_alert.py" ? correctionCanslimBuy : DIP_NO_BUY),
+      council: async () => ({ verdicts: [] }),
+    });
+
+    expect(report).toContain("CANSLIM hard gate blocked 1 BUY signal(s) in correction");
+    expect(report).toContain("NVDA (9/12) → NO_BUY");
+  });
+
   it("shows correction shadow mode watch section", async () => {
     const report = await runTradingPipeline({
       runCommand: (_cmd, args) => (args[0] === "canslim_alert.py" ? CANSLIM_NO_BUY : DIP_NO_BUY),
@@ -173,6 +190,8 @@ Summary: 4 candidates | BUY 0 | WATCH 4 | NO_BUY 0
     expect(report).toContain("Regime/Gates: correction=YES");
     expect(report).toContain("Macro Gate: OPEN | VIX 23 | PCR 1.07 | HY 450 bps (fallback_default_450)");
     expect(report).toContain("HY Note: FRED HY spread unavailable after retries");
+    expect(report).toContain("Dip Profile: correction | buy>=7 | watch>=6 | max_pos=5%");
+    expect(report).toContain("Blockers: Credit veto active (1)");
   });
 
   it("reports top blocker when a scanner emits zero BUY/WATCH signals", async () => {
