@@ -7,7 +7,7 @@
       "name": "☀️ Morning brief (Hamel)",
       "enabled": true,
       "createdAtMs": 1769550483487,
-      "updatedAtMs": 1772537939466,
+      "updatedAtMs": 1772627409650,
       "schedule": {
         "kind": "cron",
         "expr": "30 7 * * *",
@@ -21,10 +21,10 @@
         "model": "openai-codex/gpt-5.2-codex"
       },
       "state": {
-        "nextRunAtMs": 1772627400000,
-        "lastRunAtMs": 1772287864547,
+        "nextRunAtMs": 1772713800000,
+        "lastRunAtMs": 1772627400033,
         "lastStatus": "ok",
-        "lastDurationMs": 81184,
+        "lastDurationMs": 9617,
         "consecutiveErrors": 0,
         "lastRunStatus": "ok",
         "lastDelivered": false,
@@ -139,7 +139,7 @@
       "name": "📅 Calendar reminders → Telegram (ALL calendars)",
       "enabled": true,
       "createdAtMs": 1769585938649,
-      "updatedAtMs": 1772597230894,
+      "updatedAtMs": 1772629632078,
       "schedule": {
         "kind": "cron",
         "expr": "7 6-23 * * *",
@@ -154,10 +154,10 @@
         "timeoutSeconds": 90
       },
       "state": {
-        "nextRunAtMs": 1772622420000,
-        "lastRunAtMs": 1772597220031,
+        "nextRunAtMs": 1772633220000,
+        "lastRunAtMs": 1772629620030,
         "lastStatus": "ok",
-        "lastDurationMs": 10863,
+        "lastDurationMs": 12048,
         "consecutiveErrors": 0,
         "lastRunStatus": "ok",
         "lastDelivered": false,
@@ -234,7 +234,7 @@
       "name": "📈 Stock Market Brief (daily)",
       "enabled": true,
       "createdAtMs": 1769683871728,
-      "updatedAtMs": 1772113793807,
+      "updatedAtMs": 1772629113682,
       "schedule": {
         "kind": "cron",
         "expr": "55 7 * * 1-5",
@@ -249,14 +249,14 @@
         "timeoutSeconds": 120
       },
       "state": {
-        "nextRunAtMs": 1772629043770,
-        "lastRunAtMs": 1772113752175,
+        "nextRunAtMs": 1772715443770,
+        "lastRunAtMs": 1772629048699,
         "lastStatus": "ok",
-        "lastDurationMs": 41632,
+        "lastDurationMs": 64983,
         "consecutiveErrors": 0,
         "lastRunStatus": "ok",
-        "lastDeliveryStatus": "delivered",
-        "lastDelivered": true
+        "lastDeliveryStatus": "not-delivered",
+        "lastDelivered": false
       },
       "delivery": {
         "mode": "none"
@@ -268,7 +268,7 @@
       "name": "🏋️ Fitness Morning Brief (Hamel)",
       "enabled": true,
       "createdAtMs": 1769794739989,
-      "updatedAtMs": 1772111049561,
+      "updatedAtMs": 1772629986717,
       "schedule": {
         "kind": "cron",
         "expr": "12 8 * * *",
@@ -283,14 +283,14 @@
         "timeoutSeconds": 240
       },
       "state": {
-        "lastRunAtMs": 1772110980016,
+        "lastRunAtMs": 1772629920027,
         "lastStatus": "ok",
-        "lastDurationMs": 69545,
+        "lastDurationMs": 66690,
         "consecutiveErrors": 0,
         "lastRunStatus": "ok",
-        "lastDeliveryStatus": "delivered",
-        "lastDelivered": true,
-        "nextRunAtMs": 1772629920000
+        "lastDeliveryStatus": "not-delivered",
+        "lastDelivered": false,
+        "nextRunAtMs": 1772716320000
       },
       "delivery": {
         "mode": "none"
@@ -401,7 +401,7 @@
       "name": "📰 Newsletter Alert (real-time)",
       "enabled": true,
       "createdAtMs": 1769815538299,
-      "updatedAtMs": 1772536069553,
+      "updatedAtMs": 1772629767506,
       "schedule": {
         "kind": "cron",
         "expr": "7 6-16 * * *",
@@ -417,14 +417,14 @@
         "timeoutSeconds": 90
       },
       "state": {
-        "nextRunAtMs": 1772622517716,
-        "lastRunAtMs": 1772536027856,
+        "nextRunAtMs": 1772633317716,
+        "lastRunAtMs": 1772629717748,
         "lastStatus": "ok",
-        "lastDurationMs": 41697,
+        "lastDurationMs": 49758,
         "consecutiveErrors": 0,
         "lastRunStatus": "ok",
-        "lastDeliveryStatus": "delivered",
-        "lastDelivered": true
+        "lastDeliveryStatus": "not-delivered",
+        "lastDelivered": false
       },
       "delivery": {
         "mode": "none"
@@ -461,29 +461,6 @@
         "lastRunStatus": "ok",
         "lastDelivered": true,
         "lastDeliveryStatus": "delivered"
-      }
-    },
-    {
-      "id": "7e2c7deb-6832-4616-9d8b-8d8d86280e5e",
-      "agentId": "main",
-      "name": "📚 HW/Quiz Due Today (Mar 4)",
-      "enabled": true,
-      "deleteAfterRun": true,
-      "createdAtMs": 1770673238645,
-      "updatedAtMs": 1770673238645,
-      "schedule": {
-        "kind": "at",
-        "at": "2026-03-04T12:00:00.000Z"
-      },
-      "sessionTarget": "main",
-      "wakeMode": "now",
-      "payload": {
-        "kind": "systemEvent",
-        "text": "📚 Reminder: HW 04 + Quiz 04 (Pairwise and Orthogonal Arrays) due today for SSW 567. Classes at 6:30 PM.",
-        "model": "openai-codex/gpt-5.3-codex"
-      },
-      "state": {
-        "nextRunAtMs": 1772625600000
       }
     },
     {
@@ -821,7 +798,7 @@
       "name": "🌐 SAE World State Builder",
       "enabled": true,
       "createdAtMs": 1771268247494,
-      "updatedAtMs": 1772539205469,
+      "updatedAtMs": 1772625725773,
       "schedule": {
         "kind": "cron",
         "expr": "0 7,13,21 * * *",
@@ -839,10 +816,10 @@
         "channel": "last"
       },
       "state": {
-        "nextRunAtMs": 1772625647822,
-        "lastRunAtMs": 1772539200029,
+        "nextRunAtMs": 1772647247822,
+        "lastRunAtMs": 1772625720753,
         "lastStatus": "ok",
-        "lastDurationMs": 5440,
+        "lastDurationMs": 5020,
         "consecutiveErrors": 0,
         "lastRunStatus": "ok",
         "lastDelivered": false,
@@ -855,7 +832,7 @@
       "name": "🧠 SAE Cross-Domain Reasoner",
       "enabled": true,
       "createdAtMs": 1771268745562,
-      "updatedAtMs": 1772504123781,
+      "updatedAtMs": 1772626594000,
       "schedule": {
         "kind": "cron",
         "expr": "15 7,13,21 * * *",
@@ -875,14 +852,14 @@
         "channel": "last"
       },
       "state": {
-        "lastRunAtMs": 1772504118038,
+        "lastRunAtMs": 1772626582694,
         "lastStatus": "ok",
-        "lastDurationMs": 5743,
+        "lastDurationMs": 11306,
         "consecutiveErrors": 0,
         "lastRunStatus": "ok",
         "lastDelivered": false,
         "lastDeliveryStatus": "not-delivered",
-        "nextRunAtMs": 1772626582666
+        "nextRunAtMs": 1772648182666
       },
       "agentId": "cron-health"
     },
@@ -928,7 +905,7 @@
       "name": "🔍 Proprioception: Cron & Tool Health",
       "enabled": true,
       "createdAtMs": 1771323577113,
-      "updatedAtMs": 1772615983324,
+      "updatedAtMs": 1772630383415,
       "schedule": {
         "kind": "every",
         "everyMs": 3600000,
@@ -947,10 +924,10 @@
         "channel": "last"
       },
       "state": {
-        "nextRunAtMs": 1772619577328,
-        "lastRunAtMs": 1772615977328,
+        "nextRunAtMs": 1772633977443,
+        "lastRunAtMs": 1772630377443,
         "lastStatus": "ok",
-        "lastDurationMs": 5996,
+        "lastDurationMs": 5972,
         "consecutiveErrors": 0,
         "lastRunStatus": "ok",
         "lastDeliveryStatus": "not-delivered",
@@ -963,7 +940,7 @@
       "name": "📊 Proprioception: Budget & Self-Model",
       "enabled": true,
       "createdAtMs": 1771323590473,
-      "updatedAtMs": 1772605862437,
+      "updatedAtMs": 1772620246377,
       "schedule": {
         "kind": "every",
         "everyMs": 14400000,
@@ -973,7 +950,7 @@
       "wakeMode": "now",
       "payload": {
         "kind": "agentTurn",
-        "message": "Cortana proprioception budget/self-model updater.\n\n1) Setup: export PATH=\"/opt/homebrew/opt/postgresql@17/bin:$PATH\"\n2) Capture usage best-effort:\nnode /Users/hd/openclaw/skills/telegram-usage/handler.js > /tmp/proprio_usage.json 2>/tmp/proprio_usage.err || true\n\n3) Parse spend/burn/projected/pct from /tmp/proprio_usage.json (fallback 0) and capture breakdown raw[:4000].\n4) Insert snapshot:\npsql cortana -c \"INSERT INTO cortana_budget_log (spend_to_date, burn_rate, projected, breakdown, pct_used) VALUES (${SPEND:-0}, ${BURN:-0}, ${PROJECTED:-0}, '${BREAKDOWN}'::jsonb, ${PCT:-0});\"\n\n5) Update cortana_self_model via SQL CTE:\n- latest tool/cron health\n- budget penalty thresholds (>=50/75/90)\n- throttle tier normal/caution/restricted/emergency\n- upsert id=1 and return health summary\n\n6) Log throttle tier changes into cortana_throttle_log when changed.\n\n7) Output policy:\n- nominal => return NOTHING\n- degraded/critical => max 4 lines with score/status/tools_down/crons_failing/budget_pct/throttle_tier.\n\nShell compatibility: use POSIX-safe shell syntax only. Do NOT use bash-only builtins `mapfile` or `readarray`.",
+        "message": "Cortana proprioception budget/self-model updater.\n\n1) Setup: export PATH=\"/opt/homebrew/opt/postgresql@17/bin:$PATH\"\n2) Capture usage best-effort:\nnode /Users/hd/openclaw/skills/telegram-usage/handler.js > /tmp/proprio_usage.json 2>/tmp/proprio_usage.err || true\n\n3) Parse spend/burn/projected/pct from /tmp/proprio_usage.json (fallback 0) and capture breakdown raw[:4000].\n4) Insert snapshot:\npsql cortana -c \"INSERT INTO cortana_budget_log (spend_to_date, burn_rate, projected, breakdown, pct_used) VALUES (${SPEND:-0}, ${BURN:-0}, ${PROJECTED:-0}, '${BREAKDOWN}'::jsonb, ${PCT:-0});\"\n\n5) Update cortana_self_model via SQL CTE:\n- latest tool/cron health\n- budget penalty thresholds (>=50/75/90)\n- throttle tier normal/caution/restricted/emergency\n- upsert id=1 and return health summary\n\n6) Log throttle tier changes into cortana_throttle_log when changed.\n\n7) Output policy:\n- nominal => return NOTHING\n- degraded/critical => max 4 lines with score/status/tools_down/crons_failing/budget_pct/throttle_tier.",
         "model": "openai-codex/gpt-5.3-codex",
         "timeoutSeconds": 180
       },
@@ -982,10 +959,10 @@
         "channel": "last"
       },
       "state": {
-        "nextRunAtMs": 1772620190532,
-        "lastRunAtMs": 1772605790532,
+        "nextRunAtMs": 1772634590562,
+        "lastRunAtMs": 1772620190562,
         "lastStatus": "ok",
-        "lastDurationMs": 71905,
+        "lastDurationMs": 55815,
         "consecutiveErrors": 0,
         "lastRunStatus": "ok",
         "lastDeliveryStatus": "not-delivered",
@@ -1032,7 +1009,7 @@
       "description": "Immune System: threat detection and auto-healing scan",
       "enabled": true,
       "createdAtMs": 1771324082626,
-      "updatedAtMs": 1772601176335,
+      "updatedAtMs": 1772622776230,
       "schedule": {
         "kind": "cron",
         "expr": "11 */6 * * *",
@@ -1054,11 +1031,11 @@
         "bestEffort": true
       },
       "state": {
-        "lastRunAtMs": 1772601149645,
+        "lastRunAtMs": 1772622749653,
         "lastStatus": "ok",
-        "lastDurationMs": 26690,
+        "lastDurationMs": 26577,
         "consecutiveErrors": 0,
-        "nextRunAtMs": 1772622749622,
+        "nextRunAtMs": 1772644349622,
         "lastRunStatus": "ok",
         "lastDeliveryStatus": "not-delivered",
         "lastDelivered": false
@@ -1139,7 +1116,7 @@
       "name": "📊 Earnings Alert (daily)",
       "enabled": true,
       "createdAtMs": 1772108242543,
-      "updatedAtMs": 1772539270335,
+      "updatedAtMs": 1772625687348,
       "schedule": {
         "kind": "cron",
         "expr": "0 7 * * *",
@@ -1156,13 +1133,14 @@
         "mode": "none"
       },
       "state": {
-        "nextRunAtMs": 1772625600000,
-        "lastRunAtMs": 1772539205469,
+        "nextRunAtMs": 1772712000000,
+        "lastRunAtMs": 1772625605232,
         "lastRunStatus": "ok",
         "lastStatus": "ok",
-        "lastDurationMs": 64866,
-        "lastDeliveryStatus": "unknown",
-        "consecutiveErrors": 0
+        "lastDurationMs": 82116,
+        "lastDeliveryStatus": "not-delivered",
+        "consecutiveErrors": 0,
+        "lastDelivered": false
       },
       "agentId": "cron-market"
     },
@@ -1216,15 +1194,16 @@
       },
       "state": {
         "nextRunAtMs": 1772676000000,
-        "lastRunAtMs": 1772503204799,
-        "lastRunStatus": "error",
-        "lastStatus": "error",
-        "lastDurationMs": 6554,
-        "lastDeliveryStatus": "unknown",
-        "consecutiveErrors": 1
+        "lastRunAtMs": 1772619255677,
+        "lastRunStatus": "ok",
+        "lastStatus": "ok",
+        "lastDurationMs": 8711,
+        "lastDeliveryStatus": "delivered",
+        "consecutiveErrors": 0,
+        "lastDelivered": true
       },
       "agentId": "cron-maintenance",
-      "updatedAtMs": 1772503211353,
+      "updatedAtMs": 1772619335636,
       "id": "d999382d-afa0-41bb-9465-164b49100373"
     },
     {
@@ -1273,8 +1252,16 @@
         "mode": "none"
       },
       "state": {
-        "nextRunAtMs": 1772627400000
-      }
+        "nextRunAtMs": 1772713800000,
+        "lastRunAtMs": 1772629146044,
+        "lastRunStatus": "ok",
+        "lastStatus": "ok",
+        "lastDurationMs": 101430,
+        "lastDeliveryStatus": "not-delivered",
+        "consecutiveErrors": 0,
+        "lastDelivered": false
+      },
+      "updatedAtMs": 1772629247474
     },
     {
       "id": "e4db8a8d-945c-4af2-a8d5-e54f2fb4e792-collect",
@@ -1323,8 +1310,16 @@
         "mode": "none"
       },
       "state": {
-        "nextRunAtMs": 1772630100000
-      }
+        "nextRunAtMs": 1772716500000,
+        "lastRunAtMs": 1772630100025,
+        "lastRunStatus": "ok",
+        "lastStatus": "ok",
+        "lastDurationMs": 7094,
+        "lastDelivered": false,
+        "lastDeliveryStatus": "not-delivered",
+        "consecutiveErrors": 0
+      },
+      "updatedAtMs": 1772630107119
     },
     {
       "id": "cron-runtime-repo-drift-monitor-20260303",
@@ -1348,7 +1343,8 @@
         "mode": "none"
       },
       "state": {
-        "nextRunAtMs": 1772630400000
+        "nextRunAtMs": 1772630400000,
+        "runningAtMs": 1772630400025
       }
     },
     {
@@ -1368,18 +1364,18 @@
         "mode": "none"
       },
       "state": {
-        "nextRunAtMs": 1772616439344,
-        "lastRunAtMs": 1772615839344,
+        "nextRunAtMs": 1772630840061,
+        "lastRunAtMs": 1772630240061,
         "lastRunStatus": "ok",
         "lastStatus": "ok",
-        "lastDurationMs": 6878,
+        "lastDurationMs": 10064,
         "lastDelivered": false,
         "lastDeliveryStatus": "not-delivered",
         "consecutiveErrors": 0
       },
       "wakeMode": "now",
       "sessionTarget": "isolated",
-      "updatedAtMs": 1772615846222
+      "updatedAtMs": 1772630250125
     },
     {
       "id": "repo-drift-watchdog-daily",
@@ -1387,7 +1383,7 @@
       "name": "🧭 Repo Drift Watchdog (daily)",
       "enabled": true,
       "createdAtMs": 1772561763282,
-      "updatedAtMs": 1772561763282,
+      "updatedAtMs": 1772630114185,
       "schedule": {
         "kind": "cron",
         "expr": "15 8 * * *",
@@ -1403,7 +1399,13 @@
       },
       "state": {
         "consecutiveErrors": 0,
-        "nextRunAtMs": 1772630100000
+        "nextRunAtMs": 1772716500000,
+        "lastRunAtMs": 1772630107119,
+        "lastRunStatus": "ok",
+        "lastStatus": "ok",
+        "lastDurationMs": 7066,
+        "lastDelivered": false,
+        "lastDeliveryStatus": "not-delivered"
       },
       "delivery": {
         "mode": "none"
@@ -1430,16 +1432,16 @@
         "mode": "none"
       },
       "state": {
-        "nextRunAtMs": 1772616600000,
-        "lastRunAtMs": 1772615700030,
+        "nextRunAtMs": 1772631000000,
+        "lastRunAtMs": 1772630114185,
         "lastRunStatus": "ok",
         "lastStatus": "ok",
-        "lastDurationMs": 11939,
-        "lastDelivered": false,
+        "lastDurationMs": 10886,
         "lastDeliveryStatus": "not-delivered",
-        "consecutiveErrors": 0
+        "consecutiveErrors": 0,
+        "lastDelivered": false
       },
-      "updatedAtMs": 1772615711969
+      "updatedAtMs": 1772630125071
     },
     {
       "id": "session-lifecycle-policy-daily",
@@ -1496,7 +1498,7 @@
       "name": "🧯 Subagent Reliability Reaper (15m)",
       "enabled": true,
       "createdAtMs": 1772591273141,
-      "updatedAtMs": 1772615725037,
+      "updatedAtMs": 1772630133731,
       "schedule": {
         "kind": "cron",
         "expr": "*/15 * * * *",
@@ -1513,14 +1515,14 @@
         "mode": "none"
       },
       "state": {
-        "nextRunAtMs": 1772616600000,
-        "lastRunAtMs": 1772615711969,
+        "nextRunAtMs": 1772631000000,
+        "lastRunAtMs": 1772630125071,
         "lastRunStatus": "ok",
         "lastStatus": "ok",
-        "lastDurationMs": 13068,
-        "lastDelivered": false,
+        "lastDurationMs": 8660,
         "lastDeliveryStatus": "not-delivered",
-        "consecutiveErrors": 0
+        "consecutiveErrors": 0,
+        "lastDelivered": false
       }
     }
   ]
