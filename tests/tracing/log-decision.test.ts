@@ -78,6 +78,10 @@ describe("log-decision", () => {
     const payload = JSON.parse(consoleCapture.logs.join("\n"));
     expect(payload.ok).toBe(true);
     expect(payload.trace_id).toBe("trace-1");
+    const cmdArgs = spawnSync.mock.calls[0]?.[1] ?? [];
+    const sqlArg = String(cmdArgs[cmdArgs.length - 1] ?? "");
+    expect(sqlArg).toContain("INSERT INTO cortana_decision_traces");
+    expect(sqlArg).not.toContain(":'trace_id'");
     expect(exitSpy).toHaveBeenCalledWith(0);
   });
 });

@@ -60,6 +60,10 @@ async function main(): Promise<void> {
   const lookback = process.env.TRIAGE_QUERY || "is:unread newer_than:3d";
   const sendTelegram = process.env.TRIAGE_SEND_TELEGRAM || "0";
   const runInboxExecution = process.env.TRIAGE_RUN_INBOX_EXECUTION || "1";
+  const triageEnv = {
+    ...withPostgresPath(process.env),
+    PSQL_BIN: process.env.PSQL_BIN || PSQL_BIN,
+  };
 
   const rawRes = run("gog", ["--account", account, "gmail", "search", lookback, "--max", maxEmails, "--json"]);
   let rawText = rawRes.status === 0 ? rawRes.out : "[]";
@@ -86,7 +90,7 @@ async function main(): Promise<void> {
     const existing = run(
       PSQL_BIN,
       [db, "-t", "-A", "-c", `SELECT id FROM cortana_tasks WHERE status IN ('ready','in_progress') AND metadata->>'gmail_id'='${escId}' LIMIT 1;`],
-      withPostgresPath(process.env)
+      triageEnv
     ).out.trim();
     if (existing.replace(/ /g, "")) continue;
 
@@ -112,7 +116,7 @@ VALUES (
     'triage_bucket','${row.bucket}'
   )
 );`;
-    const ins = run(PSQL_BIN, [db, "-v", "ON_ERROR_STOP=1", "-c", sql], withPostgresPath(process.env));
+    const ins = run(PSQL_BIN, [db, "-v", "ON_ERROR_STOP=1", "-c", sql], triageEnv);
     if (ins.status === 0) created += 1;
   }
 
@@ -131,7 +135,7 @@ VALUES (
   if (runInboxExecution === "1") {
     const exists = run("test", ["-f", "tools/email/inbox_to_execution.py"]);
     if (exists.status === 0) {
-      const inbox = run("python3", ["tools/email/inbox_to_execution.py", "--output-json"]);
+      const inbox = run("python3", ["tools/email/inbox_to_execution.py", "--output-json"], triageEnv);
       if (inbox.out.trim()) {
         try {
           const data = JSON.parse(inbox.out);
@@ -146,7 +150,9 @@ VALUES (
   }
 
   if (sendTelegram === "1") {
-    run("openclaw", ["cron", "wake", "--mode", "now", "--text", digest]);
+    const guardScript = process.env.TELEGRAM_DELIVERY_GUARD || "/Users/hd/openclaw/tools/notifications/telegram-delivery-guard.sh";
+    const target = process.env.TELEGRAM_TARGET || "8171372724";
+    run(guardScript, [digest, target, "email_triage_digest"], triageEnv);
   }
 }
 

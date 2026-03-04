@@ -34,6 +34,8 @@ async function main(): Promise<number> {
   const safeTaskId = taskId || "";
   const safeDataInputs = dataInputsJson || "{}";
 
+  const q = (value: string): string => `'${String(value).replace(/'/g, "''")}'`;
+
   const sql = `
 INSERT INTO cortana_decision_traces (
   trace_id,
@@ -49,45 +51,24 @@ INSERT INTO cortana_decision_traces (
   metadata,
   completed_at
 ) VALUES (
-  :'trace_id',
-  :'trigger_type',
-  :'action_type',
-  :'action_name',
-  :'outcome',
-  NULLIF(:'reasoning', ''),
-  NULLIF(:'confidence', '')::numeric,
-  NULLIF(:'event_id', '')::bigint,
-  NULLIF(:'task_id', '')::bigint,
-  COALESCE(NULLIF(:'data_inputs', ''), '{}')::jsonb,
-  jsonb_build_object('logged_by', 'tools/log-decision.sh'),
-  CASE WHEN :'outcome' IN ('success', 'fail', 'skipped') THEN NOW() ELSE NULL END
+  ${q(traceId)},
+  ${q(triggerType)},
+  ${q(actionType)},
+  ${q(actionName)},
+  ${q(outcome)},
+  NULLIF(${q(reasoning)}, ''),
+  NULLIF(${q(safeConfidence)}, '')::numeric,
+  NULLIF(${q(safeEventId)}, '')::bigint,
+  NULLIF(${q(safeTaskId)}, '')::bigint,
+  COALESCE(NULLIF(${q(safeDataInputs)}, ''), '{}')::jsonb,
+  jsonb_build_object('logged_by', 'tools/log-decision.ts'),
+  CASE WHEN ${q(outcome)} IN ('success', 'fail', 'skipped') THEN NOW() ELSE NULL END
 );
 `;
 
   const res = runPsql(sql, {
     db: "cortana",
-    args: [
-      "-v",
-      `trace_id=${traceId}`,
-      "-v",
-      `trigger_type=${triggerType}`,
-      "-v",
-      `action_type=${actionType}`,
-      "-v",
-      `action_name=${actionName}`,
-      "-v",
-      `outcome=${outcome}`,
-      "-v",
-      `reasoning=${reasoning}`,
-      "-v",
-      `confidence=${safeConfidence}`,
-      "-v",
-      `event_id=${safeEventId}`,
-      "-v",
-      `task_id=${safeTaskId}`,
-      "-v",
-      `data_inputs=${safeDataInputs}`,
-    ],
+    args: ["-q", "-X", "-v", "ON_ERROR_STOP=1", "-t", "-A"],
     env: withPostgresPath(process.env),
     stdio: ["ignore", "ignore", "inherit"],
   });
