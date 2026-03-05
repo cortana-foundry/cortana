@@ -189,6 +189,125 @@ flowchart TB
   CJ --> M
 ```
 
+## 0.10 Concrete operating contracts (deep detail)
+
+### A) Session keys, delivery account IDs, and ownership contracts
+
+| Agent | Session key | Primary accountId for delivery | Owns (explicit) | Must escalate to |
+|---|---|---:|---|---|
+| Cortana | `agent:main:main` | `default` | triage, routing, synthesis, escalation decisions, final command recommendations | specialist lane or user decision |
+| Huragok | `agent:huragok:main` | `huragok` | implementation, repo operations, CI fixes, PR creation, infra/tooling changes | Cortana for strategic conflicts |
+| Researcher | `agent:researcher:main` | `researcher` | research briefs, source synthesis, fact gathering, external intel scans | Cortana for decision synthesis |
+| Oracle | `agent:oracle:main` | `oracle` | premarket/market pulse, portfolio intelligence, scenario/risk framing | Cortana for final action decision |
+| Monitor | `agent:monitor:main` | `monitor` | runtime checks, cron delivery reliability, drift and watchdog checks, incident verification | Cortana for operator escalation |
+
+**Contract:** if task maps cleanly to one specialist lane, Cortana routes there first.
+
+### B) `sessions_send` TASK message schema (required)
+
+Every task dispatch must include these fields in plain language:
+
+1. **Objective** — exactly what to produce.
+2. **Scope** — included and excluded actions.
+3. **Execution steps** — numbered when precision is needed.
+4. **Verification requirement** — how to prove success.
+5. **Delivery contract** — message tool details (`channel=telegram`, `target=8171372724`, `accountId=<owner>` when required).
+6. **No-relay rule** — whether to avoid sending result back through Cortana.
+
+#### Example (valid)
+- Objective: Patch failing CI test and open PR.
+- Scope: only files under `tools/morning-brief/*` and matching tests.
+- Verification: run specific test command and include pass/fail output.
+- Delivery: send PR URL directly to Telegram target `8171372724`.
+
+#### Example (invalid)
+- “FYI this might be broken, can you look?” (no objective/scope/verification)
+- “Tell Cortana what you found” when direct delivery is required.
+- Multi-topic chatter with no executable deliverable.
+
+### C) Verification gates (what must be checked before status claims)
+
+| Claim type | Required verification |
+|---|---|
+| “CI is green” | `gh pr checks <pr>` and/or run status with no failed jobs |
+| “Cron routing fixed” | runtime `~/.openclaw/cron/jobs.json` + repo `config/cron/jobs.json` aligned and tested |
+| “Gateway healthy” | `openclaw gateway status` returns running + responsive |
+| “Task done” | concrete artifact exists (PR URL, commit hash, output file, delivered message) |
+| “No failures” | relevant monitor check executed and no failed conditions in output |
+
+**Rule:** no green-language without check evidence.
+
+### D) Escalation payload format (mandatory for failures)
+
+When reporting failures, include all of:
+1. **Failing step/system**
+2. **Observed symptom**
+3. **Likely root cause**
+4. **Action taken or needed approval**
+5. **Immediate next action**
+6. **Risk/ETA**
+
+Short form template:
+
+`<system> failed at <step>. Symptom: <x>. Likely cause: <y>. I did/need: <z>. Next: <n> in <eta>.`
+
+### E) Cron routing discipline (operator intention)
+
+- Cron jobs should deliver through mapped specialist account IDs where configured.
+- Cortana/default lane should carry only high-signal coordination outputs.
+- Cron noise, routine checks, and repetitive health chatter belong to specialist lanes.
+
+### F) Anti-regression checklist (post-change)
+
+After routing/protocol changes, verify:
+
+- [ ] `SOUL.md` reflects current command protocol.
+- [ ] `docs/operating-rules.md` and `docs/agent-routing.md` are consistent.
+- [ ] `AGENTS.md` pointers match canonical behavior.
+- [ ] `config/cron/jobs.json` synced with runtime `~/.openclaw/cron/jobs.json` if routing changes touched cron.
+- [ ] No newly introduced duplicate relay path.
+- [ ] No status claim made without evidence.
+
+### G) Failure-mode flow (fast operator triage)
+
+```mermaid
+flowchart TD
+  X[Failure signal appears] --> Y{Is this user-visible now?}
+  Y -->|Yes| P1[Page-quality alert\nwith full escalation payload]
+  Y -->|No| Z[Collect evidence + attempt safe mitigation]
+  Z --> Q{Mitigation worked?}
+  Q -->|Yes| LOG[Log outcome + quiet specialist update]
+  Q -->|No| ESC[Escalate to Cortana\nwith exact blocker + next action]
+  ESC --> DECIDE[Cortana decision\nreroute/retry/approve]
+```
+
+### H) Command-vs-execution boundary quick map
+
+```mermaid
+graph LR
+  CD[Command Deck: Cortana] -->|decide| ROUTE[Route to owner lane]
+  ROUTE --> EXE1[Huragok executes implementation]
+  ROUTE --> EXE2[Researcher executes research]
+  ROUTE --> EXE3[Oracle executes market analysis]
+  ROUTE --> EXE4[Monitor executes health checks]
+  EXE1 --> OUT[Direct operator delivery]
+  EXE2 --> OUT
+  EXE3 --> OUT
+  EXE4 --> OUT
+  OUT --> SYN[Optional Cortana synthesis only when needed]
+```
+
+### I) What “fully in-policy” looks like
+
+A run is in-policy when:
+- routing owner is correct,
+- execution stays in specialist lane,
+- delivery target is explicit,
+- verification evidence exists,
+- Cortana output is concise and non-duplicative.
+
+If any one is missing, run is partially out-of-policy and should be corrected.
+
 ## 1. What this is
 
 Cortana is Hamel’s **autonomous AI chief-of-staff** built on **OpenClaw**.
