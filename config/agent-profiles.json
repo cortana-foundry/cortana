@@ -31,12 +31,12 @@
   },
   {
     "id": "huragok",
-    "workspace": "/Users/hd/openclaw",
+    "workspace": "/Users/hd/openclaw/identities/huragok",
     "model": "openai-codex/gpt-5.3-codex"
   },
   {
     "id": "researcher",
-    "workspace": "/Users/hd/openclaw",
+    "workspace": "/Users/hd/openclaw/identities/researcher",
     "model": "openai-codex/gpt-5.3-codex"
   },
   {

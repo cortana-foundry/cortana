@@ -11,6 +11,17 @@ Read in this order:
 4. `MEMORY.md` (MAIN SESSION only) — long-term rules + facts
 5. `memory/YYYY-MM-DD.md` (today + yesterday, if files exist) — recent events
 
+### Namespace isolation (main / researcher / huragok)
+
+Identity files are now namespaced under:
+- `identities/main/*`
+- `identities/researcher/*`
+- `identities/huragok/*`
+
+Each namespace contains `SOUL.md`, `USER.md`, `HEARTBEAT.md`, `MEMORY.md`, `IDENTITY.md`, and `memory/`.
+
+Fallback rule: if a namespace file is missing, run `tools/identity/ensure-namespace.sh` to regenerate safe placeholders (or copy main baseline for `main`).
+
 ## 2. Where Rules Live
 
 - Operating rules, delegation, routing, safety → `docs/operating-rules.md`

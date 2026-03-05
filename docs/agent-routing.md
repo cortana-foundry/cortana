@@ -14,9 +14,18 @@ This system runs multiple agents, each with its own workspace, model, and sessio
 | cron-fitness | Fitness data | `~/.openclaw/workspaces/cron-fitness` | gpt-5.3-codex | No — cron only |
 | cron-market | Market analysis | `~/.openclaw/workspaces/cron-market` | gpt-5.3-codex | No — cron only |
 | cron-maintenance | System updates | `~/.openclaw/workspaces/cron-maintenance` | gpt-5.1 | No — cron only |
-| **huragok** | Standalone Huragok identity (dedicated Telegram-bound lane + spawn target) | `/Users/hd/openclaw` | gpt-5.3-codex | Yes (bound group/channel) |
-| **researcher** | Dedicated investigation/research execution lane for Cortana delegation | `/Users/hd/openclaw` | gpt-5.3-codex | No — spawn target only |
+| **huragok** | Standalone Huragok identity (dedicated Telegram-bound lane + spawn target) | `/Users/hd/openclaw/identities/huragok` | gpt-5.3-codex | Yes (bound group/channel) |
+| **researcher** | Dedicated investigation/research execution lane for Cortana delegation | `/Users/hd/openclaw/identities/researcher` | gpt-5.3-codex | No — spawn target only |
 | cortana-acp | On-demand specialist coding lane for explicit ACP runtime requests | `/Users/hd/openclaw` | gpt-5.3-codex | No — spawn target only |
+
+## Namespace Memory Isolation
+
+Telegram identities now use isolated doctrine/memory roots:
+- `main` → root workspace identity (plus `identities/main` mirror)
+- `researcher` → `identities/researcher/*`
+- `huragok` → `identities/huragok/*`
+
+This prevents cross-identity memory bleed by default.
 
 ## Channel Routing
 
