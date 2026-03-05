@@ -39,6 +39,13 @@ Quick decision rule:
 
 For Researcher bootstrap + usage details, see `docs/researcher-bot-bootstrap.md`.
 
+## Monitor/Covenant Telegram troubleshooting
+
+If Monitor cannot see Covenant group messages, use:
+- `docs/monitor-covenant-telegram-troubleshooting.md`
+
+This covers routing keys, account bindings, group mention policy, and Telegram privacy/admin checks.
+
 ## Known Pitfall: Reply Routing
 
 When a cron agent sends a message to Telegram (e.g., a health alert), **replying to that message may route your reply to the cron agent** instead of Cortana. The cron agent has a tiny siloed workspace with no access to Cortana's memory, identity, or conversation history.
