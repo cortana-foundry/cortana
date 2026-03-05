@@ -1,3 +1,5 @@
 #!/usr/bin/env npx tsx
-import { withPostgresPath } from '../lib/db.js';
+import db from '../lib/db.ts';
+
+const { withPostgresPath } = db as { withPostgresPath: (env: NodeJS.ProcessEnv) => NodeJS.ProcessEnv };
 console.log('type', typeof withPostgresPath);
