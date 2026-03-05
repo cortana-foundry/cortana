@@ -35,10 +35,26 @@ describe("repo-auto-sync.sh hygiene policy", () => {
     expect(script).toContain('show-ref --verify --quiet "refs/heads/$b"');
   });
 
+  it("automates temp worktree conflicts with stash+remove and skips non-temp worktrees", () => {
+    expect(script).toContain("is_temp_worktree_path");
+    expect(script).toContain("list_worktrees_for_branch");
+    expect(script).toContain('stash push --include-untracked -m "$stash_message"');
+    expect(script).toContain('detail=temp-worktree-stashed');
+    expect(script).toContain('worktree remove -- "$worktree_path"');
+    expect(script).toContain('detail=temp-worktree-removed');
+    expect(script).toContain('detail=non-temp-worktree-skip');
+    expect(script).toContain('detail=delete-skipped-worktree-blocked');
+  });
+
   it("only deletes local branches merged into origin/main and never remote branches", () => {
     expect(script).toContain("for-each-ref --format='%(refname:short)' refs/heads --merged origin/main");
     expect(script).toContain('git -C "$repo" branch -d -- "$b"');
     expect(script).not.toContain("push --delete");
     expect(script).not.toContain("refs/remotes");
+  });
+
+  it("runs main flow only when executed directly", () => {
+    expect(script).toContain('if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then');
+    expect(script).toContain("main");
   });
 });

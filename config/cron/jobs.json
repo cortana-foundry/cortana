@@ -1567,7 +1567,7 @@
         "kind": "agentTurn",
         "model": "openai-codex/gpt-5.1",
         "timeoutSeconds": 180,
-        "message": "Run repo auto-sync hygiene for both repos via script:\n- /Users/hd/Developer/cortana\n- /Users/hd/Developer/cortana-external\n\nCommand:\nbash /Users/hd/Developer/cortana/tools/repo/repo-auto-sync.sh\n\nRules:\n- Fail fast on dirty/untracked/stash-present preflight.\n- Order must stay: preflight cleanliness -> pull -> local merged-branch cleanup.\n- Delete only LOCAL branches merged into origin/main (never remote delete).\n- If no issues: return NO_REPLY.\n- If any repo fails, send a concise Telegram alert via message tool to target 8171372724 with repo + failing step + error line."
+        "message": "Run repo auto-sync hygiene for both repos via script:\n- /Users/hd/Developer/cortana\n- /Users/hd/Developer/cortana-external\n\nCommand:\nbash /Users/hd/Developer/cortana/tools/repo/repo-auto-sync.sh\n\nRules:\n- Fail fast on dirty/untracked/stash-present preflight.\n- Order must stay: preflight cleanliness -> pull -> local merged-branch cleanup.\n- Delete only LOCAL branches merged into origin/main (never remote delete).\n- If a merged branch is checked out in a temp worktree (/tmp or /private/tmp): auto-stash dirty changes (include untracked) with timestamped message, remove the temp worktree, then delete the branch.\n- Never auto-remove non-temp external worktrees; skip with warning.\n- If no issues: return NO_REPLY.\n- If any repo fails, send a concise Telegram alert via message tool to target 8171372724 with repo + failing step + error line."
       },
       "delivery": {
         "mode": "none"
