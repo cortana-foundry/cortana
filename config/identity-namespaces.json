@@ -4,6 +4,7 @@
     "main": "main",
     "researcher": "researcher",
     "huragok": "huragok",
-    "oracle": "oracle"
+    "oracle": "oracle",
+    "monitor": "monitor"
   }
 }
