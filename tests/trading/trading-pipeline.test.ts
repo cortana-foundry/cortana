@@ -283,4 +283,33 @@ Summary: 3 candidates | BUY 3 | WATCH 0 | NO_BUY 0
     expect(report).toContain("Blocker telemetry: guardrail blocks/downgrades 2");
     expect(report).toContain("Summary: BUY 1 | WATCH 3 | NO_BUY 0");
   });
+
+  it("emits deterministic decision/confidence/risk fields", async () => {
+    const report = await runTradingPipeline({
+      runCommand: (_cmd, args) => (args[0] === "canslim_alert.py" ? CANSLIM_BUY : DIP_NO_BUY),
+      council: async () => ({ verdicts: [] }),
+    });
+
+    expect(report).toContain("Decision: BUY");
+    expect(report).toContain("Confidence: 0.61 | Risk: HIGH");
+  });
+
+  it("fails closed with explicit no-trade reason when required scanner fields are missing", async () => {
+    const badCanslim = `📈 Trading Advisor - CANSLIM Scan
+Summary: 1 candidates | BUY 1 | WATCH 0 | NO_BUY 0
+• NVDA (10/12) → BUY
+  Momentum setup`;
+
+    const council = vi.fn(async () => ({ verdicts: [] }));
+    const report = await runTradingPipeline({
+      runCommand: (_cmd, args) => (args[0] === "canslim_alert.py" ? badCanslim : DIP_NO_BUY),
+      council,
+    });
+
+    expect(council).not.toHaveBeenCalled();
+    expect(report).toContain("Decision: WATCH");
+    expect(report).toContain("Fail-closed scans: CANSLIM");
+    expect(report).toContain("Guardrails: Fail-closed: missing market regime in scanner output");
+  });
+
 });
