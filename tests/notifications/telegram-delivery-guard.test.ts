@@ -1,7 +1,16 @@
-import { describe, expect, it } from "vitest";
-import { chunkMessage, parseGuardArgs } from "../../tools/notifications/telegram-delivery-guard.ts";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+vi.mock("node:child_process", () => ({
+  spawnSync: vi.fn(),
+}));
+
+import { spawnSync } from "node:child_process";
+import { chunkMessage, parseGuardArgs, sendWithRetries } from "../../tools/notifications/telegram-delivery-guard.ts";
 
 describe("telegram delivery guard", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
   it("parses positional args with defaults", () => {
     const parsed = parseGuardArgs(["hello"]);
     expect(parsed.message).toBe("hello");
@@ -18,5 +27,23 @@ describe("telegram delivery guard", () => {
     expect(chunks[0]).toBe("line1");
     expect(chunks[1].length).toBe(3500);
     expect(chunks[2].length).toBe(700);
+  });
+
+  it("retries transient failures and succeeds", () => {
+    const mocked = vi.mocked(spawnSync);
+    mocked
+      .mockReturnValueOnce({ status: 1, stderr: "temporary send failure", stdout: "" } as any)
+      .mockReturnValueOnce({ status: 0, stderr: "", stdout: "ok" } as any);
+
+    expect(() => sendWithRetries("8171372724", ["hello"], 2)).not.toThrow();
+    expect(mocked).toHaveBeenCalledTimes(2);
+  });
+
+  it("throws after max retries", () => {
+    const mocked = vi.mocked(spawnSync);
+    mocked.mockReturnValue({ status: 1, stderr: "permanent failure", stdout: "" } as any);
+
+    expect(() => sendWithRetries("8171372724", ["hello"], 2)).toThrow(/failed sending chunk/);
+    expect(mocked).toHaveBeenCalledTimes(2);
   });
 });
