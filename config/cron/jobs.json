@@ -7,24 +7,24 @@
       "name": "☀️ Morning brief (Hamel)",
       "enabled": true,
       "createdAtMs": 1769550483487,
-      "updatedAtMs": 1772627409650,
+      "updatedAtMs": 1772713946037,
       "schedule": {
         "kind": "cron",
-        "expr": "0 6 * * *",
+        "expr": "30 7 * * *",
         "tz": "America/New_York"
       },
       "sessionTarget": "isolated",
       "wakeMode": "now",
       "payload": {
         "kind": "agentTurn",
-        "message": "Run the deterministic Daily Command Brief pipeline and send output exactly once.\n\nCommand:\n/Users/hd/openclaw/tools/briefing/run-daily-command-brief.sh\n\nGuarantees in script:\n- deterministic 4-section brief (calendar, fitness/recovery, market pulse, task board)\n- Telegram delivery guardrails (chunking + retries)\n- explicit failure alerts on generation/send failure\n- success log at /tmp/daily-command-brief.log\n\nDry-run path (manual tonight):\n/Users/hd/openclaw/tools/briefing/run-daily-command-brief.sh --dry-run\n\nAfter running, return one-line status only.",
+        "message": "OUTPUT CONTRACT (Telegram safety):\n- Keep each sent message under 3500 characters.\n- If longer, split into parts with headers like 'Part 1/N', 'Part 2/N'.\n- Never send oversized single messages.\n\nYou are Cortana. Create Hamel's daily morning brief for Telegram. Calm, concise, actionable.\nOutput format:\n☀️ Brief - Morning Brief\n- Today at a glance (3 bullets)\n- Warren, NJ weather (today high/low + rain chance)\n- Key news (max 3 bullets, US/world + one tech/cyber item)\n- Markets snapshot (major index tone + market open/closed from ~/openclaw/skills/markets/check_market_status.sh)\n- Top 3 priorities for today (time/health/career aligned)\n- One concrete career-advancing task\n\nRules: keep under 220 words, use 12-hour AM/PM time, avoid fluff.\nDelivery is MANUAL: send final text with message tool (channel=telegram, target=8171372724) exactly once.\nAfter sending, return a one-line confirmation only.",
         "model": "openai-codex/gpt-5.2-codex"
       },
       "state": {
-        "nextRunAtMs": 1772713800000,
-        "lastRunAtMs": 1772627400033,
+        "nextRunAtMs": 1772800200000,
+        "lastRunAtMs": 1772713800035,
         "lastStatus": "ok",
-        "lastDurationMs": 9617,
+        "lastDurationMs": 146002,
         "consecutiveErrors": 0,
         "lastRunStatus": "ok",
         "lastDelivered": false,
@@ -54,7 +54,7 @@
         "model": "openai-codex/gpt-5.2-codex"
       },
       "state": {
-        "nextRunAtMs": 1772702520000,
+        "nextRunAtMs": 1772788920000,
         "lastRunAtMs": 1772270520020,
         "lastStatus": "ok",
         "lastDurationMs": 76086,
@@ -73,7 +73,7 @@
       "name": "📬 Weekday newsletter digest (Hamel)",
       "enabled": true,
       "createdAtMs": 1769557929500,
-      "updatedAtMs": 1772492427352,
+      "updatedAtMs": 1772665355930,
       "schedule": {
         "kind": "cron",
         "expr": "0 18 * * 1-5",
@@ -88,14 +88,14 @@
         "model": "openai-codex/gpt-5.1"
       },
       "state": {
-        "nextRunAtMs": 1772665344611,
-        "lastRunAtMs": 1772492400030,
+        "nextRunAtMs": 1772751744611,
+        "lastRunAtMs": 1772665344635,
         "lastStatus": "ok",
-        "lastDurationMs": 27322,
+        "lastDurationMs": 11295,
         "consecutiveErrors": 0,
         "lastRunStatus": "ok",
-        "lastDelivered": true,
-        "lastDeliveryStatus": "delivered"
+        "lastDelivered": false,
+        "lastDeliveryStatus": "not-delivered"
       },
       "delivery": {
         "mode": "none"
@@ -139,7 +139,7 @@
       "name": "📅 Calendar reminders → Telegram (ALL calendars)",
       "enabled": true,
       "createdAtMs": 1769585938649,
-      "updatedAtMs": 1772640431276,
+      "updatedAtMs": 1772716028304,
       "schedule": {
         "kind": "cron",
         "expr": "7 6-23 * * *",
@@ -154,10 +154,10 @@
         "timeoutSeconds": 90
       },
       "state": {
-        "nextRunAtMs": 1772644020000,
-        "lastRunAtMs": 1772640420026,
+        "nextRunAtMs": 1772719620000,
+        "lastRunAtMs": 1772716020033,
         "lastStatus": "ok",
-        "lastDurationMs": 11250,
+        "lastDurationMs": 8271,
         "consecutiveErrors": 0,
         "lastRunStatus": "ok",
         "lastDelivered": false,
@@ -200,7 +200,7 @@
       "name": "🐦 X session healthcheck (bird)",
       "enabled": true,
       "createdAtMs": 1769615191317,
-      "updatedAtMs": 1772614810350,
+      "updatedAtMs": 1772701209050,
       "schedule": {
         "kind": "cron",
         "expr": "0 4,16 * * *",
@@ -215,10 +215,10 @@
         "timeoutSeconds": 90
       },
       "state": {
-        "nextRunAtMs": 1772658000000,
-        "lastRunAtMs": 1772614800029,
+        "nextRunAtMs": 1772744400000,
+        "lastRunAtMs": 1772701200035,
         "lastStatus": "ok",
-        "lastDurationMs": 10321,
+        "lastDurationMs": 9015,
         "consecutiveErrors": 0,
         "lastRunStatus": "ok",
         "lastDelivered": false,
@@ -234,7 +234,7 @@
       "name": "📈 Stock Market Brief (daily)",
       "enabled": true,
       "createdAtMs": 1769683871728,
-      "updatedAtMs": 1772629113682,
+      "updatedAtMs": 1772715523937,
       "schedule": {
         "kind": "cron",
         "expr": "55 7 * * 1-5",
@@ -249,10 +249,10 @@
         "timeoutSeconds": 120
       },
       "state": {
-        "nextRunAtMs": 1772715443770,
-        "lastRunAtMs": 1772629048699,
+        "nextRunAtMs": 1772801843770,
+        "lastRunAtMs": 1772715443796,
         "lastStatus": "ok",
-        "lastDurationMs": 64983,
+        "lastDurationMs": 80141,
         "consecutiveErrors": 0,
         "lastRunStatus": "ok",
         "lastDeliveryStatus": "not-delivered",
@@ -268,7 +268,7 @@
       "name": "🏋️ Fitness Morning Brief (Hamel)",
       "enabled": true,
       "createdAtMs": 1769794739989,
-      "updatedAtMs": 1772629986717,
+      "updatedAtMs": 1772716368255,
       "schedule": {
         "kind": "cron",
         "expr": "12 8 * * *",
@@ -283,14 +283,14 @@
         "timeoutSeconds": 240
       },
       "state": {
-        "lastRunAtMs": 1772629920027,
+        "lastRunAtMs": 1772716320034,
         "lastStatus": "ok",
-        "lastDurationMs": 66690,
+        "lastDurationMs": 48221,
         "consecutiveErrors": 0,
         "lastRunStatus": "ok",
         "lastDeliveryStatus": "not-delivered",
         "lastDelivered": false,
-        "nextRunAtMs": 1772716320000
+        "nextRunAtMs": 1772802720000
       },
       "delivery": {
         "mode": "none"
@@ -302,7 +302,7 @@
       "name": "🌙 Fitness Evening Recap (Hamel)",
       "enabled": true,
       "createdAtMs": 1769794739997,
-      "updatedAtMs": 1772501564728,
+      "updatedAtMs": 1772674235417,
       "schedule": {
         "kind": "cron",
         "expr": "30 20 * * *",
@@ -314,17 +314,17 @@
         "kind": "agentTurn",
         "model": "openai-codex/gpt-5.3-codex",
         "timeoutSeconds": 180,
-        "message": "Fitness Evening Recap summarizer for Hamel (8:30 PM ET).\nPrefix: 🏋️ Fitness - Evening Recap. Delivery: send via message tool to telegram target 8171372724.\nFormatting: 12-hour AM/PM only.\n\nPrimary source:\n- /tmp/cron-fitness-evening-recap.json\nIf missing/stale, collect inline quickly and continue.\n\nOutput sections:\nA) Today strain summary\nB) Tonal\nC) Weekly progress\nD) Tomorrow Tonal workout\nE) Tomorrow outlook\nF) Sleep recommendation\nG) Health insights\n\nRules:\n- If no workouts today, explicitly say: \"Rest day — no workout logged today.\" (NOT N/A spam).\n- Use whoop_recovery_latest and whoop_sleep_latest when available.\n- Use whoop_weekly + tonal_weekly for weekly metrics when available.\n- For section D (Tomorrow Tonal workout):\n  - If Tonal history/data fetch succeeded but no tomorrow workout is scheduled, say exactly: \"No Tonal workout scheduled for tomorrow.\"\n  - If upcoming Tonal schedule data could not be fetched (endpoint/auth/data error), say exactly: \"Couldn’t fetch upcoming Tonal schedule.\"\n- If a metric is missing in other sections, show \"Unavailable\" with brief reason from errors array.\n- Keep concise and useful; avoid repeating \"N/A\" across sections.\n\nAfter sending summary, mark delivered health insights acted_on=TRUE as before."
+        "message": "Fitness Evening Recap summarizer for Hamel (8:30 PM ET).\nPrefix: 🏋️ Fitness - Evening Recap. Delivery: send via message tool to telegram target 8171372724.\nFormatting: 12-hour AM/PM only.\n\nPrimary source:\n- /tmp/cron-fitness-evening-recap.json\nIf missing/stale, collect inline quickly and continue.\n\nOutput sections:\nA) Today strain summary\nB) Tonal\nC) Weekly progress\nD) Tomorrow Tonal workout\nE) Tomorrow outlook\nF) Sleep recommendation\nG) Health insights\n\nRules:\n- If no workouts today, explicitly say: \"Rest day — no workout logged today.\" (NOT N/A spam).\n- Use whoop_recovery_latest and whoop_sleep_latest when available.\n- Use whoop_weekly + tonal_weekly for weekly metrics when available.\n- If a metric is missing, show \"Unavailable\" with brief reason from errors array.\n- Keep concise and useful; avoid repeating \"N/A\" across sections.\n\nAfter sending summary, mark delivered health insights acted_on=TRUE as before."
       },
       "state": {
-        "nextRunAtMs": 1772674200000,
-        "lastRunAtMs": 1772501400027,
+        "nextRunAtMs": 1772760600000,
+        "lastRunAtMs": 1772674200027,
         "lastStatus": "ok",
-        "lastDurationMs": 164701,
+        "lastDurationMs": 35390,
         "consecutiveErrors": 0,
         "lastRunStatus": "ok",
-        "lastDelivered": true,
-        "lastDeliveryStatus": "delivered"
+        "lastDelivered": false,
+        "lastDeliveryStatus": "not-delivered"
       },
       "delivery": {
         "mode": "none"
@@ -367,7 +367,7 @@
       "name": "🔧 Fitness service healthcheck",
       "enabled": true,
       "createdAtMs": 1769794825944,
-      "updatedAtMs": 1772615168364,
+      "updatedAtMs": 1772701567861,
       "schedule": {
         "kind": "cron",
         "expr": "6 4,16 * * *",
@@ -382,10 +382,10 @@
         "timeoutSeconds": 120
       },
       "state": {
-        "nextRunAtMs": 1772658360000,
-        "lastRunAtMs": 1772615160025,
+        "nextRunAtMs": 1772744760000,
+        "lastRunAtMs": 1772701560030,
         "lastStatus": "ok",
-        "lastDurationMs": 8339,
+        "lastDurationMs": 7831,
         "consecutiveErrors": 0,
         "lastRunStatus": "ok",
         "lastDelivered": false,
@@ -401,7 +401,7 @@
       "name": "📰 Newsletter Alert (real-time)",
       "enabled": true,
       "createdAtMs": 1769815538299,
-      "updatedAtMs": 1772640528678,
+      "updatedAtMs": 1772716135790,
       "schedule": {
         "kind": "cron",
         "expr": "7 6-16 * * *",
@@ -417,10 +417,10 @@
         "timeoutSeconds": 90
       },
       "state": {
-        "nextRunAtMs": 1772644117716,
-        "lastRunAtMs": 1772640517734,
+        "nextRunAtMs": 1772719717716,
+        "lastRunAtMs": 1772716117741,
         "lastStatus": "ok",
-        "lastDurationMs": 10944,
+        "lastDurationMs": 18049,
         "consecutiveErrors": 0,
         "lastRunStatus": "ok",
         "lastDeliveryStatus": "not-delivered",
@@ -436,7 +436,7 @@
       "name": "🌙 Bedtime Check (10pm ET)",
       "enabled": true,
       "createdAtMs": 1770599536224,
-      "updatedAtMs": 1772504118038,
+      "updatedAtMs": 1772676930738,
       "schedule": {
         "kind": "cron",
         "expr": "15 21 * * *",
@@ -453,14 +453,14 @@
         "mode": "none"
       },
       "state": {
-        "nextRunAtMs": 1772676900000,
-        "lastRunAtMs": 1772504100029,
+        "nextRunAtMs": 1772763300000,
+        "lastRunAtMs": 1772676900033,
         "lastStatus": "ok",
-        "lastDurationMs": 18009,
+        "lastDurationMs": 30705,
         "consecutiveErrors": 0,
         "lastRunStatus": "ok",
-        "lastDelivered": true,
-        "lastDeliveryStatus": "delivered"
+        "lastDelivered": false,
+        "lastDeliveryStatus": "not-delivered"
       }
     },
     {
@@ -632,7 +632,7 @@
       "name": "🔍 Daily System Health Summary",
       "enabled": true,
       "createdAtMs": 1770940327751,
-      "updatedAtMs": 1772503969781,
+      "updatedAtMs": 1772676768092,
       "schedule": {
         "kind": "cron",
         "expr": "12 21 * * *",
@@ -650,14 +650,14 @@
         "mode": "none"
       },
       "state": {
-        "nextRunAtMs": 1772676720000,
-        "lastRunAtMs": 1772503920029,
+        "nextRunAtMs": 1772763120000,
+        "lastRunAtMs": 1772676720037,
         "lastStatus": "ok",
-        "lastDurationMs": 49752,
+        "lastDurationMs": 48055,
         "consecutiveErrors": 0,
         "lastRunStatus": "ok",
-        "lastDeliveryStatus": "delivered",
-        "lastDelivered": true
+        "lastDeliveryStatus": "not-delivered",
+        "lastDelivered": false
       }
     },
     {
@@ -666,7 +666,7 @@
       "name": "🧹 Cron Session Cleanup",
       "enabled": true,
       "createdAtMs": 1770984376271,
-      "updatedAtMs": 1772607606172,
+      "updatedAtMs": 1772694013843,
       "schedule": {
         "kind": "cron",
         "expr": "0 2 * * *",
@@ -684,10 +684,10 @@
         "mode": "none"
       },
       "state": {
-        "nextRunAtMs": 1772694000000,
-        "lastRunAtMs": 1772607600029,
+        "nextRunAtMs": 1772780400000,
+        "lastRunAtMs": 1772694000028,
         "lastStatus": "ok",
-        "lastDurationMs": 6143,
+        "lastDurationMs": 13815,
         "consecutiveErrors": 0,
         "lastRunStatus": "ok",
         "lastDelivered": false,
@@ -761,10 +761,10 @@
     {
       "id": "9d2f7f92-b9e9-48bc-87b0-a5859bb83927",
       "agentId": "cron-market",
-      "name": "📈 Trading Pipeline Alert (market sessions)",
+      "name": "📈 CANSLIM Alert Scan (market sessions)",
       "enabled": true,
       "createdAtMs": 1771202685902,
-      "updatedAtMs": 1772634700080,
+      "updatedAtMs": 1772656254829,
       "schedule": {
         "kind": "cron",
         "expr": "30 9,12,15 * * 1-5",
@@ -775,7 +775,7 @@
       "wakeMode": "now",
       "payload": {
         "kind": "agentTurn",
-        "message": "⚠️ DELIVERY: Do NOT rely on announce delivery. You MUST use the `message` tool (action=send, target=8171372724, channel=telegram) to send your final output. This is required because announce delivery is broken (openclaw/openclaw#16925).\n\nRun the unified trading pipeline and return its output exactly (no extra commentary).\n\nCommands:\ncd ~/Developer/cortana\nexport TRADING_SCAN_LIMIT_CANSLIM=${TRADING_SCAN_LIMIT_CANSLIM:-120}\nexport TRADING_SCAN_LIMIT_DIP=${TRADING_SCAN_LIMIT_DIP:-120}\nnpx tsx tools/trading/trading-pipeline.ts\n\nRules:\n- Runs CANSLIM + Dip Buyer scans safely (no trade placement).\n- Council must be invoked only for BUY signals.\n- Output must include BUY/WATCH/NO_BUY summary and correction shadow WATCH section when market is in correction.\n- If the script errors, return one concise error line starting with: '📈 Trading Advisor - Error:'",
+        "message": "⚠️ DELIVERY: Do NOT rely on announce delivery. You MUST use the `message` tool (action=send, target=8171372724, channel=telegram) to send your final output. This is required because announce delivery is broken (openclaw/openclaw#16925).\n\nRun the CANSLIM alert scanner and return its output exactly (no extra commentary).\n\nCommands:\ncd ~/Developer/cortana-external/backtester\npython3 canslim_alert.py --limit 8 --min-score 6\n\nRules:\n- Output must include market status summary and candidate signals (BUY/WATCH/NO_BUY).\n- ALWAYS forward full scan output exactly, even when results are all NO_BUY (never suppress no-signal runs).\n- If the script errors, return one concise error line starting with: '📈 Trading Advisor - Error:'",
         "model": "openai-codex/gpt-5.3-codex",
         "timeoutSeconds": 240
       },
@@ -783,10 +783,10 @@
         "mode": "none"
       },
       "state": {
-        "nextRunAtMs": 1772645426140,
-        "lastRunAtMs": 1772634691176,
+        "nextRunAtMs": 1772721026140,
+        "lastRunAtMs": 1772656245715,
         "lastStatus": "ok",
-        "lastDurationMs": 8904,
+        "lastDurationMs": 9114,
         "consecutiveErrors": 0,
         "lastRunStatus": "ok",
         "lastDeliveryStatus": "not-delivered",
@@ -798,7 +798,7 @@
       "name": "🌐 SAE World State Builder",
       "enabled": true,
       "createdAtMs": 1771268247494,
-      "updatedAtMs": 1772625725773,
+      "updatedAtMs": 1772712117326,
       "schedule": {
         "kind": "cron",
         "expr": "0 7,13,21 * * *",
@@ -816,10 +816,10 @@
         "channel": "last"
       },
       "state": {
-        "nextRunAtMs": 1772647247822,
-        "lastRunAtMs": 1772625720753,
+        "nextRunAtMs": 1772733647822,
+        "lastRunAtMs": 1772712110341,
         "lastStatus": "ok",
-        "lastDurationMs": 5020,
+        "lastDurationMs": 6985,
         "consecutiveErrors": 0,
         "lastRunStatus": "ok",
         "lastDelivered": false,
@@ -832,7 +832,7 @@
       "name": "🧠 SAE Cross-Domain Reasoner",
       "enabled": true,
       "createdAtMs": 1771268745562,
-      "updatedAtMs": 1772626594000,
+      "updatedAtMs": 1772712990066,
       "schedule": {
         "kind": "cron",
         "expr": "15 7,13,21 * * *",
@@ -852,14 +852,14 @@
         "channel": "last"
       },
       "state": {
-        "lastRunAtMs": 1772626582694,
+        "lastRunAtMs": 1772712982694,
         "lastStatus": "ok",
-        "lastDurationMs": 11306,
+        "lastDurationMs": 7372,
         "consecutiveErrors": 0,
         "lastRunStatus": "ok",
         "lastDelivered": false,
         "lastDeliveryStatus": "not-delivered",
-        "nextRunAtMs": 1772648182666
+        "nextRunAtMs": 1772734582666
       },
       "agentId": "cron-health"
     },
@@ -868,7 +868,7 @@
       "name": "🧠 Memory Consolidation",
       "enabled": true,
       "createdAtMs": 1771322310876,
-      "updatedAtMs": 1772611996983,
+      "updatedAtMs": 1772698488055,
       "schedule": {
         "kind": "cron",
         "expr": "12 3 * * *",
@@ -889,14 +889,14 @@
         "bestEffort": true
       },
       "state": {
-        "nextRunAtMs": 1772698320000,
-        "lastRunAtMs": 1772611920032,
+        "nextRunAtMs": 1772784720000,
+        "lastRunAtMs": 1772698320034,
         "lastStatus": "ok",
-        "lastDurationMs": 76951,
+        "lastDurationMs": 168021,
         "consecutiveErrors": 0,
         "lastRunStatus": "ok",
-        "lastDeliveryStatus": "delivered",
-        "lastDelivered": true
+        "lastDeliveryStatus": "not-delivered",
+        "lastDelivered": false
       },
       "agentId": "cron-maintenance"
     },
@@ -905,7 +905,7 @@
       "name": "🔍 Proprioception: Cron & Tool Health",
       "enabled": true,
       "createdAtMs": 1771323577113,
-      "updatedAtMs": 1772641182308,
+      "updatedAtMs": 1772716783290,
       "schedule": {
         "kind": "every",
         "everyMs": 3600000,
@@ -924,10 +924,10 @@
         "channel": "last"
       },
       "state": {
-        "nextRunAtMs": 1772644777656,
-        "lastRunAtMs": 1772641177656,
+        "nextRunAtMs": 1772720378231,
+        "lastRunAtMs": 1772716778231,
         "lastStatus": "ok",
-        "lastDurationMs": 4652,
+        "lastDurationMs": 5059,
         "consecutiveErrors": 0,
         "lastRunStatus": "ok",
         "lastDeliveryStatus": "not-delivered",
@@ -940,7 +940,7 @@
       "name": "📊 Proprioception: Budget & Self-Model",
       "enabled": true,
       "createdAtMs": 1771323590473,
-      "updatedAtMs": 1772634689136,
+      "updatedAtMs": 1772706714623,
       "schedule": {
         "kind": "every",
         "everyMs": 14400000,
@@ -959,10 +959,10 @@
         "channel": "last"
       },
       "state": {
-        "nextRunAtMs": 1772648990592,
-        "lastRunAtMs": 1772634590592,
+        "nextRunAtMs": 1772720990745,
+        "lastRunAtMs": 1772706590745,
         "lastStatus": "ok",
-        "lastDurationMs": 98544,
+        "lastDurationMs": 123878,
         "consecutiveErrors": 0,
         "lastRunStatus": "ok",
         "lastDeliveryStatus": "not-delivered",
@@ -1009,7 +1009,7 @@
       "description": "Immune System: threat detection and auto-healing scan",
       "enabled": true,
       "createdAtMs": 1771324082626,
-      "updatedAtMs": 1772622776230,
+      "updatedAtMs": 1772709161293,
       "schedule": {
         "kind": "cron",
         "expr": "11 */6 * * *",
@@ -1031,11 +1031,11 @@
         "bestEffort": true
       },
       "state": {
-        "lastRunAtMs": 1772622749653,
+        "lastRunAtMs": 1772709149652,
         "lastStatus": "ok",
-        "lastDurationMs": 26577,
+        "lastDurationMs": 11641,
         "consecutiveErrors": 0,
-        "nextRunAtMs": 1772644349622,
+        "nextRunAtMs": 1772730749622,
         "lastRunStatus": "ok",
         "lastDeliveryStatus": "not-delivered",
         "lastDelivered": false
@@ -1047,7 +1047,7 @@
       "name": "🎯 Mission Advancement (Nightly)",
       "enabled": true,
       "createdAtMs": 1771499531391,
-      "updatedAtMs": 1772501636250,
+      "updatedAtMs": 1772674465562,
       "schedule": {
         "kind": "cron",
         "expr": "30 20 * * *",
@@ -1066,10 +1066,10 @@
         "channel": "last"
       },
       "state": {
-        "nextRunAtMs": 1772674409197,
-        "lastRunAtMs": 1772501564728,
+        "nextRunAtMs": 1772760809197,
+        "lastRunAtMs": 1772674409228,
         "lastStatus": "ok",
-        "lastDurationMs": 71522,
+        "lastDurationMs": 56334,
         "consecutiveErrors": 0,
         "lastRunStatus": "ok",
         "lastDeliveryStatus": "delivered",
@@ -1116,7 +1116,7 @@
       "name": "📊 Earnings Alert (daily)",
       "enabled": true,
       "createdAtMs": 1772108242543,
-      "updatedAtMs": 1772625687348,
+      "updatedAtMs": 1772712075637,
       "schedule": {
         "kind": "cron",
         "expr": "0 7 * * *",
@@ -1133,11 +1133,11 @@
         "mode": "none"
       },
       "state": {
-        "nextRunAtMs": 1772712000000,
-        "lastRunAtMs": 1772625605232,
+        "nextRunAtMs": 1772798400000,
+        "lastRunAtMs": 1772712000024,
         "lastRunStatus": "ok",
         "lastStatus": "ok",
-        "lastDurationMs": 82116,
+        "lastDurationMs": 75613,
         "lastDeliveryStatus": "not-delivered",
         "consecutiveErrors": 0,
         "lastDelivered": false
@@ -1193,17 +1193,17 @@
         "bestEffort": true
       },
       "state": {
-        "nextRunAtMs": 1772676000000,
-        "lastRunAtMs": 1772619255677,
+        "nextRunAtMs": 1772762400000,
+        "lastRunAtMs": 1772676000030,
         "lastRunStatus": "ok",
         "lastStatus": "ok",
-        "lastDurationMs": 8711,
+        "lastDurationMs": 9260,
         "lastDeliveryStatus": "delivered",
         "consecutiveErrors": 0,
         "lastDelivered": true
       },
       "agentId": "cron-maintenance",
-      "updatedAtMs": 1772619335636,
+      "updatedAtMs": 1772676009290,
       "id": "d999382d-afa0-41bb-9465-164b49100373"
     },
     {
@@ -1252,16 +1252,16 @@
         "mode": "none"
       },
       "state": {
-        "nextRunAtMs": 1772713800000,
-        "lastRunAtMs": 1772629146044,
+        "nextRunAtMs": 1772800200000,
+        "lastRunAtMs": 1772714802860,
         "lastRunStatus": "ok",
         "lastStatus": "ok",
-        "lastDurationMs": 101430,
+        "lastDurationMs": 13390,
         "lastDeliveryStatus": "not-delivered",
         "consecutiveErrors": 0,
         "lastDelivered": false
       },
-      "updatedAtMs": 1772629247474
+      "updatedAtMs": 1772714816250
     },
     {
       "id": "e4db8a8d-945c-4af2-a8d5-e54f2fb4e792-collect",
@@ -1285,8 +1285,16 @@
         "mode": "none"
       },
       "state": {
-        "nextRunAtMs": 1772673600000
-      }
+        "nextRunAtMs": 1772760000000,
+        "lastRunAtMs": 1772673600028,
+        "lastRunStatus": "ok",
+        "lastStatus": "ok",
+        "lastDurationMs": 58042,
+        "lastDelivered": false,
+        "lastDeliveryStatus": "not-delivered",
+        "consecutiveErrors": 0
+      },
+      "updatedAtMs": 1772673658070
     },
     {
       "id": "cron-slo-daily-monitor-20260303",
@@ -1310,16 +1318,16 @@
         "mode": "none"
       },
       "state": {
-        "nextRunAtMs": 1772716500000,
-        "lastRunAtMs": 1772630100025,
+        "nextRunAtMs": 1772802900000,
+        "lastRunAtMs": 1772716500027,
         "lastRunStatus": "ok",
         "lastStatus": "ok",
-        "lastDurationMs": 7094,
+        "lastDurationMs": 6219,
         "lastDelivered": false,
         "lastDeliveryStatus": "not-delivered",
         "consecutiveErrors": 0
       },
-      "updatedAtMs": 1772630107119
+      "updatedAtMs": 1772716506246
     },
     {
       "id": "cron-runtime-repo-drift-monitor-20260303",
@@ -1350,7 +1358,8 @@
         "lastDurationMs": 12375,
         "lastDelivered": false,
         "lastDeliveryStatus": "not-delivered",
-        "consecutiveErrors": 0
+        "consecutiveErrors": 0,
+        "runningAtMs": 1772716800006
       },
       "updatedAtMs": 1772630412405
     },
@@ -1371,18 +1380,18 @@
         "mode": "none"
       },
       "state": {
-        "nextRunAtMs": 1772643440616,
-        "lastRunAtMs": 1772642840616,
+        "nextRunAtMs": 1772717337860,
+        "lastRunAtMs": 1772716737860,
         "lastRunStatus": "ok",
         "lastStatus": "ok",
-        "lastDurationMs": 5916,
+        "lastDurationMs": 10841,
         "lastDelivered": false,
         "lastDeliveryStatus": "not-delivered",
         "consecutiveErrors": 0
       },
       "wakeMode": "now",
       "sessionTarget": "isolated",
-      "updatedAtMs": 1772642846532
+      "updatedAtMs": 1772716748701
     },
     {
       "id": "repo-drift-watchdog-daily",
@@ -1390,7 +1399,7 @@
       "name": "🧭 Repo Drift Watchdog (daily)",
       "enabled": true,
       "createdAtMs": 1772561763282,
-      "updatedAtMs": 1772630114185,
+      "updatedAtMs": 1772716513485,
       "schedule": {
         "kind": "cron",
         "expr": "15 8 * * *",
@@ -1406,11 +1415,11 @@
       },
       "state": {
         "consecutiveErrors": 0,
-        "nextRunAtMs": 1772716500000,
-        "lastRunAtMs": 1772630107119,
+        "nextRunAtMs": 1772802900000,
+        "lastRunAtMs": 1772716506246,
         "lastRunStatus": "ok",
         "lastStatus": "ok",
-        "lastDurationMs": 7066,
+        "lastDurationMs": 7239,
         "lastDelivered": false,
         "lastDeliveryStatus": "not-delivered"
       },
@@ -1439,16 +1448,16 @@
         "mode": "none"
       },
       "state": {
-        "nextRunAtMs": 1772643600000,
-        "lastRunAtMs": 1772642700021,
+        "nextRunAtMs": 1772717400000,
+        "lastRunAtMs": 1772716513485,
         "lastRunStatus": "ok",
         "lastStatus": "ok",
-        "lastDurationMs": 12196,
+        "lastDurationMs": 12347,
         "lastDeliveryStatus": "not-delivered",
         "consecutiveErrors": 0,
         "lastDelivered": false
       },
-      "updatedAtMs": 1772642712217
+      "updatedAtMs": 1772716525832
     },
     {
       "id": "session-lifecycle-policy-daily",
@@ -1521,7 +1530,7 @@
       "name": "🧯 Subagent Reliability Reaper (15m)",
       "enabled": true,
       "createdAtMs": 1772591273141,
-      "updatedAtMs": 1772642724782,
+      "updatedAtMs": 1772716535151,
       "schedule": {
         "kind": "cron",
         "expr": "*/15 * * * *",
@@ -1538,11 +1547,11 @@
         "mode": "none"
       },
       "state": {
-        "nextRunAtMs": 1772643600000,
-        "lastRunAtMs": 1772642712217,
+        "nextRunAtMs": 1772717400000,
+        "lastRunAtMs": 1772716525833,
         "lastRunStatus": "ok",
         "lastStatus": "ok",
-        "lastDurationMs": 12565,
+        "lastDurationMs": 9318,
         "lastDeliveryStatus": "not-delivered",
         "consecutiveErrors": 0,
         "lastDelivered": false
@@ -1555,7 +1564,7 @@
       "name": "🔄 Repo Auto Sync + Local Branch Cleanup",
       "enabled": true,
       "createdAtMs": 1772642795141,
-      "updatedAtMs": 1772642795141,
+      "updatedAtMs": 1772715634363,
       "schedule": {
         "kind": "cron",
         "expr": "*/30 * * * 1-5",
@@ -1567,13 +1576,20 @@
         "kind": "agentTurn",
         "model": "openai-codex/gpt-5.1",
         "timeoutSeconds": 180,
-        "message": "Run repo auto-sync hygiene for both repos via script:\n- /Users/hd/Developer/cortana\n- /Users/hd/Developer/cortana-external\n\nCommand:\nbash /Users/hd/Developer/cortana/tools/repo/repo-auto-sync.sh\n\nRules:\n- Fail fast on dirty/untracked/stash-present preflight.\n- Order must stay: preflight cleanliness -> pull -> local merged-branch cleanup.\n- Delete only LOCAL branches merged into origin/main (never remote delete).\n- If a merged branch is checked out in a temp worktree (/tmp or /private/tmp): auto-stash dirty changes (include untracked) with timestamped message, remove the temp worktree, then delete the branch.\n- Never auto-remove non-temp external worktrees; skip with warning.\n- If no issues: return NO_REPLY.\n- If any repo fails, send a concise Telegram alert via message tool to target 8171372724 with repo + failing step + error line."
+        "message": "Run repo auto-sync hygiene for both repos via script:\n- /Users/hd/Developer/cortana\n- /Users/hd/Developer/cortana-external\n\nCommand:\nbash /Users/hd/Developer/cortana/tools/repo/repo-auto-sync.sh\n\nRules:\n- Fail fast on dirty/untracked/stash-present preflight.\n- Order must stay: preflight cleanliness -> pull -> local merged-branch cleanup.\n- Delete only LOCAL branches merged into origin/main (never remote delete).\n- If no issues: return NO_REPLY.\n- If any repo fails, send a concise Telegram alert via message tool to target 8171372724 with repo + failing step + error line."
       },
       "delivery": {
         "mode": "none"
       },
       "state": {
-        "nextRunAtMs": 1772643600000
+        "nextRunAtMs": 1772717400000,
+        "lastRunAtMs": 1772715627534,
+        "lastRunStatus": "ok",
+        "lastStatus": "ok",
+        "lastDurationMs": 6829,
+        "lastDelivered": false,
+        "lastDeliveryStatus": "not-delivered",
+        "consecutiveErrors": 0
       }
     }
   ]
