@@ -159,6 +159,19 @@ ensure_clean_preflight() {
   return 0
 }
 
+ensure_no_stash_preflight() {
+  local repo="$1"
+
+  local stash_list
+  stash_list="$(git -C "$repo" stash list)"
+  if [[ -n "$stash_list" ]]; then
+    printf 'WARN repo=%s step=preflight-stash detail=stash-present-skip\n' "$repo" >&2
+    return 1
+  fi
+
+  return 0
+}
+
 cleanup_local_merged_branches() {
   local repo="$1"
 
@@ -209,6 +222,8 @@ sync_repo() {
     fi
     fail "$repo" "preflight-clean" "preflight check failed"
   fi
+
+  ensure_no_stash_preflight "$repo" || fail "$repo" "preflight-stash" "stash list not empty"
 
   git -C "$repo" fetch --all --prune || fail "$repo" "fetch" "git fetch --all --prune failed"
   git -C "$repo" checkout main || fail "$repo" "checkout" "git checkout main failed"
