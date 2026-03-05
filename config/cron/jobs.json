@@ -10,14 +10,14 @@
       "updatedAtMs": 1772627409650,
       "schedule": {
         "kind": "cron",
-        "expr": "30 7 * * *",
+        "expr": "0 6 * * *",
         "tz": "America/New_York"
       },
       "sessionTarget": "isolated",
       "wakeMode": "now",
       "payload": {
         "kind": "agentTurn",
-        "message": "OUTPUT CONTRACT (Telegram safety):\n- Keep each sent message under 3500 characters.\n- If longer, split into parts with headers like 'Part 1/N', 'Part 2/N'.\n- Never send oversized single messages.\n\nYou are Cortana. Create Hamel's daily morning brief for Telegram. Calm, concise, actionable.\nOutput format:\n\u2600\ufe0f Brief - Morning Brief\n- Today at a glance (3 bullets)\n- Warren, NJ weather (today high/low + rain chance)\n- Key news (max 3 bullets, US/world + one tech/cyber item)\n- Markets snapshot (major index tone + market open/closed from ~/openclaw/skills/markets/check_market_status.sh)\n- Top 3 priorities for today (time/health/career aligned)\n- One concrete career-advancing task\n\nRules: keep under 220 words, use 12-hour AM/PM time, avoid fluff.\nDelivery is MANUAL: send final text with message tool (channel=telegram, target=8171372724) exactly once.\nAfter sending, return a one-line confirmation only.",
+        "message": "Run the deterministic Daily Command Brief pipeline and send output exactly once.\n\nCommand:\n/Users/hd/openclaw/tools/briefing/run-daily-command-brief.sh\n\nGuarantees in script:\n- deterministic 4-section brief (calendar, fitness/recovery, market pulse, task board)\n- Telegram delivery guardrails (chunking + retries)\n- explicit failure alerts on generation/send failure\n- success log at /tmp/daily-command-brief.log\n\nDry-run path (manual tonight):\n/Users/hd/openclaw/tools/briefing/run-daily-command-brief.sh --dry-run\n\nAfter running, return one-line status only.",
         "model": "openai-codex/gpt-5.2-codex"
       },
       "state": {
