@@ -23,7 +23,11 @@ interface ScanResult {
   blockerSamplesLine?: string;
   blockedByGuards?: number;
   guardNotes?: string[];
+  failClosed?: boolean;
+  failClosedReason?: string;
 }
+
+type DecisionState = "BUY" | "WATCH" | "NO_TRADE";
 
 interface PipelineDeps {
   runCommand: (command: string, args: string[]) => string;
@@ -117,6 +121,46 @@ function getCorrectionProfile(): CorrectionProfile {
 function formatSignalLine(signal: TradingSignal): string {
   const score = Number.isFinite(signal.score) ? `${signal.score}/12` : "n/a";
   return `• ${signal.ticker} (${score}) → ${signal.action}${signal.reason ? ` | ${signal.reason}` : ""}`;
+}
+
+function failCloseScan(scan: ScanResult, reason: string): ScanResult {
+  const rewrittenSignals = scan.signals.map((signal) => ({ ...signal, action: "NO_BUY" as const, reason }));
+  return {
+    ...scan,
+    signals: rewrittenSignals,
+    blockedByGuards: rewrittenSignals.length,
+    failClosed: true,
+    failClosedReason: reason,
+    guardNotes: [...(scan.guardNotes ?? []), `Fail-closed: ${reason}`],
+  };
+}
+
+function applyFailClosedPolicy(scans: ScanResult[]): ScanResult[] {
+  return scans.map((scan) => {
+    if (!scan.marketRegime) {
+      return failCloseScan(scan, "missing market regime in scanner output");
+    }
+    if (!scan.statusLine) {
+      return failCloseScan(scan, "missing status line in scanner output");
+    }
+    if (scan.candidatesEvaluated > 0 && scan.thresholdPassed <= 0) {
+      return failCloseScan(scan, "summary counts inconsistent (evaluated>0 but threshold-passed=0)");
+    }
+    return scan;
+  });
+}
+
+function decisionStateFromCounts(buy: number, watch: number): DecisionState {
+  if (buy > 0) return "BUY";
+  if (watch > 0) return "WATCH";
+  return "NO_TRADE";
+}
+
+function confidenceAndRiskFor(state: DecisionState, correctionMode: boolean, failClosed: boolean): { confidence: number; risk: "LOW" | "MEDIUM" | "HIGH" } {
+  if (failClosed) return { confidence: 0.95, risk: "LOW" };
+  if (state === "BUY") return { confidence: correctionMode ? 0.61 : 0.74, risk: correctionMode ? "HIGH" : "MEDIUM" };
+  if (state === "WATCH") return { confidence: 0.8, risk: correctionMode ? "MEDIUM" : "LOW" };
+  return { confidence: 0.9, risk: "LOW" };
 }
 
 function applyCorrectionGuards(scans: ScanResult[]): ScanResult[] {
@@ -275,6 +319,15 @@ function buildFinalReport(scans: ScanResult[], verdicts: CouncilVerdict[]): stri
   const symbolsScanned = scans.reduce((sum, s) => sum + (s.scanned || s.scanLimit), 0);
   const candidatesEvaluated = scans.reduce((sum, s) => sum + s.candidatesEvaluated, 0);
   const blockedByGuards = scans.reduce((sum, s) => sum + (s.blockedByGuards ?? 0), 0);
+  const failClosedScans = scans.filter((s) => s.failClosed);
+  const decisionState = decisionStateFromCounts(buy, watch);
+  const metrics = confidenceAndRiskFor(decisionState, correctionMode, failClosedScans.length > 0);
+  const noTradeReason =
+    decisionState === "NO_TRADE"
+      ? (failClosedScans[0]?.failClosedReason
+        ? `Fail-closed: ${failClosedScans[0].failClosedReason}`
+        : (scans.map((scan) => topBlocker(scan)).find((x) => x && x !== "n/a") ?? "No qualifying setups met strategy gates."))
+      : undefined;
 
   const lines: string[] = [
     "📈 Trading Advisor - Unified Pipeline",
@@ -283,9 +336,13 @@ function buildFinalReport(scans: ScanResult[], verdicts: CouncilVerdict[]): stri
     buildRegimeGateLine(scans),
     `Diagnostics: symbols scanned ${symbolsScanned} | candidates evaluated ${candidatesEvaluated}`,
     `Blocker telemetry: guardrail blocks/downgrades ${blockedByGuards}`,
+    `Decision: ${decisionState}`,
+    `Confidence: ${metrics.confidence.toFixed(2)} | Risk: ${metrics.risk}`,
+    noTradeReason ? `No-trade reason: ${noTradeReason}` : undefined,
+    failClosedScans.length > 0 ? `Fail-closed scans: ${failClosedScans.map((s) => s.name).join(", ")}` : undefined,
     `Summary: BUY ${buy} | WATCH ${watch} | NO_BUY ${noBuy}`,
     "",
-  ];
+  ].filter(Boolean) as string[];
 
   for (const scan of scans) {
     lines.push(...formatStrategySection(scan), "");
@@ -357,7 +414,8 @@ export async function runTradingPipeline(deps?: Partial<PipelineDeps>): Promise<
     },
   ];
 
-  const guardedOutputs = applyCorrectionGuards(scanOutputs);
+  const failClosedOutputs = applyFailClosedPolicy(scanOutputs);
+  const guardedOutputs = applyCorrectionGuards(failClosedOutputs);
 
   const councilVerdicts: CouncilVerdict[] = [];
   for (const scan of guardedOutputs) {
