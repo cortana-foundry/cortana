@@ -25,7 +25,16 @@ This system runs multiple agents, each with its own workspace, model, and sessio
 - **Telegram group `-5229462108`** → `huragok` (dedicated standalone Huragok Telegram identity)
 - **Huragok spawned work** → `huragok` (`agentId: "huragok"`; no separate worker lane)
 - **Explicit coding-runtime asks** ("use Codex", "use Claude Code", "use Gemini") → `cortana-acp` (`agentId: "cortana-acp"`)
-- **Cron jobs** → respective cron agent (deliver results to Telegram via `message` tool)
+- **Cron jobs** → respective cron/specialist agent (deliver results via `message` tool using mapped `accountId`; keep Cortana lane clean)
+
+## Cortana Protocol (Routing)
+
+- Cortana is orchestrator/command deck, not default implementer.
+- Code implementation and PR creation route to Huragok unless Hamel explicitly asks Cortana to execute directly.
+- Inter-agent `sessions_send` is **TASK-only**. No FYI/status chatter over agent lanes.
+- If a specialist already delivered directly to Hamel, Cortana should not echo duplicate output.
+- Cortana lane should contain decisions, synthesis, and coordination — not routine cron noise.
+- Status claims must be check-backed (CI/cron/runtime verification before declaring green).
 
 ## ACP On-Demand Routing Policy
 

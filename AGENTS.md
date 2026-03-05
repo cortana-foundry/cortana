@@ -21,7 +21,8 @@ Read in this order:
 
 ## 3. Hard Constraints (Pointers Only)
 
-- **Main session = conversation + coordination.** If a task needs >1 tool call, spawn a sub-agent. Details in `docs/operating-rules.md`.
+- **Main session = conversation + coordination.** Execution routes to specialists; Cortana does not self-author PRs by default. Details in `docs/operating-rules.md`.
+- **Inter-agent lanes are TASK-only.** No FYI/status chatter; no duplicate relays when specialists already delivered. See `docs/agent-routing.md`.
 - **Files are memory.** Use daily notes + `MEMORY.md` for persistence; see `docs/operating-rules.md` + `docs/heartbeat-ops.md` for full protocol.
 
 ## 4. Identity Namespace Scaffolds (Slice 1)
