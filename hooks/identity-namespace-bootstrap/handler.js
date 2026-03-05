@@ -3,6 +3,16 @@ import path from "node:path";
 
 const FILES = ["SOUL.md", "USER.md", "IDENTITY.md", "HEARTBEAT.md", "MEMORY.md"];
 
+function normalizeBootstrapEntryName(entryFile) {
+  if (!entryFile || typeof entryFile !== "object") return "";
+
+  const fromName = typeof entryFile.name === "string" ? path.basename(entryFile.name.trim()) : "";
+  if (fromName) return fromName;
+
+  const fromPath = typeof entryFile.path === "string" ? path.basename(entryFile.path.trim()) : "";
+  return fromPath;
+}
+
 function parseAgentId(event) {
   const explicit = typeof event?.context?.agentId === "string" ? event.context.agentId.trim().toLowerCase() : "";
   if (explicit) return explicit;
@@ -54,7 +64,7 @@ export default async function identityNamespaceBootstrapHook(event) {
       continue;
     }
 
-    const idx = files.findIndex((entryFile) => entryFile?.name === name);
+    const idx = files.findIndex((entryFile) => normalizeBootstrapEntryName(entryFile) === name);
     if (idx >= 0) {
       files[idx] = { ...files[idx], name, path: candidate, content, missing: false };
     } else {

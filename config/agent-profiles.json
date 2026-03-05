@@ -52,5 +52,11 @@
     "workspace": "/Users/hd/openclaw",
     "identityNamespace": "oracle",
     "model": "openai-codex/gpt-5.3-codex"
+  },
+  {
+    "id": "monitor",
+    "workspace": "/Users/hd/openclaw",
+    "identityNamespace": "monitor",
+    "model": "openai-codex/gpt-5.3-codex"
   }
 ]
