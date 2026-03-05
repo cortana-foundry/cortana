@@ -32,3 +32,7 @@ config/cron/*.bak*
 
 # Runtime fitness data (pulled live from Whoop/Tonal APIs)
 memory/fitness/
+
+# Identity runtime state (keep repo clean; do not ignore TOOLS.md)
+identities/*/.openclaw/
+identities/*/memory/
