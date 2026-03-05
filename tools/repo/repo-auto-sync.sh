@@ -147,13 +147,38 @@ ensure_clean_preflight() {
 
   local status
   status="$(git -C "$repo" status --porcelain --untracked-files=all)"
-  if [[ -n "$status" ]]; then
-    printf 'WARN repo=%s step=preflight-clean detail=dirty-or-untracked-skip\n' "$repo" >&2
-    while IFS= read -r line; do
-      [[ -z "$line" ]] && continue
-      printf 'WARN repo=%s step=preflight-clean detail=status-entry entry=%q\n' "$repo" "$line" >&2
-    done <<< "$status"
+  if [[ -z "$status" ]]; then
+    return 0
+  fi
+
+  local tracked_dirty=0
+  local untracked_only=0
+
+  while IFS= read -r line; do
+    [[ -z "$line" ]] && continue
+
+    local xy path
+    xy="${line:0:2}"
+    path="${line:3}"
+
+    printf 'WARN repo=%s step=preflight-clean detail=status-entry kind=%q entry=%q\n' "$repo" "$xy" "$line" >&2
+
+    if [[ "$xy" == "??" ]]; then
+      untracked_only=1
+      continue
+    fi
+
+    tracked_dirty=1
+  done <<< "$status"
+
+  if [[ "$tracked_dirty" -eq 1 ]]; then
+    printf 'WARN repo=%s step=preflight-clean detail=tracked-changes-present-skip\n' "$repo" >&2
     return 2
+  fi
+
+  if [[ "$untracked_only" -eq 1 ]]; then
+    printf 'WARN repo=%s step=preflight-clean detail=untracked-only-continue\n' "$repo" >&2
+    return 0
   fi
 
   return 0
