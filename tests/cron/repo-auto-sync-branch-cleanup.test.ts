@@ -22,8 +22,9 @@ describe("Repo Auto Sync branch cleanup command", () => {
     expect(message).toContain("Fail fast on dirty/untracked/stash-present preflight");
     expect(message).toContain("preflight cleanliness -> pull -> local merged-branch cleanup");
     expect(message).toContain("Delete only LOCAL branches merged into origin/main (never remote delete)");
+    expect(message).toContain("checked out in a temp worktree (/tmp or /private/tmp): auto-stash dirty changes (include untracked) with timestamped message, remove the temp worktree, then delete the branch");
+    expect(message).toContain("Never auto-remove non-temp external worktrees; skip with warning");
     expect(message).not.toContain("git clean -fd");
-    expect(message).not.toContain("git stash");
   });
 
   it("sanitizes marker-prefixed branch tokens (regression for '+ fix/...')", () => {
