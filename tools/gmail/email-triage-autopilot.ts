@@ -1,11 +1,8 @@
 #!/usr/bin/env npx tsx
 
 import { spawnSync } from "node:child_process";
-import db from "../lib/db.js";
-import paths from "../lib/paths.js";
-
-const { withPostgresPath } = db as { withPostgresPath: (env: NodeJS.ProcessEnv) => NodeJS.ProcessEnv };
-const { PSQL_BIN } = paths as { PSQL_BIN: string };
+import { withPostgresPath } from "../lib/db.js";
+import { PSQL_BIN } from "../lib/paths.js";
 
 type EmailRow = {
   id: string;
