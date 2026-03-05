@@ -111,6 +111,84 @@ flowchart LR
   QUIET --> SPECIALIST[Specialist delivery lane]
 ```
 
+## 0.8 Full context handoff (for new operator or LLM)
+
+If someone new opens this repo, they should assume:
+
+1. **This is a live command system, not a demo.**
+   `~/openclaw` contains active operating policy for a production personal assistant workflow.
+
+2. **Cortana is orchestration-first by design.**
+   Cortana should route work to specialist lanes and avoid default implementation/PR authoring.
+
+3. **Specialists are first-class execution owners.**
+   - Huragok = implementation/PR/infra
+   - Researcher = research/news synthesis
+   - Oracle = market/portfolio analysis
+   - Monitor = runtime/cron/drift/reliability
+
+4. **Delivery path is explicit.**
+   Specialist outputs generally deliver directly to Telegram target `8171372724` via `message` tool.
+
+5. **Inter-agent traffic is constrained.**
+   `sessions_send` lanes are TASK-only. No status chatter/FYI traffic.
+
+6. **Cortana channel must remain high-signal.**
+   Only coordination, decisions, blockers, verified status.
+
+7. **Verification is mandatory before claims.**
+   CI/cron/runtime status should be checked before declaring healthy/completed.
+
+8. **Recent architecture hardening was deliberate.**
+   Current docs encode a delegation/routing reliability discipline, not optional style guidance.
+
+### 0.9 Context map graph (who does what, end-to-end)
+
+```mermaid
+flowchart TB
+  subgraph Human Layer
+    H[Hamel]
+  end
+
+  subgraph Command Layer
+    C[Cortana / main\nDecision + Routing + Verification]
+  end
+
+  subgraph Execution Layer
+    U[Huragok\nImplement + PR + Infra]
+    R[Researcher\nResearch + News]
+    O[Oracle\nMarket + Portfolio]
+    M[Monitor\nHealth + Cron + Drift]
+  end
+
+  subgraph Control Artifacts
+    S[SOUL.md]
+    OR[docs/operating-rules.md]
+    AR[docs/agent-routing.md]
+    AG[AGENTS.md]
+    HB[HEARTBEAT.md]
+    CJ[config/cron/jobs.json]
+  end
+
+  H --> C
+  C -->|TASK dispatch| U
+  C -->|TASK dispatch| R
+  C -->|TASK dispatch| O
+  C -->|TASK dispatch| M
+
+  U -->|direct delivery| H
+  R -->|direct delivery| H
+  O -->|direct delivery| H
+  M -->|direct delivery| H
+
+  S --> C
+  OR --> C
+  AR --> C
+  AG --> C
+  HB --> M
+  CJ --> M
+```
+
 ## 1. What this is
 
 Cortana is Hamel’s **autonomous AI chief-of-staff** built on **OpenClaw**.
