@@ -21,6 +21,8 @@ tmp/research/
 __pycache__/
 
 # Runtime local state (do not track)
+/memory/runtime/
+memory/runtime/
 memory/heartbeat-state.json
 heartbeat-state.json
 config/heartbeat-state.json
