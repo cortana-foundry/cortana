@@ -30,6 +30,20 @@ describe("repo-auto-sync.sh hygiene policy", () => {
     expect(pull).toBeLessThan(cleanup);
   });
 
+  it("restores tracked volatile runtime state before preflight using pattern allowlist", () => {
+    expect(script).toContain("VOLATILE_STATE_PATTERNS");
+    expect(script).toContain('"memory/*-alerted.json"');
+    expect(script).toContain('"memory/*-seen.json"');
+    expect(script).toContain('"memory/*-sent.json"');
+    expect(script).toContain('"memory/*-state.json"');
+    expect(script).toContain('"memory/brief-last.json"');
+    expect(script).toContain('"memory/cron-health-*.json"');
+    expect(script).toContain('"reports/proactive-signal-audit.json"');
+    expect(script).toContain("collect_tracked_volatile_state_files");
+    expect(script).toContain("restore_tracked_volatile_state_files");
+    expect(script).toContain('restore_tracked_volatile_state_files "$repo"');
+  });
+
   it("sanitizes and validates branch candidates and skips protected branches", () => {
     expect(script).toContain("sanitize_branch_token");
     expect(script).toContain("s/^[*+[:space:]]+//");

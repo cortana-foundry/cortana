@@ -5,7 +5,7 @@ import path from "node:path";
 import crypto from "node:crypto";
 import { readJsonFile } from "../lib/json-file.js";
 
-const STATE_PATH = "/Users/hd/openclaw/memory/circuit-breaker-state.json";
+const STATE_PATH = "/Users/hd/openclaw/memory/runtime/circuit-breaker-state.json";
 const POLICY_PATH = "/Users/hd/openclaw/config/provider-fallback-policy.json";
 const WINDOW_SIZE = 50;
 const TRIP_THRESHOLD = 0.2;

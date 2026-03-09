@@ -3,7 +3,54 @@ set -euo pipefail
 
 REPOS=("/Users/hd/Developer/cortana" "/Users/hd/Developer/cortana-external")
 PROTECTED_BRANCHES=("main" "master" "dev" "develop")
-VOLATILE_STATE_FILES=("memory/newsletter-alerted.json" "memory/x-trending-seen.json")
+VOLATILE_STATE_PATTERNS=(
+  "memory/*-alerted.json"
+  "memory/*-seen.json"
+  "memory/*-sent.json"
+  "memory/*-state.json"
+  "memory/brief-last.json"
+  "memory/cron-health-*.json"
+  "reports/proactive-signal-audit.json"
+)
+
+collect_tracked_volatile_state_files() {
+  local repo="$1"
+  local tracked=()
+  local path=""
+  local pattern=""
+
+  while IFS= read -r path; do
+    [[ -n "$path" ]] || continue
+    for pattern in "${VOLATILE_STATE_PATTERNS[@]}"; do
+      if [[ "$path" == $pattern ]]; then
+        tracked+=("$path")
+        break
+      fi
+    done
+  done < <(git -C "$repo" ls-files)
+
+  if (( ${#tracked[@]} > 0 )); then
+    printf '%s
+' "${tracked[@]}"
+  fi
+}
+
+restore_tracked_volatile_state_files() {
+  local repo="$1"
+  local tracked=()
+  local path=""
+
+  while IFS= read -r path; do
+    [[ -n "$path" ]] || continue
+    tracked+=("$path")
+  done < <(collect_tracked_volatile_state_files "$repo")
+
+  if (( ${#tracked[@]} == 0 )); then
+    return 0
+  fi
+
+  git -C "$repo" restore --worktree -- "${tracked[@]}" >/dev/null 2>&1 || true
+}
 
 fail() {
   local repo="$1"
@@ -147,7 +194,7 @@ ensure_clean_preflight() {
   local repo="$1"
 
   if [[ "$repo" == "/Users/hd/Developer/cortana" ]]; then
-    git -C "$repo" restore --worktree -- "${VOLATILE_STATE_FILES[@]}" >/dev/null 2>&1 || true
+    restore_tracked_volatile_state_files "$repo"
   fi
 
   local status

@@ -10,7 +10,7 @@ export function runCli(argv = process.argv.slice(2)): number {
     return 0;
   }
 
-  const statePath = `${resolveRepoPath()}/memory/vector-health-state.json`;
+  const statePath = `${resolveRepoPath()}/memory/runtime/vector-health-state.json`;
   const state = readJsonFile<Record<string, any>>(statePath) ?? {};
   const statusRes: any = spawnSync("openclaw", ["memory", "status", "--json"], { encoding: "utf8" });
   const statusRows = JSON.parse(statusRes?.stdout || "[]");
