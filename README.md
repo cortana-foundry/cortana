@@ -61,19 +61,12 @@ Live scheduler changes included:
 
 ### 0.3 Operator guidance
 
-### 0.3 Operator guidance
->>>>>>> 2dd1fe2 (docs: add cron schedule shape note)
-
 When editing or adding future crons:
 - prefer **Monitor** for automated machine/ops delivery,
 - reserve **Cortana** for high-signal human-facing outputs,
 - make maintenance jobs **silent-by-default**,
 - require a clear reason for any cron that speaks routinely,
-<<<<<<< HEAD
-- delete low-yield noise instead of preserving it out of sentimentality.
-=======
 - document schedule *shape* here, but keep exact timing in `jobs.json`.
->>>>>>> 2dd1fe2 (docs: add cron schedule shape note)
 
 ## 0. 2026-03-05 Operator Critical Update (live)
 
