@@ -110,7 +110,7 @@ describe("task-board reset-engine", () => {
         scheduledPromotedCount: 2,
         staleClosedCount: 4,
       },
-      new Date("2026-03-10T21:00:00-04:00")
+      new Date(2026, 2, 10, 21, 0, 0)
     );
 
     expect(output).toContain("Tomorrow Mission Stack - Wednesday, March 11");
