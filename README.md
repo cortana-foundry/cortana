@@ -16,6 +16,42 @@ This repository is public. Do **not** hardcode personal identifiers (phone/chat 
 - Store real values in private runtime config (`~/.openclaw/*`) or secrets manager
 - If an example must show a real value for local debugging, keep it in untracked local notes only
 
+## 0. 2026-03-10 Operator Note — Cron Noise Cleanup (live)
+
+Today’s cron cleanup established a new delivery and noise policy for the live system:
+
+- **Cortana stays** as the human-facing command voice for high-value summaries and strategic briefings.
+- **Monitor is now the primary cron/ops delivery voice** for most automated alerts.
+- Maintenance/watchdog/recovery jobs were tightened to be **exception-only** (healthy runs should return `NO_REPLY`).
+- Low-yield/noise-prone cron jobs were removed during the cleanup pass rather than kept by default.
+
+### 0.0 Current cron delivery policy
+
+- **Cortana/main**: morning brief, mission-level synthesis, command-presence summaries.
+- **Monitor**: newsletters, market alerts, system health, maintenance, watchdog/reliability, fitness summaries, and most routine cron outputs.
+- **Default rule**: if a cron is healthy and non-actionable, it should stay silent.
+
+### 0.1 Cleanup outcomes from this pass
+
+Direct changes made live in scheduler config:
+- Moved the majority of user-visible cron delivery under **Monitor**.
+- Silenced maintenance jobs that were previously capable of routine healthy chatter.
+- Removed clearly low-value cron noise, including:
+  - `Weekly Cortana Status`
+  - `Weekly Compounder Scoreboard`
+  - `twitter-update-every-4h`
+  - `Daily Upgrade Protocol`
+- Reduced active cron count materially while preserving core coverage (calendar, newsletter, market, fitness, maintenance, health).
+
+### 0.2 Operator guidance
+
+When editing or adding future crons:
+- prefer **Monitor** for automated machine/ops delivery,
+- reserve **Cortana** for high-signal human-facing outputs,
+- make maintenance jobs **silent-by-default**,
+- require a clear reason for any cron that speaks routinely,
+- delete low-yield noise instead of preserving it out of sentimentality.
+
 ## 0. 2026-03-05 Operator Critical Update (live)
 
 This system is now explicitly **dispatcher-first**:
