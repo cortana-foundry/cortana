@@ -82,7 +82,12 @@ Triggers:
 - Runtime drift suppression / actionable-only reporting is active through `tools/monitoring/runtime-repo-drift-monitor.ts`.
 - Bounded service recovery is active through `tools/monitoring/autonomy-remediation.ts` (gateway restart once with verification, channel recovery via existing delivery hooks, critical cron single-retry recovery, and session lifecycle cleanup verification).
 - Operator visibility: run `npx tsx tools/monitoring/autonomy-status.ts` for a compact executive summary of what was auto-fixed, what failed then recovered, what still needs Hamel, and what exceeded authority or was deferred.
-- Validation coverage lives in `tests/session/session-lifecycle-policy.test.ts`, `tests/monitoring/runtime-repo-drift-monitor.test.ts`, `tests/monitoring/autonomy-status.test.ts`, `tests/monitoring/autonomy-remediation.test.ts`, and `tests/alerting/cron-auto-retry.test.ts`.
+- Live rollout gate: run `npx tsx tools/monitoring/autonomy-rollout.ts`.
+  - Healthy live state stays quiet.
+  - Bounded auto-remediation without open operator work reports `watch`.
+  - Any escalations, actionable drift, or missing required inputs return explicit `attention` output and non-zero exit.
+- Steady-state cadence: autonomy rollout should be checked every 4 hours. Healthy paths stay quiet; operator summaries should fire only when rollout is in `attention`.
+- Validation coverage lives in `tests/session/session-lifecycle-policy.test.ts`, `tests/monitoring/runtime-repo-drift-monitor.test.ts`, `tests/monitoring/autonomy-status.test.ts`, `tests/monitoring/autonomy-rollout.test.ts`, `tests/monitoring/autonomy-remediation.test.ts`, and `tests/alerting/cron-auto-retry.test.ts`.
 
 ## Guardrails
 
