@@ -1715,6 +1715,87 @@
         "mode": "none",
         "accountId": "monitor"
       }
+    },
+    {
+      "id": "36d68783-4368-43db-b376-5424620657a0",
+      "agentId": "cron-maintenance",
+      "name": "🧭 Autonomy operator cadence",
+      "enabled": true,
+      "createdAtMs": 1773243480000,
+      "updatedAtMs": 1773243480000,
+      "schedule": {
+        "kind": "cron",
+        "expr": "5 */4 * * *",
+        "tz": "America/New_York"
+      },
+      "sessionTarget": "isolated",
+      "wakeMode": "now",
+      "payload": {
+        "kind": "agentTurn",
+        "message": "Run `npx tsx /Users/hd/Developer/cortana/tools/monitoring/autonomy-ops.ts`.\n- If it prints nothing, return exactly NO_REPLY.\n- If it prints an operator surface, send that output exactly once with the `message` tool to telegram target 8171372724 using accountId `monitor`, then return exactly NO_REPLY.\nHealthy paths stay quiet; unchanged operator states should not resend.",
+        "model": "openai-codex/gpt-5.4"
+      },
+      "state": {
+        "consecutiveErrors": 0
+      },
+      "delivery": {
+        "mode": "none",
+        "accountId": "monitor"
+      }
+    },
+    {
+      "id": "88aef7df-3409-44bf-8d3c-bdc5408bbf59",
+      "agentId": "cron-maintenance",
+      "name": "📘 Daily executive autonomy digest",
+      "enabled": true,
+      "createdAtMs": 1773243540000,
+      "updatedAtMs": 1773243540000,
+      "schedule": {
+        "kind": "cron",
+        "expr": "15 20 * * *",
+        "tz": "America/New_York"
+      },
+      "sessionTarget": "isolated",
+      "wakeMode": "now",
+      "payload": {
+        "kind": "agentTurn",
+        "message": "⚠️ DELIVERY ROUTING (MANDATORY): Use the `message` tool for user-visible output with exactly:\n- action: send\n- channel: telegram\n- target: 8171372724\n- accountId: monitor\nDo not rely on announce delivery.\n\nGenerate the compact daily autonomy digest by running:\n`npx tsx /Users/hd/Developer/cortana/tools/monitoring/autonomy-daily-digest.ts`\n\nSend the result exactly once. Healthy/no-action days still send the digest; do not page separately from this cron. After sending, return exactly NO_REPLY.",
+        "model": "openai-codex/gpt-5.4"
+      },
+      "state": {
+        "consecutiveErrors": 0
+      },
+      "delivery": {
+        "mode": "none",
+        "accountId": "monitor"
+      }
+    },
+    {
+      "id": "5f807eab-8e4b-42d4-9ab7-a7dd231f66d4",
+      "agentId": "cron-maintenance",
+      "name": "🧪 Weekly autonomy drill cadence",
+      "enabled": true,
+      "createdAtMs": 1773243600000,
+      "updatedAtMs": 1773243600000,
+      "schedule": {
+        "kind": "cron",
+        "expr": "45 13 * * 1",
+        "tz": "America/New_York"
+      },
+      "sessionTarget": "isolated",
+      "wakeMode": "now",
+      "payload": {
+        "kind": "agentTurn",
+        "message": "Run `npx tsx /Users/hd/Developer/cortana/tools/monitoring/autonomy-drill.ts`.\n- If it exits 0, return exactly NO_REPLY.\n- If it exits non-zero, send the drill output exactly once with the `message` tool to telegram target 8171372724 using accountId `monitor`, then return exactly NO_REPLY.\nThis is bounded weekly validation, not a frequent pager.",
+        "model": "openai-codex/gpt-5.4"
+      },
+      "state": {
+        "consecutiveErrors": 0
+      },
+      "delivery": {
+        "mode": "none",
+        "accountId": "monitor"
+      }
     }
   ]
 }

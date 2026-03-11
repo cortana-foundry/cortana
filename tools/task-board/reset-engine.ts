@@ -79,9 +79,15 @@ function runJsonCommand(name: string, args: string[]): Json {
     throw new Error(`${name}: ${detail}`);
   }
 
-  const raw = `${proc.stdout || ""}`.trim().split(/\r?\n/).filter(Boolean).at(-1) ?? "";
-  if (!raw) throw new Error(`${name}: empty output`);
-  return parseJson<Json>(raw, name);
+  const stdout = `${proc.stdout || ""}`.trim();
+  if (!stdout) throw new Error(`${name}: empty output`);
+  try {
+    return parseJson<Json>(stdout, name);
+  } catch {
+    const raw = stdout.split(/\r?\n/).filter(Boolean).at(-1) ?? "";
+    if (!raw) throw new Error(`${name}: empty output`);
+    return parseJson<Json>(raw, name);
+  }
 }
 
 function runSqlJson<T>(sql: string, label: string): T {

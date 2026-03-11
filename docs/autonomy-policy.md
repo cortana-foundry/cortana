@@ -82,13 +82,16 @@ Triggers:
 - Runtime drift suppression / actionable-only reporting is active through `tools/monitoring/runtime-repo-drift-monitor.ts`.
 - Bounded service recovery is active through `tools/monitoring/autonomy-remediation.ts` (gateway restart once with verification, channel recovery via existing delivery hooks, critical cron single-retry recovery, and session lifecycle cleanup verification).
 - Operator visibility: run `npx tsx tools/monitoring/autonomy-status.ts` for a compact executive summary of what was auto-fixed, what failed then recovered, what still needs Hamel, and what exceeded authority or was deferred.
-- Operator surface: run `npx tsx tools/monitoring/autonomy-ops.ts` for one clean operator view across status, rollout state, family-critical handling, and blocked/deferred attention items.
+- Operator surface: run `npx tsx tools/monitoring/autonomy-ops.ts` for one clean operator view across status, rollout state, family-critical handling, and blocked/deferred attention items. It suppresses unchanged repeat chatter so stale copies do not keep paging.
+- Daily executive digest: run `npx tsx tools/monitoring/autonomy-daily-digest.ts` for the compact once-daily operator digest covering auto-fixes, recovered degradation, human-needed items, authority blocks, and family-critical lane status.
 - Live drill support: run `npx tsx tools/monitoring/autonomy-drill.ts` for bounded live-fire readiness across gateway, channel, critical cron, repo handoff, and family-critical scenarios.
 - Live rollout gate: run `npx tsx tools/monitoring/autonomy-rollout.ts`.
   - Healthy live state stays quiet.
   - Bounded auto-remediation without open operator work reports `watch`.
   - Any escalations, actionable drift, or missing required inputs return explicit `attention` output and non-zero exit.
-- Steady-state cadence: autonomy rollout should be checked every 4 hours. Healthy paths stay quiet; operator summaries should fire only when rollout is in `attention`.
+- Steady-state cadence: autonomy rollout should be checked every 4 hours. Healthy paths stay quiet; operator summaries should fire only when rollout is in `attention` and the state changed.
+- Daily cadence: send one executive autonomy digest each evening with the compact operator summary; healthy/no-action days degrade to digest-only instead of paging.
+- Drill cadence: run a bounded autonomy drill/readiness sweep once weekly to keep gateway, delivery, critical cron, repo handoff, and family-critical lanes exercised without noisy constant probing.
 - Validation coverage lives in `tests/session/session-lifecycle-policy.test.ts`, `tests/monitoring/runtime-repo-drift-monitor.test.ts`, `tests/monitoring/autonomy-status.test.ts`, `tests/monitoring/autonomy-rollout.test.ts`, `tests/monitoring/autonomy-drill.test.ts`, `tests/monitoring/autonomy-ops.test.ts`, `tests/monitoring/autonomy-remediation.test.ts`, and `tests/alerting/cron-auto-retry.test.ts`.
 
 ## Guardrails
