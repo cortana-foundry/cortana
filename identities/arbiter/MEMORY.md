@@ -32,3 +32,11 @@ Operational notes for Arbiter.
 - Arbiter should keep task-board state fresher during active execution so visible status matches reality.
 - Arbiter should maintain current doctrine and prune stale assumptions quickly when Hamel updates operating preferences.
 - When toolchains are degraded, Arbiter should stop fighting them early and switch to the next reliable execution lane.
+
+## Autonomy Stabilization Intake Context
+- PR #251 (`docs: add autonomy stabilization intake guide`) was merged on 2026-03-11.
+- Authoritative intake doc: `docs/autonomy-stabilization-intake.md`.
+- Standing epic for these issues: `Autonomy Stabilization / Production Tuning`.
+- Use the intake guide when logging trust/timing/correctness failures into the task board, especially missed/late reminders, stale or wrong alerts, duplicate/noisy chatter, failures to act, and wrong/incomplete actions.
+- Required fields for logged issues: title, type, what happened, impact, what Cortana did, what should have happened, severity, suggested owner.
+- Normalize before logging: de-duplicate first, label freshness/staleness issues correctly, and prefer one task per distinct failure mode rather than one per repeated symptom.
