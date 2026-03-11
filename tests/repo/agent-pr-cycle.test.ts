@@ -1,10 +1,12 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
 import { spawnSync } from "node:child_process";
 
-const SCRIPT = path.resolve(__dirname, "../../tools/repo/agent-pr-cycle.sh");
+const HERE = path.dirname(fileURLToPath(import.meta.url));
+const SCRIPT = path.resolve(HERE, "../../tools/repo/agent-pr-cycle.sh");
 
 function run(cmd: string, cwd: string, env?: NodeJS.ProcessEnv) {
   const result = spawnSync("bash", ["-lc", cmd], { cwd, env: { ...process.env, ...env }, encoding: "utf8" });
