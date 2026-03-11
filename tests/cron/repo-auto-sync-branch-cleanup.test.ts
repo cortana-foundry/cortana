@@ -20,12 +20,12 @@ describe("Repo Auto Sync branch cleanup command", () => {
     const message = String(job?.payload?.message ?? "");
     expect(message).toContain("without invoking external helper scripts");
     expect(message).toContain("git -C <repo> status --porcelain --untracked-files=all");
-    expect(message).toContain("<repo> preflight-clean: tracked-changes-present-skip");
+    expect(message).toContain("If there are tracked changes, do NOT pull immediately. First classify whether dirty state is EXPECTED or ACTIONABLE");
     expect(message).toContain("git -C <repo> rev-list --left-right --count origin/main...HEAD");
-    expect(message).toContain("<repo> branch-state: local-main-ahead-skip");
+    expect(message).toContain("ahead only -> report one concise line ONLY if on `main`; otherwise treat feature-branch ahead state as expected and silent");
     expect(message).toContain("<repo> branch-state: diverged-manual-intervention-required");
     expect(message).toContain("delete merged local branches when safe");
-    expect(message).toContain("return exactly NO_REPLY");
+    expect(message).toContain("If both repos are healthy/safe OR only have expected in-flight dirty state, return exactly NO_REPLY");
     expect(message).toContain("send ONE concise Telegram message via message tool");
     expect(message).not.toContain("bash /Users/hd/Developer/cortana/tools/repo/repo-auto-sync.sh");
     expect(message).not.toContain("git clean -fd");
