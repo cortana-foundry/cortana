@@ -65,4 +65,75 @@ describe("autonomy-status", () => {
     expect(output).toContain("actionable drift: cron/jobs.json");
     expect(output).toContain("suppressed drift: agent-profiles.json");
   });
+
+  it("emits machine-readable json with the same operational summary", async () => {
+    spawnSync
+      .mockReturnValueOnce({
+        status: 0,
+        stdout: JSON.stringify({ status: "healthy" }),
+        stderr: "",
+      })
+      .mockReturnValueOnce({
+        status: 0,
+        stdout: JSON.stringify({ status: "healthy", actionable: [], suppressed: [], missing: [] }),
+        stderr: "",
+      })
+      .mockReturnValueOnce({
+        status: 0,
+        stdout: JSON.stringify({ posture: "balanced", remediated: 0, escalated: 0, healthy: 4, skipped: 0, items: [] }),
+        stderr: "",
+      });
+
+    setArgv(["--json"]);
+    const consoleSpy = captureConsole();
+    await importFresh("../../tools/monitoring/autonomy-status.ts");
+    await flushModuleSideEffects();
+    consoleSpy.restore();
+
+    const parsed = JSON.parse(consoleSpy.logs.join("\n"));
+    expect(parsed).toMatchObject({
+      posture: "balanced",
+      autoRemediated: 0,
+      escalated: 0,
+      suppressed: 0,
+      actionable: 0,
+      missing: 0,
+      needsHuman: 0,
+      sessionStatus: "healthy",
+      driftStatus: "healthy",
+      remediationCounts: { remediated: 0, escalated: 0, healthy: 4, skipped: 0 },
+    });
+  });
+
+  it("still summarizes remediation output when a child check exits non-zero with json", async () => {
+    spawnSync
+      .mockReturnValueOnce({
+        status: 0,
+        stdout: JSON.stringify({ status: "healthy" }),
+        stderr: "",
+      })
+      .mockReturnValueOnce({
+        status: 0,
+        stdout: JSON.stringify({ status: "healthy", actionable: [], suppressed: [], missing: [] }),
+        stderr: "",
+      })
+      .mockReturnValueOnce({
+        status: 1,
+        stdout: JSON.stringify({ posture: "balanced", remediated: 0, escalated: 1, healthy: 3, skipped: 0, items: [{ system: "session", status: "escalate" }] }),
+        stderr: "",
+      });
+
+    setArgv(["--json"]);
+    const consoleSpy = captureConsole();
+    await importFresh("../../tools/monitoring/autonomy-status.ts");
+    await flushModuleSideEffects();
+    consoleSpy.restore();
+
+    const parsed = JSON.parse(consoleSpy.logs.join("\n"));
+    expect(parsed).toMatchObject({
+      escalated: 1,
+      needsHuman: 1,
+      deferredItems: ["session:escalate"],
+    });
+  });
 });

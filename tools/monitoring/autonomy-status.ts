@@ -7,67 +7,140 @@ import { loadAutonomyConfig } from "./autonomy-lanes.ts";
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, "..", "..");
 
-function runJson(script: string, args: string[] = []) {
+type JsonMap = Record<string, any>;
+
+type AutonomyStatusSummary = {
+  posture: string;
+  autoRemediated: number;
+  escalated: number;
+  suppressed: number;
+  actionable: number;
+  missing: number;
+  needsHuman: number;
+  autoFixedItems: string[];
+  failedRecoveredItems: string[];
+  deferredItems: string[];
+  waitingOnHuman: string[];
+  sessionStatus: string;
+  driftStatus: string;
+  remediationCounts: {
+    remediated: number;
+    escalated: number;
+    healthy: number;
+    skipped: number;
+  };
+  actionableDriftLabels: string[];
+  suppressedDriftLabels: string[];
+};
+
+function runJson(script: string, args: string[] = []): JsonMap {
   const proc = spawnSync("npx", ["--yes", "tsx", script, "--json", ...args], {
     cwd: ROOT,
     encoding: "utf8",
   });
-  if (proc.status !== 0) {
-    throw new Error((proc.stderr || proc.stdout || `${path.basename(script)} failed`).trim());
+
+  const stdout = String(proc.stdout ?? "").trim();
+  if (stdout) {
+    try {
+      return JSON.parse(stdout) as JsonMap;
+    } catch {
+      // Fall through to the status/error handling below.
+    }
   }
-  return JSON.parse((proc.stdout || "{}").trim());
+
+  if (proc.status !== 0) {
+    throw new Error((proc.stderr || stdout || `${path.basename(script)} failed`).trim());
+  }
+  return {};
 }
 
-function main() {
+export function collectAutonomyStatus(): AutonomyStatusSummary {
   const config = loadAutonomyConfig();
   const session = runJson(path.join(ROOT, "tools", "session", "session-lifecycle-policy.ts"));
   const drift = runJson(path.join(ROOT, "tools", "monitoring", "runtime-repo-drift-monitor.ts"), ["--dry-run"]);
   const remediation = runJson(path.join(ROOT, "tools", "monitoring", "autonomy-remediation.ts"));
 
   const remediationItems = Array.isArray(remediation.items) ? remediation.items : [];
-  const autoFixedItems = remediationItems.filter((item: any) => item?.status === "remediated").map((item: any) => item.system);
+  const autoFixedItems = remediationItems.filter((item: any) => item?.status === "remediated").map((item: any) => String(item.system));
   const failedRecoveredItems = remediationItems
     .filter((item: any) => item?.status === "remediated" && ["gateway", "channel", "cron"].includes(String(item.system)))
-    .map((item: any) => item.system);
+    .map((item: any) => String(item.system));
   const deferredItems = remediationItems
     .filter((item: any) => item?.status === "skipped" || item?.status === "escalate")
     .map((item: any) => `${item.system}:${item.status}`);
 
+  const remediationEscalated = Number(remediation.escalated ?? 0);
   const autoRemediated = (session.status === "remediated" ? 1 : 0) + Number(remediation.remediated ?? 0);
-  const escalated = (session.status === "cleanup_failed" || session.status === "breach_persists" ? 1 : 0) + Number(remediation.escalated ?? 0);
+  const escalated = (session.status === "cleanup_failed" || session.status === "breach_persists" ? 1 : 0) + remediationEscalated;
   const suppressed = Array.isArray(drift.suppressed) ? drift.suppressed.length : 0;
   const actionable = Array.isArray(drift.actionable) ? drift.actionable.length : 0;
   const missing = Array.isArray(drift.missing) ? drift.missing.length : 0;
   const needsHuman = actionable + missing + escalated;
+  const waitingOnHuman = [
+    actionable ? `${actionable} drift item(s)` : "",
+    missing ? `${missing} missing input(s)` : "",
+    escalated ? `${escalated} escalated check(s)` : "",
+  ].filter(Boolean);
 
+  return {
+    posture: String(config.posture),
+    autoRemediated,
+    escalated,
+    suppressed,
+    actionable,
+    missing,
+    needsHuman,
+    autoFixedItems,
+    failedRecoveredItems,
+    deferredItems,
+    waitingOnHuman,
+    sessionStatus: String(session.status ?? "unknown"),
+    driftStatus: String(drift.status ?? "unknown"),
+    remediationCounts: {
+      remediated: Number(remediation.remediated ?? 0),
+      escalated: remediationEscalated,
+      healthy: Number(remediation.healthy ?? 0),
+      skipped: Number(remediation.skipped ?? 0),
+    },
+    actionableDriftLabels: Array.isArray(drift.actionable) ? drift.actionable.map((x: any) => x.check?.label).filter(Boolean) : [],
+    suppressedDriftLabels: Array.isArray(drift.suppressed) ? drift.suppressed.map((x: any) => x.check?.label).filter(Boolean) : [],
+  };
+}
+
+export function renderAutonomyStatus(summary: AutonomyStatusSummary): string {
   const lines = [
     "🤖 Autonomy Status",
-    `- posture: ${config.posture}`,
-    `- auto-remediated: ${autoRemediated}`,
-    `- escalated: ${escalated}`,
-    `- suppressed healthy/noise: ${suppressed}`,
-    `- needs human action: ${needsHuman}`,
-    `- auto-fixed today: ${autoFixedItems.length ? autoFixedItems.join(", ") : "none"}`,
-    `- failed then recovered: ${failedRecoveredItems.length ? failedRecoveredItems.join(", ") : "none"}`,
-    `- waiting on Hamel: ${actionable || missing || escalated ? [
-      actionable ? `${actionable} drift item(s)` : "",
-      missing ? `${missing} missing input(s)` : "",
-      escalated ? `${escalated} escalated check(s)` : "",
-    ].filter(Boolean).join(", ") : "none"}`,
-    `- deferred/exceeded authority: ${deferredItems.length ? deferredItems.join(", ") : "none"}`,
-    `- session lifecycle: ${session.status}`,
-    `- runtime drift: ${drift.status}`,
-    `- service remediation: remediated=${Number(remediation.remediated ?? 0)} escalated=${Number(remediation.escalated ?? 0)} healthy=${Number(remediation.healthy ?? 0)} skipped=${Number(remediation.skipped ?? 0)}`,
+    `- posture: ${summary.posture}`,
+    `- auto-remediated: ${summary.autoRemediated}`,
+    `- escalated: ${summary.escalated}`,
+    `- suppressed healthy/noise: ${summary.suppressed}`,
+    `- needs human action: ${summary.needsHuman}`,
+    `- auto-fixed today: ${summary.autoFixedItems.length ? summary.autoFixedItems.join(", ") : "none"}`,
+    `- failed then recovered: ${summary.failedRecoveredItems.length ? summary.failedRecoveredItems.join(", ") : "none"}`,
+    `- waiting on Hamel: ${summary.waitingOnHuman.length ? summary.waitingOnHuman.join(", ") : "none"}`,
+    `- deferred/exceeded authority: ${summary.deferredItems.length ? summary.deferredItems.join(", ") : "none"}`,
+    `- session lifecycle: ${summary.sessionStatus}`,
+    `- runtime drift: ${summary.driftStatus}`,
+    `- service remediation: remediated=${summary.remediationCounts.remediated} escalated=${summary.remediationCounts.escalated} healthy=${summary.remediationCounts.healthy} skipped=${summary.remediationCounts.skipped}`,
   ];
 
-  if (Array.isArray(drift.actionable) && drift.actionable.length) {
-    lines.push(`- actionable drift: ${drift.actionable.map((x: any) => x.check?.label).filter(Boolean).join(", ")}`);
+  if (summary.actionableDriftLabels.length) {
+    lines.push(`- actionable drift: ${summary.actionableDriftLabels.join(", ")}`);
   }
-  if (Array.isArray(drift.suppressed) && drift.suppressed.length) {
-    lines.push(`- suppressed drift: ${drift.suppressed.map((x: any) => x.check?.label).filter(Boolean).join(", ")}`);
+  if (summary.suppressedDriftLabels.length) {
+    lines.push(`- suppressed drift: ${summary.suppressedDriftLabels.join(", ")}`);
   }
 
-  console.log(lines.join("\n"));
+  return lines.join("\n");
+}
+
+function main() {
+  const summary = collectAutonomyStatus();
+  if (process.argv.includes("--json")) {
+    console.log(JSON.stringify(summary, null, 2));
+    return;
+  }
+  console.log(renderAutonomyStatus(summary));
 }
 
 main();
