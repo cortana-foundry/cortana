@@ -29,6 +29,10 @@ type AutonomyStatusSummary = {
     healthy: number;
     skipped: number;
   };
+  familyCritical: {
+    recovered: number;
+    escalated: number;
+  };
   actionableDriftLabels: string[];
   suppressedDriftLabels: string[];
 };
@@ -62,6 +66,14 @@ export function collectAutonomyStatus(): AutonomyStatusSummary {
 
   const remediationItems = Array.isArray(remediation.items) ? remediation.items : [];
   const autoFixedItems = remediationItems.filter((item: any) => item?.status === "remediated").map((item: any) => String(item.system));
+  const cronVerification = remediationItems.find((item: any) => item?.system === "cron")?.verification;
+  const cronSummary = typeof cronVerification === "string" ? (() => {
+    try {
+      return JSON.parse(cronVerification) as JsonMap;
+    } catch {
+      return {} as JsonMap;
+    }
+  })() : {};
   const failedRecoveredItems = remediationItems
     .filter((item: any) => item?.status === "remediated" && ["gateway", "channel", "cron"].includes(String(item.system)))
     .map((item: any) => String(item.system));
@@ -102,6 +114,10 @@ export function collectAutonomyStatus(): AutonomyStatusSummary {
       healthy: Number(remediation.healthy ?? 0),
       skipped: Number(remediation.skipped ?? 0),
     },
+    familyCritical: {
+      recovered: Number((cronSummary.familyCritical as JsonMap | undefined)?.recovered ?? 0),
+      escalated: Number((cronSummary.familyCritical as JsonMap | undefined)?.escalations ?? 0),
+    },
     actionableDriftLabels: Array.isArray(drift.actionable) ? drift.actionable.map((x: any) => x.check?.label).filter(Boolean) : [],
     suppressedDriftLabels: Array.isArray(drift.suppressed) ? drift.suppressed.map((x: any) => x.check?.label).filter(Boolean) : [],
   };
@@ -119,6 +135,7 @@ export function renderAutonomyStatus(summary: AutonomyStatusSummary): string {
     `- failed then recovered: ${summary.failedRecoveredItems.length ? summary.failedRecoveredItems.join(", ") : "none"}`,
     `- waiting on Hamel: ${summary.waitingOnHuman.length ? summary.waitingOnHuman.join(", ") : "none"}`,
     `- deferred/exceeded authority: ${summary.deferredItems.length ? summary.deferredItems.join(", ") : "none"}`,
+    `- family-critical lane: recovered=${summary.familyCritical.recovered} escalated=${summary.familyCritical.escalated}`,
     `- session lifecycle: ${summary.sessionStatus}`,
     `- runtime drift: ${summary.driftStatus}`,
     `- service remediation: remediated=${summary.remediationCounts.remediated} escalated=${summary.remediationCounts.escalated} healthy=${summary.remediationCounts.healthy} skipped=${summary.remediationCounts.skipped}`,

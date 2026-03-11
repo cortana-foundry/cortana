@@ -37,7 +37,7 @@ describe("autonomy-status", () => {
           skipped: 0,
           items: [
             { system: "gateway", status: "remediated" },
-            { system: "cron", status: "remediated" },
+            { system: "cron", status: "remediated", verification: JSON.stringify({ familyCritical: { recovered: 1, escalations: 1 } }) },
             { system: "channel", status: "escalate" }
           ]
         }),
@@ -61,6 +61,7 @@ describe("autonomy-status", () => {
     expect(output).toContain("failed then recovered: gateway, cron");
     expect(output).toContain("waiting on Hamel: 1 drift item(s), 1 escalated check(s)");
     expect(output).toContain("deferred/exceeded authority: channel:escalate");
+    expect(output).toContain("family-critical lane: recovered=1 escalated=1");
     expect(output).toContain("service remediation: remediated=2 escalated=1 healthy=0 skipped=0");
     expect(output).toContain("actionable drift: cron/jobs.json");
     expect(output).toContain("suppressed drift: agent-profiles.json");
@@ -102,6 +103,7 @@ describe("autonomy-status", () => {
       sessionStatus: "healthy",
       driftStatus: "healthy",
       remediationCounts: { remediated: 0, escalated: 0, healthy: 4, skipped: 0 },
+      familyCritical: { recovered: 0, escalated: 0 },
     });
   });
 
