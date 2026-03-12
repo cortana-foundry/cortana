@@ -29,6 +29,16 @@ type DriftAssessment = {
   reason: string;
 };
 
+type CooldownEntry = {
+  label?: string;
+  untilMs?: number;
+  reason?: string;
+};
+
+type CooldownState = {
+  entries?: CooldownEntry[];
+};
+
 const VOLATILE_KEYS = new Set([
   "state",
   "updatedAtMs",
@@ -45,6 +55,8 @@ const VOLATILE_KEYS = new Set([
   "runningAtMs",
   "lastError",
 ]);
+
+const DEFAULT_COOLDOWN_PATH = path.join(os.homedir(), ".openclaw", "state", "runtime-repo-drift-cooldown.json");
 
 function parseArgs(): Args {
   const argv = process.argv.slice(2);
@@ -111,6 +123,28 @@ function normalizedDigest(file: string): string | null {
 
 function readJson(file: string): unknown {
   return JSON.parse(fs.readFileSync(file, "utf8"));
+}
+
+function readCooldownState(nowMs: number): Map<string, CooldownEntry> {
+  try {
+    const raw = readJson(process.env.DRIFT_COOLDOWN_PATH || DEFAULT_COOLDOWN_PATH) as CooldownState;
+    const entries = Array.isArray(raw?.entries) ? raw.entries : [];
+    return new Map(
+      entries
+        .filter((entry) => typeof entry?.label === "string" && typeof entry?.untilMs === "number" && entry.untilMs > nowMs)
+        .map((entry) => [String(entry.label), entry])
+    );
+  } catch {
+    return new Map();
+  }
+}
+
+function activeCooldownReason(label: string, nowMs: number): string | null {
+  const entry = readCooldownState(nowMs).get(label);
+  if (!entry || typeof entry.untilMs !== "number") return null;
+  const minutes = Math.max(1, Math.ceil((entry.untilMs - nowMs) / 60000));
+  const suffix = entry.reason ? ` (${entry.reason})` : "";
+  return `intentional runtime patch cooldown active ~${minutes}m${suffix}`;
 }
 
 function syncCronJobsSemantically(runtimeFile: string, repoFile: string): void {
@@ -184,6 +218,18 @@ function assess(check: Check): DriftAssessment {
       rawMismatch: true,
       actionable: false,
       reason: "runtime-only state drift suppressed",
+    };
+  }
+
+  const cooldown = activeCooldownReason(check.label, Date.now());
+  if (cooldown) {
+    return {
+      check,
+      runtimeHash,
+      repoHash,
+      rawMismatch: true,
+      actionable: false,
+      reason: cooldown,
     };
   }
 
@@ -295,7 +341,7 @@ function main() {
   const lines = ["🧭 Runtime/Repo Drift Detected"];
   for (const item of actionable) lines.push(`- ${item.check.label}: ${item.reason}`);
   for (const item of missing) lines.push(`- ${item.check.label}: ${item.reason}`);
-  if (suppressed.length) lines.push(`- suppressed runtime-only drift: ${suppressed.map((s) => s.check.label).join(", ")}`);
+  if (suppressed.length) lines.push(`- suppressed drift: ${suppressed.map((s) => `${s.check.label} (${s.reason})`).join(", ")}`);
 
   if (args.autoPr && actionable.length) {
     try {
