@@ -3,7 +3,7 @@ set -euo pipefail
 
 REPOS=("/Users/hd/Developer/cortana" "/Users/hd/Developer/cortana-external")
 PROTECTED_BRANCHES=("main" "master" "dev" "develop")
-VOLATILE_STATE_FILES=("memory/newsletter-alerted.json" "memory/x-trending-seen.json")
+VOLATILE_STATE_FILES=("memory/calendar-reminders-sent.json" "memory/newsletter-alerted.json" "memory/x-trending-seen.json")
 
 fail() {
   local repo="$1"
