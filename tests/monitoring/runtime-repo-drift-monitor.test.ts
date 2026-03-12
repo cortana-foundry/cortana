@@ -104,6 +104,26 @@ describe("runtime-repo-drift-monitor", () => {
     expect(payload.suppressed[0].check.label).toBe("cron/jobs.json");
   });
 
+  it("suppresses actionable drift during intentional runtime patch cooldown", async () => {
+    seedFiles({
+      "/home/test/.openclaw/cron/jobs.json": cronJobsJson("Runtime Job", "Shared Job"),
+      "/repo/config/cron/jobs.json": cronJobsJson("Repo Job", "Shared Job"),
+      "/home/test/.openclaw/agent-profiles.json": JSON.stringify({ profiles: [] }),
+      "/repo/config/agent-profiles.json": JSON.stringify({ profiles: [] }),
+      "/home/test/.openclaw/state/runtime-repo-drift-cooldown.json": JSON.stringify({
+        entries: [{ label: "cron/jobs.json", untilMs: 1772535900000, reason: "manual hotfix" }],
+      }),
+    });
+
+    const quietOutput = await runMonitor(["--repo-root", "/repo"]);
+    expect(quietOutput).toContain("NO_REPLY");
+
+    const output = await runMonitor(["--json", "--repo-root", "/repo"]);
+    const payload = JSON.parse(output);
+    expect(payload.status).toBe("healthy");
+    expect(payload.suppressed[0].reason).toContain("intentional runtime patch cooldown active");
+  });
+
   it("enables auto-pr when --auto-pr is passed", async () => {
     seedFiles({
       "/home/test/.openclaw/cron/jobs.json": cronJobsJson("Runtime Job", "Shared Job"),
