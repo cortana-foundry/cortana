@@ -156,12 +156,16 @@ async function main(): Promise<number> {
     return 0;
   }
 
+  log("Running: openclaw doctor");
+  const doctor = spawnSync("openclaw", ["doctor"], { stdio: "inherit" });
+  if (doctor.status !== 0) return doctor.status ?? 1;
+
   log("Running: openclaw gateway install --force");
   const install = spawnSync("openclaw", ["gateway", "install", "--force"], { stdio: "inherit" });
   if (install.status !== 0) return install.status ?? 1;
 
   if (args.skipRestart) {
-    log("Skip-restart mode complete after install.");
+    log("Skip-restart mode complete after doctor + install.");
     return 0;
   }
 
