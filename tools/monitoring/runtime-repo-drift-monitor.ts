@@ -42,6 +42,8 @@ const VOLATILE_KEYS = new Set([
   "consecutiveErrors",
   "reconciledAt",
   "reconciledReason",
+  "runningAtMs",
+  "lastError",
 ]);
 
 function parseArgs(): Args {
@@ -107,6 +109,52 @@ function normalizedDigest(file: string): string | null {
   }
 }
 
+function readJson(file: string): unknown {
+  return JSON.parse(fs.readFileSync(file, "utf8"));
+}
+
+function syncCronJobsSemantically(runtimeFile: string, repoFile: string): void {
+  const runtimeRaw = readJson(runtimeFile) as { jobs?: Array<Record<string, unknown>>; [key: string]: unknown };
+  const repoRaw = readJson(repoFile) as { jobs?: Array<Record<string, unknown>>; [key: string]: unknown };
+
+  const runtimeJobs = Array.isArray(runtimeRaw.jobs) ? runtimeRaw.jobs : [];
+  const repoJobs = Array.isArray(repoRaw.jobs) ? repoRaw.jobs : [];
+  const runtimeById = new Map(runtimeJobs.map((job) => [String(job.id ?? ""), job]));
+
+  const mergedJobs = repoJobs.map((repoJob) => {
+    const id = String(repoJob.id ?? "");
+    const runtimeJob = runtimeById.get(id);
+    if (!runtimeJob) return repoJob;
+
+    const repoSemantic = stripVolatile(repoJob);
+    const runtimeSemantic = stripVolatile(runtimeJob);
+    const repoDigest = digestBytes(JSON.stringify(repoSemantic));
+    const runtimeDigest = digestBytes(JSON.stringify(runtimeSemantic));
+
+    if (repoDigest === runtimeDigest) return repoJob;
+
+    const merged: Record<string, unknown> = { ...repoJob };
+
+    for (const [key, value] of Object.entries(runtimeJob)) {
+      if (VOLATILE_KEYS.has(key)) continue;
+      merged[key] = value;
+    }
+
+    return merged;
+  });
+
+  const merged = { ...repoRaw, jobs: mergedJobs };
+  fs.writeFileSync(repoFile, `${JSON.stringify(merged, null, 2)}\n`, "utf8");
+}
+
+function syncFileForRepo(check: Check): void {
+  if (check.label === "cron/jobs.json") {
+    syncCronJobsSemantically(check.runtime, check.repo);
+    return;
+  }
+  fs.copyFileSync(check.runtime, check.repo);
+}
+
 function assess(check: Check): DriftAssessment {
   const runtimeHash = digest(check.runtime);
   const repoHash = digest(check.repo);
@@ -167,7 +215,7 @@ function syncAndOpenPr(assessments: DriftAssessment[], args: Args): string {
     const rel = path.relative(args.repoRoot, assessment.check.repo);
     copied.push(rel);
     if (!args.dryRun) {
-      fs.copyFileSync(assessment.check.runtime, assessment.check.repo);
+      syncFileForRepo(assessment.check);
       run(`git add ${JSON.stringify(rel)}`, args.repoRoot);
     }
   }
@@ -195,6 +243,7 @@ function syncAndOpenPr(assessments: DriftAssessment[], args: Args): string {
     ...copied.map((f) => `- ${f}`),
     "",
     "Volatile runtime-only state fields were suppressed by runtime-repo-drift-monitor.ts.",
+    "cron/jobs.json is merged semantically so runtime state churn does not leak into the PR.",
   ].join("\n");
 
   const prUrl = run(
