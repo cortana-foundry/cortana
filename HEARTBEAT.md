@@ -112,6 +112,15 @@ Otherwise: Cortana remains silent (`HEARTBEAT_OK` behavior preserved).
 - Only broken/actionable items should message Hamel.
 - Cortana should not duplicate delegated summaries.
 
+## Queued User Message Precedence
+
+If queued/direct user messages are delivered alongside or immediately after a heartbeat poll, the queued user request wins.
+
+- Do **not** treat `HEARTBEAT_OK` as the final user-visible reply when a newer queued user instruction/question is present.
+- Complete the heartbeat read/check silently, then answer the queued user request normally.
+- Only emit `HEARTBEAT_OK` when the heartbeat poll is the only thing requiring a reply.
+- If relevant, mention heartbeat status inside the normal reply instead of sending a standalone heartbeat-only response.
+
 ## Quiet Hours
 
 - **23:00–06:00 ET:** default silent unless urgent.
