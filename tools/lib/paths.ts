@@ -1,4 +1,3 @@
-import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
 import { fileURLToPath } from "url";
@@ -10,44 +9,12 @@ export function getScriptDir(importMetaUrl: string): string {
   return path.dirname(fileURLToPath(importMetaUrl));
 }
 
-function safeExistsSync(filePath: string): boolean {
-  let fn: ((p: string) => boolean) | undefined;
-  try {
-    fn = (fs as typeof import("node:fs") & { default?: { existsSync?: (p: string) => boolean } }).existsSync;
-  } catch {
-    fn = undefined;
-  }
-  if (typeof fn !== "function") {
-    try {
-      fn = (fs as { default?: { existsSync?: (p: string) => boolean } }).default?.existsSync;
-    } catch {
-      fn = undefined;
-    }
-  }
-  if (typeof fn !== "function") return false;
-  return fn(filePath);
-}
-
 export function findRepoRoot(startDir?: string): string {
-  let dir = startDir ?? getScriptDir(import.meta.url);
-  for (let i = 0; i < 12; i += 1) {
-    if (
-      safeExistsSync(path.join(dir, "AGENTS.md")) ||
-      safeExistsSync(path.join(dir, ".git"))
-    ) {
-      return dir;
-    }
-    const parent = path.dirname(dir);
-    if (parent === dir) {
-      break;
-    }
-    dir = parent;
-  }
-  return startDir ?? process.cwd();
+  return startDir ?? process.env.CORTANA_SOURCE_REPO ?? process.cwd();
 }
 
 export function repoRoot(): string {
-  return findRepoRoot();
+  return process.env.CORTANA_SOURCE_REPO ?? process.cwd();
 }
 
 export function resolveRepoPath(...segments: string[]): string {
