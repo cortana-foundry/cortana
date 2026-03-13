@@ -29,6 +29,7 @@ Today’s cron cleanup established a new live delivery and noise policy:
 
 - **Cortana/main**: morning brief, mission-level synthesis, command-presence summaries.
 - **Monitor**: newsletters, market alerts, system health, maintenance, watchdog/reliability, fitness summaries, and most routine cron outputs.
+- **Monitor is the user-facing owner lane for inbox/email ops and maintenance alerts.**
 - **Default rule**: if a cron is healthy and non-actionable, it should stay silent.
 
 ### 0.1 Current schedule shape (document the shape, not every minute)
