@@ -9,6 +9,8 @@ When you receive a heartbeat poll (message matches the configured heartbeat prom
 Default heartbeat prompt:
 `Read HEARTBEAT.md if it exists (workspace context). Follow it strictly. Do not infer or repeat old tasks from prior chats. If nothing needs attention, reply HEARTBEAT_OK.`
 
+**Queued-message precedence:** if queued/direct user messages arrive with or right after the heartbeat poll, answer the user request instead of sending a standalone `HEARTBEAT_OK`. Heartbeat silence applies only when the heartbeat poll is the only thing awaiting a reply.
+
 You are free to edit `HEARTBEAT.md` with a short checklist or reminders. Keep it small to limit token burn.
 
 ### Heartbeat vs Cron: When to Use Each
