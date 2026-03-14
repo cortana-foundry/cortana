@@ -42,6 +42,7 @@ Dip Buyer: scanned 120 | evaluated 1 | threshold-passed 1 | emitted BUY 0 / WATC
     expect(alert).toContain("CANSLIM: BUY 0 | WATCH 1 | NO_BUY 0");
     expect(alert).toContain("Dip Buyer: BUY 0 | WATCH 1 | NO_BUY 0");
     expect(alert).toContain("Focus: CANSLIM AAPL WATCH | Dip TSLA WATCH");
+    expect(alert).toContain("Watchlist: Dip TSLA 8/12 | CANSLIM AAPL 7/12");
   });
 
   it("surfaces the no-trade reason when both strategies are blocked", () => {
@@ -60,5 +61,23 @@ Dip Buyer: scanned 120 | evaluated 1 | threshold-passed 1 | emitted BUY 0 / WATC
 
     expect(alert).toContain("Decision: NO_TRADE | 0.90 | Risk: LOW");
     expect(alert).toContain("Reason: Fail-closed: missing market regime in scanner output");
+  });
+
+  it("adds a ranked watchlist when correction mode has WATCH candidates but no BUYs", () => {
+    const report = `📈 Trading Advisor - Unified Pipeline
+Decision: WATCH
+Confidence: 0.80 | Risk: MEDIUM
+Regime/Gates: correction=YES | correction | defensive
+Summary: BUY 0 | WATCH 4 | NO_BUY 0
+CANSLIM: scanned 120 | evaluated 1 | threshold-passed 1 | emitted BUY 0 / WATCH 1 / NO_BUY 0
+• AAPL (7/12) → WATCH
+Dip Buyer: scanned 120 | evaluated 3 | threshold-passed 3 | emitted BUY 0 / WATCH 3 / NO_BUY 0
+• GOOGL (9/12) → WATCH
+• NFLX (9/12) → WATCH
+• MSFT (9/12) → WATCH`;
+
+    const alert = buildCronAlertFromPipelineReport(report);
+
+    expect(alert).toContain("Watchlist: Dip GOOGL 9/12 | Dip NFLX 9/12 | Dip MSFT 9/12 | CANSLIM AAPL 7/12");
   });
 });

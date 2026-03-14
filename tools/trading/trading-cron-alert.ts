@@ -115,6 +115,24 @@ function formatFocusLabel(line: string | null): string | null {
   return `${match[1]} ${match[2]}`;
 }
 
+function collectSignals(lines: string[], section: string, action: "BUY" | "WATCH" | "NO_BUY", limit = 3): string[] {
+  const startIndex = lines.findIndex((line) => line.startsWith(`${section}:`));
+  if (startIndex === -1) return [];
+
+  const out: string[] = [];
+  for (let i = startIndex + 1; i < lines.length; i += 1) {
+    const line = lines[i];
+    if (!line.trim()) break;
+    if (!line.startsWith("• ")) continue;
+    const match = line.match(/^•\s+([A-Z.\-]+)\s+\((\d+)\/\d+\)\s+→\s+(BUY|WATCH|NO_BUY)/);
+    if (!match || match[3] !== action) continue;
+    out.push(`${match[1]} ${match[2]}/12`);
+    if (out.length >= limit) break;
+  }
+
+  return out;
+}
+
 export function buildCronAlertFromPipelineReport(report: string): string {
   const lines = report
     .split(/\r?\n/)
@@ -142,6 +160,13 @@ export function buildCronAlertFromPipelineReport(report: string): string {
 
   const focusBits = [canslimFocus ? `CANSLIM ${canslimFocus}` : "", dipFocus ? `Dip ${dipFocus}` : ""].filter(Boolean);
   if (focusBits.length) compactLines.push(`Focus: ${focusBits.join(" | ")}`);
+
+  const watchlist = [
+    ...collectSignals(lines, "Dip Buyer", "WATCH", 3).map((item) => `Dip ${item}`),
+    ...collectSignals(lines, "CANSLIM", "WATCH", 2).map((item) => `CANSLIM ${item}`),
+  ].slice(0, 5);
+  if (watchlist.length) compactLines.push(`Watchlist: ${watchlist.join(" | ")}`);
+
   if (noTrade) compactLines.push(`Reason: ${trimLabel(noTrade, "No-trade reason:")}`);
   else if (blockerTelemetry) compactLines.push(trimLabel(blockerTelemetry, "Blocker telemetry:"));
   if (councilLine) compactLines.push("Council ran for active BUY signals.");

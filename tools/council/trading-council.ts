@@ -86,6 +86,27 @@ export function parseSignals(alertText: string): TradingSignal[] {
     });
   }
 
+  if (out.length > 0) return out;
+
+  const seen = new Set<string>();
+  for (const line of lines) {
+    if (!/^(Top leaders|Leaders):/i.test(line)) continue;
+    const regex = /([A-Z][A-Z0-9.-]*)\s+(BUY|WATCH|NO_BUY)\s+\((\d+)\/\d+\)/g;
+    let match: RegExpExecArray | null;
+    while ((match = regex.exec(line)) !== null) {
+      const ticker = match[1]!;
+      if (seen.has(ticker)) continue;
+      seen.add(ticker);
+      out.push({
+        ticker,
+        action: match[2] as SignalAction,
+        score: parseNumber(match[3]),
+        reason: "Parsed from compact leader summary",
+        source,
+      });
+    }
+  }
+
   return out;
 }
 

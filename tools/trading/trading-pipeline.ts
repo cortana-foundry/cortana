@@ -339,18 +339,32 @@ function summarizeSignals(signals: TradingSignal[]) {
 
 function parseMarketLine(text: string): { marketRegime?: string; marketLine?: string; statusLine?: string } {
   const lines = text.split(/\r?\n/);
-  const marketLine = lines.find((l) => l.startsWith("Market:"));
-  const statusLine = lines.find((l) => l.startsWith("Status:"));
+  const canonicalMarketLine = lines.find((l) => l.startsWith("Market:"));
+  const regimeLine = lines.find((l) => l.startsWith("Market regime:"));
+  const marketLine = canonicalMarketLine ?? regimeLine?.replace(/^Market regime:/i, "Market:");
+  const statusLine = lines.find((l) => l.startsWith("Status:")) ?? lines.find((l) => l.startsWith("Final action:"));
   if (!marketLine) return { statusLine };
   const marketRegime = marketLine.match(/^Market:\s*([^|]+)/i)?.[1]?.trim().toLowerCase();
   return { marketRegime, marketLine, statusLine };
 }
 
 function parseSummaryCounts(text: string): { candidatesEvaluated: number; scanned: number; thresholdPassed: number } {
-  const summaryLine = text.split(/\r?\n/).find((l) => l.startsWith("Summary:"));
-  const scanned = Number(summaryLine?.match(/scanned\s+(\d+)/i)?.[1] ?? 0);
-  const candidatesEvaluated = Number(summaryLine?.match(/evaluated\s+(\d+)/i)?.[1] ?? summaryLine?.match(/Summary:\s*(\d+)\s+candidates/i)?.[1] ?? 0);
-  const thresholdPassed = Number(summaryLine?.match(/threshold-passed\s+(\d+)/i)?.[1] ?? candidatesEvaluated);
+  const lines = text.split(/\r?\n/);
+  const summaryLine = lines.find((l) => l.startsWith("Summary:"));
+  if (summaryLine) {
+    const scanned = Number(summaryLine.match(/scanned\s+(\d+)/i)?.[1] ?? 0);
+    const candidatesEvaluated = Number(summaryLine.match(/evaluated\s+(\d+)/i)?.[1] ?? summaryLine.match(/Summary:\s*(\d+)\s+candidates/i)?.[1] ?? 0);
+    const thresholdPassed = Number(summaryLine.match(/threshold-passed\s+(\d+)/i)?.[1] ?? candidatesEvaluated);
+    return { candidatesEvaluated, scanned, thresholdPassed };
+  }
+
+  const qualifiedLine = lines.find((l) => l.startsWith("Qualified setups:"));
+  const decisionReviewLine = lines.find((l) => l.startsWith("Decision review:"));
+  const scanned = Number(qualifiedLine?.match(/of\s+(\d+)\s+scanned/i)?.[1] ?? 0);
+  const candidatesEvaluated = Number(qualifiedLine?.match(/Qualified setups:\s*(\d+)/i)?.[1] ?? 0);
+  const thresholdPassed = Number(
+    decisionReviewLine?.match(/BUY\s+(\d+)/i)?.[1] ?? 0,
+  ) + Number(decisionReviewLine?.match(/WATCH\s+(\d+)/i)?.[1] ?? 0);
   return { candidatesEvaluated, scanned, thresholdPassed };
 }
 
