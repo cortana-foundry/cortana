@@ -5,6 +5,7 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { spawnSync } from "node:child_process";
 import { getScriptDir } from "../lib/paths.js";
+import { runTsxScript } from "./tsx-runner";
 
 export type SignalAction = "BUY" | "WATCH" | "NO_BUY";
 export type AlertSource = "CANSLIM" | "DipBuyer" | "Unknown";
@@ -110,14 +111,6 @@ export function parseSignals(alertText: string): TradingSignal[] {
   return out;
 }
 
-function runTsx(file: string, args: string[]): string {
-  const r = spawnSync("tsx", [file, ...args], { encoding: "utf8" });
-  if (r.status !== 0) {
-    throw new Error(r.stderr || r.stdout || "command failed");
-  }
-  return (r.stdout || "").trim();
-}
-
 function runCodexPrompt(model: string, prompt: string): string {
   const r = spawnSync("codex", ["exec", "--model", model, prompt], { encoding: "utf8" });
   if (r.status !== 0) throw new Error(r.stderr || "codex failed");
@@ -176,7 +169,7 @@ function createSession(signal: TradingSignal): string {
     source: signal.source,
   });
 
-  const out = runTsx(deliberate, [
+  const out = runTsxScript(deliberate, [
     "--title", title,
     "--participants", PARTICIPANTS.join(","),
     "--context", context,
@@ -199,7 +192,7 @@ function castVote(sessionId: string, voter: (typeof PARTICIPANTS)[number], signa
     // keep fallback
   }
 
-  runTsx(council, [
+  runTsxScript(council, [
     "vote",
     "--session", sessionId,
     "--voter", voter,
@@ -293,7 +286,7 @@ export async function runTradingCouncil(alertText: string): Promise<{ output: st
     const votes = PARTICIPANTS.map((voter) => castVote(sessionId, voter, signal));
 
     const tallyScript = path.join(getScriptDir(import.meta.url), "council-tally.ts");
-    const tallyOut = runTsx(tallyScript, ["--session", sessionId]);
+    const tallyOut = runTsxScript(tallyScript, ["--session", sessionId]);
     const tally = JSON.parse(tallyOut);
     const totals = tally?.summary?.totals || {};
 

@@ -1,18 +1,12 @@
 #!/usr/bin/env npx tsx
 
-import { spawnSync } from "child_process";
 import path from "path";
 import { getScriptDir } from "../lib/paths.js";
+import { runTsxScript } from "./tsx-runner";
 
 function jsonError(msg: string): string { return JSON.stringify({ ok: false, error: msg }); }
 function die(msg: string): never { console.log(jsonError(msg)); process.exit(1); }
 function usage() { console.log(`Usage:\n  council-deliberate.sh --title <title> --participants "a,b" --context <json> [--expires <minutes>] [--initiator <name>]`); }
-
-function run(file: string, args: string[]): string {
-  const r = spawnSync("tsx", [file, ...args], { encoding: "utf8" });
-  if (r.status !== 0) throw new Error(r.stderr || "command failed");
-  return (r.stdout || "").trim();
-}
 
 async function main(): Promise<void> {
   let title = ""; let participants = ""; let context = "{}"; let expires = "30"; let initiator = "cortana";
@@ -34,9 +28,9 @@ async function main(): Promise<void> {
   const councilTs = path.join(scriptDir, "council.ts");
   let createOut = "";
   try {
-    createOut = run(councilTs, ["create", "--type", "deliberation", "--title", title, "--initiator", initiator, "--participants", participants, "--expires", expires, "--context", context]);
-  } catch {
-    die("Failed to create deliberation session");
+    createOut = runTsxScript(councilTs, ["create", "--type", "deliberation", "--title", title, "--initiator", initiator, "--participants", participants, "--expires", expires, "--context", context]);
+  } catch (error) {
+    die(`Failed to create deliberation session: ${error instanceof Error ? error.message : String(error)}`);
   }
 
   const obj = JSON.parse(createOut);
