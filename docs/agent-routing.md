@@ -30,7 +30,9 @@ This system runs multiple agents, each with its own workspace, model, and sessio
 
 ## Stable Ops Owner Lane
 
-Monitor is the user-facing owner lane for inbox/email ops and maintenance alerts.
+Monitor is the user-facing owner lane for inbox/email ops and operational maintenance alerts.
+Monitor is the user-facing owner lane for trading alert scans.
+Quiet maintenance watchers should return exactly `NO_REPLY` on healthy paths.
 
 - Another specialist can still execute the underlying work.
 - The user-facing delivery account, prompt ownership language, and cron routing should still point to Monitor.
