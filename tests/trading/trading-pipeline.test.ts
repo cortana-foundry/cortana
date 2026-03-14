@@ -37,6 +37,16 @@ Summary: scanned 120 | evaluated 1 | threshold-passed 1 | BUY 1 | WATCH 0 | NO_B
 • TSLA (8/12) → BUY
   Entry $200.00 | Stop $186.00`;
 
+const DIP_RAW_COMPACT = `Dip Buyer Scan
+Market regime: correction
+Qualified setups: 20 of 20 scanned | BUY 0 | WATCH 8
+BUY names: none
+Top leaders: GOOGL WATCH (9/12) 🐦 Neutral | NFLX WATCH (9/12) 🐦 Neutral | MSFT WATCH (9/12) 🐦 Neutral
+Decision review: BUY 0 | WATCH 5 | NO_BUY 0
+Tuning balance: clean BUY 0 | risky BUY proxy 0 | abstain 0 | veto 0 | higher-tq restraint proxy n/a
+Leaders: GOOGL WATCH (9/12) 🐦 Neutral | NFLX WATCH (9/12) 🐦 Neutral | MSFT WATCH (9/12) 🐦 Neutral
+Final action: DO NOT BUY — market regime veto (Regime score -7: 6 distribution days and -4.5% drawdown. Stay defensive)`;
+
 beforeEach(() => {
   process.env.FRED_API_KEY = "test-dummy-key";
 });
@@ -93,6 +103,16 @@ describe("trading pipeline orchestration", () => {
     expect(council).toHaveBeenCalledTimes(1);
     expect(report).toContain("🏛️ Council (BUY signals only):");
     expect(report).toContain("NVDA: APPROVED");
+  });
+
+  it("parses compact dip buyer output so wrapper counts do not collapse to zero", async () => {
+    const report = await runTradingPipeline({
+      runCommand: (_cmd, args) => (args[0] === "canslim_alert.py" ? CANSLIM_NO_BUY : DIP_RAW_COMPACT),
+      council: async () => ({ verdicts: [] }),
+    });
+
+    expect(report).toContain("Diagnostics: symbols scanned 140 | candidates evaluated 21");
+    expect(report).toContain("Dip Buyer: scanned 20 | evaluated 20 | threshold-passed 5 | emitted BUY 0 / WATCH 3 / NO_BUY 0");
   });
 
   it("preserves CANSLIM correction hard gate even if scanner emits BUY", async () => {
