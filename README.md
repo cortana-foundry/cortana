@@ -1134,6 +1134,11 @@ Because this repository is public:
 
 Monitor is the user-facing owner lane for inbox/email ops and operational maintenance alerts.
 
+Stable routing phrases:
+- Monitor is the user-facing owner lane for inbox/email ops and operational maintenance alerts.
+- Monitor is the user-facing owner lane for trading alert scans.
+- Quiet maintenance watchers should return exactly `NO_REPLY` on healthy paths.
+
 - Another specialist can execute the underlying work.
 - User-visible ownership, prompt language, and delivery routing stay Monitor-labeled.
 - If this contract changes, update `HEARTBEAT.md`, `docs/agent-routing.md`, `docs/operating-rules.md`, `README.md`, and `config/cron/jobs.json` together.

@@ -131,3 +131,5 @@ If queued/direct user messages are delivered alongside or immediately after a he
 ## Stable Ops Routing
 
 Monitor is the user-facing owner lane for inbox/email ops and operational maintenance alerts.
+Monitor is the user-facing owner lane for trading alert scans.
+Quiet maintenance watchers should return exactly `NO_REPLY` on healthy paths.

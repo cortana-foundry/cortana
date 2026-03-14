@@ -171,7 +171,9 @@ Capture what matters. Decisions, context, things to remember. Skip the secrets u
 
 Stable operational routing/preferences must be updated together across the canonical files, not as one-off prompt edits.
 
-- Monitor is the user-facing owner lane for inbox/email ops and maintenance alerts.
+- Monitor is the user-facing owner lane for inbox/email ops and operational maintenance alerts.
+- Monitor is the user-facing owner lane for trading alert scans.
+- Quiet maintenance watchers should return exactly `NO_REPLY` on healthy paths.
 - Underlying execution can still belong to another specialist, but the user-facing ownership must remain Monitor-labeled.
 - Update `MEMORY.md`, `HEARTBEAT.md`, `docs/agent-routing.md`, `README.md`, and `config/cron/jobs.json` in the same workflow whenever this contract changes.
 
