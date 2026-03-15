@@ -136,12 +136,25 @@ function main(): void {
 
   const stdout = (proc.stdout || "").trim();
   const stderr = (proc.stderr || "").trim();
-  const delivered = (proc.status ?? 1) === 0 && /sent\s*\(/i.test(stdout);
+  const parsedLine = stdout.split(/\r?\n/).filter(Boolean).pop();
+  let parsed: any = null;
+  try {
+    parsed = parsedLine ? JSON.parse(parsedLine) : null;
+  } catch {
+    parsed = null;
+  }
+  const mode = parsed?.mode ?? null;
+  const delivered = parsed?.delivered === true && mode === "sent";
 
-  if (!delivered) {
+  if ((proc.status ?? 1) !== 0) {
     const err = (stderr || stdout || "telegram delivery failed").trim();
     console.error(err);
     process.exit((proc.status ?? 1) || 1);
+  }
+
+  if (!delivered) {
+    console.error(`telegram delivery not confirmed (mode=${mode || "unknown"})`);
+    return;
   }
 
   markNotified(picked.file, picked.summary);

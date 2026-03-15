@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { execSync } from "node:child_process";
-import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
+import { mkdtempSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { pickPendingFromCandidates, type SummaryCandidate } from "../../tools/trading/backtest-notify";
 
@@ -98,17 +98,15 @@ describe("backtest notify selection", () => {
 
     expect(picked).toBeNull();
   });
+});
 
-  it("fails delivery when the notifier does not confirm send", () => {
-    const root = mkdtempSync(path.join(process.cwd(), "tmp-notify-"));
-    const runId = "20260101-000000";
+describe("backtest notify delivery contract", () => {
+  function setupRun(root: string, runId: string): string {
     const runDir = path.join(root, "runs", runId);
     const summaryPath = path.join(runDir, "summary.json");
     const messagePath = path.join(runDir, "message.txt");
-    const notifyStub = path.join(root, "notify-stub.sh");
 
     mkdirSync(runDir, { recursive: true });
-
     const summary = {
       schemaVersion: 1,
       runId,
@@ -126,11 +124,55 @@ describe("backtest notify selection", () => {
 
     writeFileSync(messagePath, "hello\n");
     writeFileSync(summaryPath, JSON.stringify(summary, null, 2));
+    return summaryPath;
+  }
+
+  it("stamps notified when guard confirms sent", () => {
+    const root = mkdtempSync(path.join(process.cwd(), "tmp-notify-"));
+    const notifyStub = path.join(root, "notify-stub.sh");
+    const summaryPath = setupRun(root, "20260101-000000");
+
     writeFileSync(
       notifyStub,
-      "#!/usr/bin/env bash\n# simulate dedupe/suppressed delivery that exits 0 but does not send\nexit 0\n",
+      "#!/usr/bin/env bash\nprintf '{\"delivered\":true,\"mode\":\"sent\"}\\n'\nexit 0\n",
       { mode: 0o755 },
     );
+
+    execSync(`BACKTEST_ROOT_DIR=${root} BACKTEST_NOTIFY_BIN=${notifyStub} node --import tsx ./tools/trading/backtest-notify.ts`, {
+      cwd: process.cwd(),
+      stdio: "pipe",
+    });
+
+    const updated = JSON.parse(readFileSync(summaryPath, "utf8"));
+    expect(updated.notifiedAt).not.toBeNull();
+  });
+
+  it("does not stamp notified when guard returns deduped/suppressed", () => {
+    const root = mkdtempSync(path.join(process.cwd(), "tmp-notify-"));
+    const notifyStub = path.join(root, "notify-stub.sh");
+    const summaryPath = setupRun(root, "20260101-000001");
+
+    writeFileSync(
+      notifyStub,
+      "#!/usr/bin/env bash\nprintf '{\"delivered\":false,\"mode\":\"deduped\"}\\n'\nexit 0\n",
+      { mode: 0o755 },
+    );
+
+    execSync(`BACKTEST_ROOT_DIR=${root} BACKTEST_NOTIFY_BIN=${notifyStub} node --import tsx ./tools/trading/backtest-notify.ts`, {
+      cwd: process.cwd(),
+      stdio: "pipe",
+    });
+
+    const updated = JSON.parse(readFileSync(summaryPath, "utf8"));
+    expect(updated.notifiedAt).toBeNull();
+  });
+
+  it("fails when guard fails delivery", () => {
+    const root = mkdtempSync(path.join(process.cwd(), "tmp-notify-"));
+    const notifyStub = path.join(root, "notify-stub.sh");
+    const summaryPath = setupRun(root, "20260101-000002");
+
+    writeFileSync(notifyStub, "#!/usr/bin/env bash\nexit 1\n", { mode: 0o755 });
 
     let exitCode = 0;
     try {
@@ -142,6 +184,8 @@ describe("backtest notify selection", () => {
       exitCode = error?.status ?? 1;
     }
 
+    const updated = JSON.parse(readFileSync(summaryPath, "utf8"));
     expect(exitCode).not.toBe(0);
+    expect(updated.notifiedAt).toBeNull();
   });
 });
