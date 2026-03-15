@@ -1,4 +1,7 @@
 import { describe, expect, it } from "vitest";
+import { execSync } from "node:child_process";
+import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
+import path from "node:path";
 import { pickPendingFromCandidates, type SummaryCandidate } from "../../tools/trading/backtest-notify";
 
 function candidate(
@@ -94,5 +97,51 @@ describe("backtest notify selection", () => {
     ]);
 
     expect(picked).toBeNull();
+  });
+
+  it("fails delivery when the notifier does not confirm send", () => {
+    const root = mkdtempSync(path.join(process.cwd(), "tmp-notify-"));
+    const runId = "20260101-000000";
+    const runDir = path.join(root, "runs", runId);
+    const summaryPath = path.join(runDir, "summary.json");
+    const messagePath = path.join(runDir, "message.txt");
+    const notifyStub = path.join(root, "notify-stub.sh");
+
+    mkdirSync(runDir, { recursive: true });
+
+    const summary = {
+      schemaVersion: 1,
+      runId,
+      strategy: "Trading market-session unified",
+      status: "success",
+      completedAt: "2026-01-01T00:00:00.000Z",
+      notifiedAt: null,
+      artifacts: {
+        directory: runDir,
+        summary: summaryPath,
+        log: path.join(runDir, "run.log"),
+        message: messagePath,
+      },
+    };
+
+    writeFileSync(messagePath, "hello\n");
+    writeFileSync(summaryPath, JSON.stringify(summary, null, 2));
+    writeFileSync(
+      notifyStub,
+      "#!/usr/bin/env bash\n# simulate dedupe/suppressed delivery that exits 0 but does not send\nexit 0\n",
+      { mode: 0o755 },
+    );
+
+    let exitCode = 0;
+    try {
+      execSync(`BACKTEST_ROOT_DIR=${root} BACKTEST_NOTIFY_BIN=${notifyStub} node --import tsx ./tools/trading/backtest-notify.ts`, {
+        cwd: process.cwd(),
+        stdio: "pipe",
+      });
+    } catch (error: any) {
+      exitCode = error?.status ?? 1;
+    }
+
+    expect(exitCode).not.toBe(0);
   });
 });

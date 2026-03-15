@@ -134,10 +134,14 @@ function main(): void {
     env: process.env,
   });
 
-  if (proc.status !== 0) {
-    const err = (proc.stderr || proc.stdout || "telegram delivery failed").trim();
+  const stdout = (proc.stdout || "").trim();
+  const stderr = (proc.stderr || "").trim();
+  const delivered = (proc.status ?? 1) === 0 && /sent\s*\(/i.test(stdout);
+
+  if (!delivered) {
+    const err = (stderr || stdout || "telegram delivery failed").trim();
     console.error(err);
-    process.exit(proc.status ?? 1);
+    process.exit((proc.status ?? 1) || 1);
   }
 
   markNotified(picked.file, picked.summary);
