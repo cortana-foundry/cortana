@@ -39,21 +39,21 @@
         {
           "path": "docs/agent-routing.md",
           "phrases": [
-            "Monitor is the user-facing owner lane for inbox/email ops and maintenance alerts"
+            "Monitor is the user-facing owner lane for inbox/email ops and operational maintenance alerts."
           ]
         },
         {
           "path": "docs/operating-rules.md",
           "phrases": [
             "Stable operational routing/preferences must be updated together",
-            "Monitor is the user-facing owner lane for inbox/email ops and maintenance alerts"
+            "Monitor is the user-facing owner lane for inbox/email ops and operational maintenance alerts."
           ]
         },
         {
           "path": "README.md",
           "phrases": [
-            "Monitor is now the primary cron/ops delivery voice",
-            "prefer Monitor for automated machine/ops delivery"
+            "Monitor is the user-facing owner lane for inbox/email ops and operational maintenance alerts.",
+            "Monitor is the user-facing owner lane for trading alert scans."
           ]
         }
       ]
@@ -88,7 +88,8 @@
         "newsletter",
         "gmail",
         "inbox",
-        "email triage"
+        "email triage",
+        "calendar reminders"
       ],
       "requireExplicitOwner": true,
       "requireQuietHealthy": true
@@ -137,7 +138,9 @@
       "jobKeywords": [
         "canslim alert scan",
         "dip buyer",
-        "trading-cron-alert.ts"
+        "trading-cron-alert.ts",
+        "trading backtest notify",
+        "backtest-notify"
       ],
       "requireExplicitOwner": true,
       "requireQuietHealthy": false
