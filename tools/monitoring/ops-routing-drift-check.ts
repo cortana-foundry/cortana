@@ -108,6 +108,14 @@ function extractPromptOwners(message: string): string[] {
     owners.add(match[1].toLowerCase());
   }
 
+  for (const match of message.matchAll(/\b(monitor|researcher|huragok|oracle|default)\s+is\s+the\s+user-facing\s+owner\s+lane\b/gi)) {
+    owners.add(match[1].toLowerCase());
+  }
+
+  for (const match of message.matchAll(/\bthis\s+(?:preflight|sweep|watcher|flush|cadence|check|scan|job)\s+is\s+(monitor|researcher|huragok|oracle|default)-owned\b/gi)) {
+    owners.add(match[1].toLowerCase());
+  }
+
   return [...owners];
 }
 
