@@ -95,18 +95,11 @@ function parseCounts(line: string | undefined): { buy: number; watch: number; no
 
 type ParsedSignal = { ticker: string; score: number; action: "BUY" | "WATCH" | "NO_BUY"; section: string };
 
-function collectSignalsDetailed(lines: string[], section: string): ParsedSignal[] {
-  const startIndex = lines.findIndex((line) => line.startsWith(`${section}:`));
-  if (startIndex === -1) return [];
-
+function parseSignalFragments(text: string, section: string): ParsedSignal[] {
+  const signalRe = /•\s+([A-Z.\-]+)\s+\((\d+)\/\d+\)\s+→\s+(BUY|WATCH|NO_BUY)/g;
   const out: ParsedSignal[] = [];
-  for (let i = startIndex + 1; i < lines.length; i += 1) {
-    const line = lines[i];
-    if (!line.trim()) break;
-    if (/^[A-Za-z][A-Za-z\s]+:/.test(line) && !line.startsWith("• ")) break;
-    if (!line.startsWith("• ")) continue;
-    const match = line.match(/^•\s+([A-Z.\-]+)\s+\((\d+)\/\d+\)\s+→\s+(BUY|WATCH|NO_BUY)/);
-    if (!match) continue;
+  let match: RegExpExecArray | null;
+  while ((match = signalRe.exec(text)) !== null) {
     out.push({
       ticker: match[1],
       score: Number(match[2]),
@@ -114,8 +107,35 @@ function collectSignalsDetailed(lines: string[], section: string): ParsedSignal[
       section,
     });
   }
-
   return out;
+}
+
+function collectSignalsDetailed(lines: string[], section: string): ParsedSignal[] {
+  const startIndex = lines.findIndex((line) => line.startsWith(`${section}:`));
+  if (startIndex === -1) return [];
+
+  const out: ParsedSignal[] = [];
+  // Known non-signal prefixes that appear between the section header and signal lines
+  const skipPrefixes = ["Guardrails:", "Top blocker:", "👁️"];
+  for (let i = startIndex + 1; i < lines.length; i += 1) {
+    const line = lines[i];
+    if (!line.trim()) continue; // skip blank lines within the section
+    // Stop at the next major section header (but not skip-prefixed lines or signal lines)
+    if (/^[A-Za-z][A-Za-z\s]+:/.test(line) && !line.includes("•") && !skipPrefixes.some((p) => line.startsWith(p))) break;
+    // Stop at emoji-prefixed lines that aren't shadow mode or signal lines
+    if (/^[⚠️📈]/.test(line)) break;
+    if (!line.includes("•")) continue;
+    // Handle pipe-separated multi-signal lines (e.g. "• ARES (10/12) → BUY | • APP (9/12) → BUY | ...")
+    out.push(...parseSignalFragments(line, section));
+  }
+
+  // Deduplicate by ticker, keeping the first (highest priority) occurrence
+  const seen = new Set<string>();
+  return out.filter((s) => {
+    if (seen.has(s.ticker)) return false;
+    seen.add(s.ticker);
+    return true;
+  });
 }
 
 export function buildCronAlertFromPipelineReport(report: string): string {
@@ -157,8 +177,8 @@ export function buildCronAlertFromPipelineReport(report: string): string {
   const formatWatch = (items: ParsedSignal[]): string => {
     if (!items.length) return " —";
     const shown = items.slice(0, 3).map((s) => `${s.ticker} ${s.score}/12`).join(" · ");
-    const missing = items.length - 3;
-    return missing > 0 ? ` ${shown}\n [+ ${missing} missing — bug]` : ` ${shown}`;
+    const remaining = items.length - 3;
+    return remaining > 0 ? ` ${shown} [+${remaining} more]` : ` ${shown}`;
   };
 
   const messageLines = [
@@ -166,7 +186,7 @@ export function buildCronAlertFromPipelineReport(report: string): string {
     "⚡ P1 High | Action Now",
     "",
     `🎯 Decision: ${decision} | Confidence: ${confidence} | Risk: ${risk}`,
-    inCorrection ? "🔴 Regime: CORRECTION — no new positions | unavailable" : `🟢 Regime: ${regimeRaw}`,
+    inCorrection ? `🔴 Regime: CORRECTION — no new positions` : `🟢 Regime: ${regimeRaw}`,
     "",
     "┌ Summary ─────────────────────┐",
     `│ BUY ${summaryCounts.buy} │ WATCH ${summaryCounts.watch} │ NO_BUY ${summaryCounts.noBuy} │`,
