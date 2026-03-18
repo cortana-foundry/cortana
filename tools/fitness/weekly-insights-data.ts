@@ -1,6 +1,7 @@
 #!/usr/bin/env npx tsx
 
 import { spawnSync } from "node:child_process";
+import os from "node:os";
 import path from "node:path";
 import { collectRecentMealEntries } from "./meal-log.js";
 import { chooseSurfacedInsightIds, fetchPendingHealthInsights, markInsightsSql } from "./insights-db.js";
@@ -60,6 +61,16 @@ function currentIsoWeekTag(date = new Date()): string {
   const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
   const weekNo = Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
   return `${d.getUTCFullYear()}-W${String(weekNo).padStart(2, "0")}`;
+}
+
+export function weeklyPaths(isoWeek: string, agentId = "cron-fitness"): {
+  sandboxFilePath: string;
+  repoFilePath: string;
+} {
+  return {
+    sandboxFilePath: path.join(os.homedir(), ".openclaw", "workspaces", agentId, "memory", "fitness", "weekly", `${isoWeek}.md`),
+    repoFilePath: path.join("/Users/hd/Developer/cortana/memory/fitness/weekly", `${isoWeek}.md`),
+  };
 }
 
 function ymdDaysAgo(days: number): string {
@@ -237,13 +248,14 @@ function main(): void {
   const pendingInsights = fetchPendingHealthInsights(8);
   const surfacedInsightIds = chooseSurfacedInsightIds(pendingInsights, riskBand, 2);
   const isoWeek = currentIsoWeekTag();
-  const weeklyFilePath = path.join("/Users/hd/Developer/cortana/memory/fitness/weekly", `${isoWeek}.md`);
+  const weeklyTarget = weeklyPaths(isoWeek);
 
   const out = {
     generated_at: new Date().toISOString(),
     date: today,
     iso_week: isoWeek,
-    weekly_file_path: weeklyFilePath,
+    weekly_file_path: weeklyTarget.sandboxFilePath,
+    weekly_repo_file_path: weeklyTarget.repoFilePath,
     windows: {
       current: { start: currentStart, end: currentEnd },
       previous: { start: previousStart, end: previousEnd },
@@ -275,4 +287,6 @@ function main(): void {
   process.stdout.write(`${JSON.stringify(out)}\n`);
 }
 
-main();
+if (import.meta.url === `file://${process.argv[1]}`) {
+  main();
+}

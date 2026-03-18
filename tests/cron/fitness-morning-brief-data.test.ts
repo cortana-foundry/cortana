@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  buildReadinessSupport,
   buildMorningTrainingRecommendation,
   readinessEmoji,
   whoopRecoveryBandFromScore,
@@ -32,5 +33,38 @@ describe("fitness morning brief readiness mapping", () => {
       isStale: false,
     });
     expect(yellow.mode).toBe("controlled_train");
+  });
+
+  it("surfaces hrv and rhr support signals from recent recovery entries", () => {
+    const support = buildReadinessSupport([
+      {
+        date: "2026-03-18",
+        createdAt: "2026-03-18T10:00:00Z",
+        recoveryScore: 58,
+        hrv: 102,
+        rhr: 50,
+      },
+      {
+        date: "2026-03-17",
+        createdAt: "2026-03-17T10:00:00Z",
+        recoveryScore: 62,
+        hrv: 98,
+        rhr: 51,
+      },
+      {
+        date: "2026-03-16",
+        createdAt: "2026-03-16T10:00:00Z",
+        recoveryScore: 67,
+        hrv: 97,
+        rhr: 52,
+      },
+    ]);
+
+    expect(support.hrv_latest).toBe(102);
+    expect(support.hrv_baseline7).toBe(97.5);
+    expect(support.hrv_delta_pct).toBeCloseTo(4.62, 2);
+    expect(support.rhr_latest).toBe(50);
+    expect(support.rhr_baseline7).toBe(51.5);
+    expect(support.rhr_delta).toBe(-1.5);
   });
 });

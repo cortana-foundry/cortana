@@ -3,17 +3,23 @@
 import { spawnSync } from "node:child_process";
 import { chooseSurfacedInsightIds, fetchPendingHealthInsights, markInsightsSql } from "./insights-db.js";
 import {
+  computeTrend,
   dataFreshnessHours,
   extractRecoveryEntries,
   extractSleepEntries,
+  extractWhoopWorkouts,
   localYmd,
+  tonalTodayWorkouts,
+  tonalWorkoutsFromPayload as tonalWorkoutsFromPayloadCore,
   type ReadinessBand,
+  type RecoveryEntry,
 } from "./signal-utils.js";
 
 function curlJson(url: string, timeoutSec: number): unknown {
   const r = spawnSync("curl", ["-s", "--max-time", String(timeoutSec), url], {
     encoding: "utf8",
     stdio: ["ignore", "pipe", "ignore"],
+    maxBuffer: 16 * 1024 * 1024,
   });
   if ((r.status ?? 1) !== 0) return {};
   try {
@@ -25,6 +31,56 @@ function curlJson(url: string, timeoutSec: number): unknown {
 
 function toObj(v: unknown): Record<string, unknown> {
   return v && typeof v === "object" && !Array.isArray(v) ? (v as Record<string, unknown>) : {};
+}
+
+function numberOrNull(value: unknown): number | null {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string") {
+    const n = Number.parseFloat(value);
+    return Number.isFinite(n) ? n : null;
+  }
+  return null;
+}
+
+function ymdInZone(value: string, timeZone = "America/New_York"): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value.slice(0, 10);
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(date);
+}
+
+function tonalTodayWorkoutsWithFallback(payload: unknown, today = localYmd(), timeZone = "America/New_York") {
+  const primary = tonalTodayWorkouts(payload, today, timeZone);
+  if (primary.length > 0) return primary;
+
+  return tonalWorkoutsFromPayloadCore(payload)
+    .map((entry) => {
+      const rawTime = typeof entry.beginTime === "string" ? entry.beginTime : "";
+      const stats = toObj(entry.stats);
+      const detail = toObj(entry.detail);
+      const inDay = rawTime.slice(0, 10) === today || ymdInZone(rawTime, timeZone) === today;
+      return {
+        include: inDay,
+        workout: {
+          id: String(entry.id ?? entry.activityId ?? ""),
+          time: rawTime,
+          volume: numberOrNull(stats.totalVolume) ?? numberOrNull(entry.totalVolume),
+          durationMinutes: (() => {
+            const seconds = numberOrNull(entry.duration);
+            if (seconds == null) return null;
+            return Math.round(seconds / 60);
+          })(),
+          title: typeof detail.title === "string" ? detail.title : null,
+        },
+      };
+    })
+    .filter((entry) => entry.include)
+    .map((entry) => entry.workout)
+    .sort((a, b) => a.time.localeCompare(b.time));
 }
 
 export function whoopRecoveryBandFromScore(score: number | null): ReadinessBand {
@@ -39,6 +95,26 @@ export function readinessEmoji(band: ReadinessBand): string {
   if (band === "yellow") return "🟡";
   if (band === "red") return "🔴";
   return "⚪";
+}
+
+export function buildReadinessSupport(recoveries: RecoveryEntry[]): {
+  hrv_latest: number | null;
+  hrv_baseline7: number | null;
+  hrv_delta_pct: number | null;
+  rhr_latest: number | null;
+  rhr_baseline7: number | null;
+  rhr_delta: number | null;
+} {
+  const hrvTrend = computeTrend(recoveries.map((entry) => entry.hrv));
+  const rhrTrend = computeTrend(recoveries.map((entry) => entry.rhr));
+  return {
+    hrv_latest: hrvTrend.latest,
+    hrv_baseline7: hrvTrend.baseline7,
+    hrv_delta_pct: hrvTrend.deltaPct,
+    rhr_latest: rhrTrend.latest,
+    rhr_baseline7: rhrTrend.baseline7,
+    rhr_delta: rhrTrend.delta,
+  };
 }
 
 function sleepQualityBand(sleepPerformance: number | null): "good" | "fair" | "poor" | "unknown" {
@@ -108,11 +184,15 @@ function main(): void {
   if (!/healthy/i.test(tonHealthRaw)) {
     errors.push("tonal_not_healthy");
   }
+  const tonal = /healthy/i.test(tonHealthRaw) ? curlJson("http://localhost:3033/tonal/data?fresh=true", 16) : {};
 
   const recoveries = extractRecoveryEntries(whoop);
   const sleeps = extractSleepEntries(whoop);
+  const whoopWorkouts = extractWhoopWorkouts(whoop).filter((entry) => entry.date === today);
+  const tonalWorkouts = tonalTodayWorkoutsWithFallback(tonal, today);
   const latestRecovery = recoveries[0] ?? null;
   const latestSleep = sleeps[0] ?? null;
+  const readinessSupport = buildReadinessSupport(recoveries);
   const readinessBand = whoopRecoveryBandFromScore(latestRecovery?.recoveryScore ?? null);
   const recoveryFreshnessHours = dataFreshnessHours(latestRecovery?.createdAt ?? null);
   const sleepFreshnessHours = dataFreshnessHours(latestSleep?.createdAt ?? null);
@@ -152,6 +232,20 @@ function main(): void {
       efficiency: latestSleep?.sleepEfficiency ?? null,
       freshness_hours: sleepFreshnessHours,
     },
+    readiness_support_signals: readinessSupport,
+    today_training_context: {
+      whoop_workouts_today: whoopWorkouts.length,
+      whoop_total_strain_today: Number(whoopWorkouts.reduce((sum, entry) => sum + (entry.strain ?? 0), 0).toFixed(2)),
+      tonal_sessions_today: tonalWorkouts.length,
+      tonal_total_volume_today: Number(tonalWorkouts.reduce((sum, entry) => sum + (entry.volume ?? 0), 0).toFixed(2)),
+      tonal_workouts: tonalWorkouts.slice(0, 5).map((entry) => ({
+        id: entry.id,
+        time: entry.time,
+        volume: entry.volume,
+        duration_minutes: entry.durationMinutes,
+        title: entry.title,
+      })),
+    },
     today_training_recommendation: recommendation,
     data_freshness: {
       is_stale: isStale,
@@ -165,7 +259,10 @@ function main(): void {
     quality_flags: {
       has_whoop: recoveries.length > 0 && sleeps.length > 0,
       has_recovery_score: latestRecovery?.recoveryScore != null,
+      has_hrv_signal: readinessSupport.hrv_latest != null,
+      has_rhr_signal: readinessSupport.rhr_latest != null,
       has_sleep_signal: latestSleep?.sleepPerformance != null,
+      has_tonal_today: tonalWorkouts.length > 0,
     },
     tonal_health: tonalHealth,
   };

@@ -43,8 +43,10 @@ describe("fitness cron contract", () => {
     const weeklyMessage = String(weekly?.payload?.message ?? "");
     expect(morningMessage).toContain("tools/fitness/morning-brief-data.ts");
     expect(morningMessage).toContain("morning_readiness");
+    expect(morningMessage).toContain("readiness_support_signals");
     expect(morningMessage).toContain("color_emoji");
     expect(morningMessage).toContain("today_training_recommendation");
+    expect(morningMessage).toContain("today_training_context");
     expect(morningMessage).toContain("insight_mark_sql");
     expect(morningMessage).not.toContain("'health' = ANY(domains)");
 
@@ -58,6 +60,9 @@ describe("fitness cron contract", () => {
     expect(weeklyMessage).toContain("trend_signals");
     expect(weeklyMessage).toContain("hard_truth_inputs");
     expect(weeklyMessage).toContain("112-140g/day");
+    expect(weeklyMessage).toContain("weekly_file_path");
+    expect(weeklyMessage).toContain("weekly_repo_file_path");
+    expect(weeklyMessage).toContain("do not fail the cron");
   });
 
   it("defines whoop alert-only monitors with expected schedules and Spartan routing", () => {
