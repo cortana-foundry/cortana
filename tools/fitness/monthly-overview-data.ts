@@ -93,11 +93,14 @@ function main(): void {
       tonal_volume: delta(current.total_tonal_volume, previous.total_tonal_volume),
       protein_avg_daily: delta(current.avg_protein_g, previous.avg_protein_g),
       hydration_liters: delta(current.avg_hydration_liters, previous.avg_hydration_liters),
+      steps_total: delta(current.total_steps, previous.total_steps),
+      steps_avg_daily: delta(current.avg_daily_steps, previous.avg_daily_steps),
     },
     data_quality: {
       days_with_data: current.days_with_data,
       has_minimum_coverage: current.days_with_data >= 14,
       hydration_coverage_days: current.days_with_hydration,
+      step_coverage_days: current.days_with_steps,
       protein_coverage_days: current.days_with_protein,
     },
     notes: [
