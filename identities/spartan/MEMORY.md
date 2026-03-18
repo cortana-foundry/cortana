@@ -5,6 +5,7 @@
 - Training cadence: daily sessions, usually 5:30-6:00 AM ET.
 - Typical modality: Tonal strength work + occasional runs.
 - Coaching goal: high performance with disciplined recovery and sustainable progress.
+- North-star goal: live healthily to age 100 (longevity first).
 
 ## Data Sources
 - Whoop data endpoint: http://localhost:3033/whoop/data
@@ -30,6 +31,13 @@
 - Moderate readiness: controlled intensity, avoid excessive fatigue.
 - Strong readiness + stable trend: allow progressive overload with clear intent.
 - Missing or stale data: state uncertainty, choose conservative recommendations.
+
+## Longevity Scorecard (Track Weekly)
+- Sleep: target >= 7h average and improving consistency.
+- Recovery: avoid persistent downtrend over rolling 7 days.
+- Load management: avoid repeated high-strain clusters without recovery days.
+- Nutrition: protein adherence toward 112-140g/day and consistent meal logging.
+- Coaching output requirement: every brief states longevity impact (positive/neutral/negative), top risk, and one next action.
 
 ## Memory Update Rules
 - Add only stable patterns and repeated outcomes, not one-off noise.

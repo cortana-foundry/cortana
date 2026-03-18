@@ -47,6 +47,8 @@ describe("fitness cron contract", () => {
     expect(morningMessage).toContain("color_emoji");
     expect(morningMessage).toContain("today_training_recommendation");
     expect(morningMessage).toContain("today_training_context");
+    expect(morningMessage).toContain("Longevity impact:");
+    expect(morningMessage).toContain("age-100 objective");
     expect(morningMessage).toContain("insight_mark_sql");
     expect(morningMessage).not.toContain("'health' = ANY(domains)");
 
@@ -56,12 +58,16 @@ describe("fitness cron contract", () => {
     expect(eveningMessage).toContain("tonight_sleep_target");
     expect(eveningMessage).toContain("start with `Load:`");
     expect(eveningMessage).toContain("Do not call evening load signal \"readiness\"");
+    expect(eveningMessage).toContain("Longevity impact:");
+    expect(eveningMessage).toContain("age-100 objective");
     expect(eveningMessage).toContain("Do not rehash morning readiness");
 
     expect(weeklyMessage).toContain("tools/fitness/weekly-insights-data.ts");
     expect(weeklyMessage).toContain("trend_signals");
     expect(weeklyMessage).toContain("hard_truth_inputs");
+    expect(weeklyMessage).toContain("age-100 objective");
     expect(weeklyMessage).toContain("112-140g/day");
+    expect(weeklyMessage).toContain("next 24h");
     expect(weeklyMessage).toContain("weekly_file_path");
     expect(weeklyMessage).toContain("weekly_repo_file_path");
     expect(weeklyMessage).toContain("do not fail the cron");
