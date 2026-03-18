@@ -32,21 +32,32 @@ describe("fitness cron contract", () => {
     expect(healthcheck?.delivery?.accountId).toBe("monitor");
   });
 
-  it("keeps deterministic prompt contracts and removes broad insight marking", () => {
+  it("keeps non-overlapping briefing prompt contracts and removes broad insight marking", () => {
     const jobs = loadJobs();
     const morning = jobs.find((job) => job.id === "a519512a-5fb8-459f-8780-31e53793c1d4");
+    const evening = jobs.find((job) => job.id === "e4db8a8d-945c-4af2-a8d5-e54f2fb4e792");
     const weekly = jobs.find((job) => job.id === "5aa1f47e-27e6-49cd-a20d-3dac0f1b8428");
 
     const morningMessage = String(morning?.payload?.message ?? "");
+    const eveningMessage = String(evening?.payload?.message ?? "");
     const weeklyMessage = String(weekly?.payload?.message ?? "");
     expect(morningMessage).toContain("tools/fitness/morning-brief-data.ts");
-    expect(morningMessage).toContain("hard truth");
+    expect(morningMessage).toContain("morning_readiness");
+    expect(morningMessage).toContain("color_emoji");
+    expect(morningMessage).toContain("today_training_recommendation");
     expect(morningMessage).toContain("insight_mark_sql");
     expect(morningMessage).not.toContain("'health' = ANY(domains)");
 
+    expect(eveningMessage).toContain("tools/fitness/evening-recap-data.ts");
+    expect(eveningMessage).toContain("today_training_output");
+    expect(eveningMessage).toContain("today_nutrition");
+    expect(eveningMessage).toContain("tonight_sleep_target");
+    expect(eveningMessage).toContain("Do not rehash morning readiness");
+
     expect(weeklyMessage).toContain("tools/fitness/weekly-insights-data.ts");
+    expect(weeklyMessage).toContain("trend_signals");
+    expect(weeklyMessage).toContain("hard_truth_inputs");
     expect(weeklyMessage).toContain("112-140g/day");
-    expect(weeklyMessage).toContain("risk call");
   });
 
   it("defines whoop alert-only monitors with expected schedules and Spartan routing", () => {
@@ -67,4 +78,3 @@ describe("fitness cron contract", () => {
     expect(overreach?.schedule?.expr).toBe("15 19 * * *");
   });
 });
-

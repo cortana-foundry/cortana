@@ -2,19 +2,43 @@
 
 import { spawnSync } from "node:child_process";
 import path from "node:path";
-import { collectRecentMealEntries, summarizeMealRollup } from "./meal-log.js";
+import { collectRecentMealEntries } from "./meal-log.js";
 import { chooseSurfacedInsightIds, fetchPendingHealthInsights, markInsightsSql } from "./insights-db.js";
 import {
-  buildReadinessSignal,
-  computeTrend,
-  dataFreshnessHours,
   extractRecoveryEntries,
   extractSleepEntries,
   extractWhoopWorkouts,
   localYmd,
-  summarizeTonalWeekly,
-  summarizeWhoopWeekly,
+  tonalWorkoutsFromPayload,
+  type ReadinessBand,
 } from "./signal-utils.js";
+
+type WindowMetrics = {
+  days_with_recovery: number;
+  avg_recovery: number | null;
+  avg_hrv: number | null;
+  avg_rhr: number | null;
+  days_with_sleep: number;
+  avg_sleep_hours: number | null;
+  avg_sleep_performance: number | null;
+  whoop_workouts: number;
+  total_strain: number | null;
+  avg_strain: number | null;
+  tonal_sessions: number;
+  tonal_total_volume: number | null;
+  avg_tonal_volume: number | null;
+  meals_logged: number;
+  protein_days_logged: number;
+  protein_avg_daily: number | null;
+  protein_days_on_target: number;
+};
+
+type MetricDelta = {
+  current: number | null;
+  previous: number | null;
+  delta: number | null;
+  delta_pct: number | null;
+};
 
 function curlJson(url: string, timeoutSec: number): unknown {
   const r = spawnSync("curl", ["-s", "--max-time", String(timeoutSec), url], {
@@ -38,6 +62,128 @@ function currentIsoWeekTag(date = new Date()): string {
   return `${d.getUTCFullYear()}-W${String(weekNo).padStart(2, "0")}`;
 }
 
+function ymdDaysAgo(days: number): string {
+  return localYmd("America/New_York", new Date(Date.now() - days * 24 * 3600 * 1000));
+}
+
+function inRange(dateYmd: string, startYmd: string, endYmd: string): boolean {
+  return dateYmd >= startYmd && dateYmd <= endYmd;
+}
+
+function average(values: Array<number | null>): number | null {
+  const nums = values.filter((value): value is number => typeof value === "number" && Number.isFinite(value));
+  if (!nums.length) return null;
+  return Number((nums.reduce((sum, value) => sum + value, 0) / nums.length).toFixed(2));
+}
+
+function sum(values: Array<number | null>): number | null {
+  const nums = values.filter((value): value is number => typeof value === "number" && Number.isFinite(value));
+  if (!nums.length) return null;
+  return Number(nums.reduce((total, value) => total + value, 0).toFixed(2));
+}
+
+function compareMetric(current: number | null, previous: number | null): MetricDelta {
+  const delta = current != null && previous != null ? Number((current - previous).toFixed(2)) : null;
+  const deltaPct =
+    current != null && previous != null && previous !== 0 ? Number((((current - previous) / previous) * 100).toFixed(2)) : null;
+  return { current, previous, delta, delta_pct: deltaPct };
+}
+
+function ymdFromTimestamp(time: string | null, timeZone = "America/New_York"): string {
+  if (!time) return "";
+  const d = new Date(time);
+  if (Number.isNaN(d.getTime())) return time.slice(0, 10);
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(d);
+}
+
+function windowMetrics(opts: {
+  startYmd: string;
+  endYmd: string;
+  whoop: unknown;
+  tonal: unknown;
+  mealEntries: Array<{ date: string; proteinG: number | null }>;
+}): WindowMetrics {
+  const recoveriesByDate = new Map<string, { recovery: number | null; hrv: number | null; rhr: number | null }>();
+  for (const row of extractRecoveryEntries(opts.whoop)) {
+    if (!inRange(row.date, opts.startYmd, opts.endYmd)) continue;
+    if (recoveriesByDate.has(row.date)) continue;
+    recoveriesByDate.set(row.date, {
+      recovery: row.recoveryScore,
+      hrv: row.hrv,
+      rhr: row.rhr,
+    });
+  }
+
+  const sleepByDate = new Map<string, { hours: number | null; perf: number | null }>();
+  for (const row of extractSleepEntries(opts.whoop)) {
+    if (!inRange(row.date, opts.startYmd, opts.endYmd)) continue;
+    if (sleepByDate.has(row.date)) continue;
+    sleepByDate.set(row.date, {
+      hours: row.sleepHours,
+      perf: row.sleepPerformance,
+    });
+  }
+
+  const whoopWorkouts = extractWhoopWorkouts(opts.whoop).filter((row) => inRange(row.date, opts.startYmd, opts.endYmd));
+  const tonalWorkouts = tonalWorkoutsFromPayload(opts.tonal)
+    .map((entry) => ({
+      date: ymdFromTimestamp(typeof entry.beginTime === "string" ? entry.beginTime : null),
+      volume: (() => {
+        const stats = entry.stats as Record<string, unknown> | undefined;
+        if (stats && typeof stats.totalVolume === "number" && Number.isFinite(stats.totalVolume)) return stats.totalVolume;
+        if (typeof entry.totalVolume === "number" && Number.isFinite(entry.totalVolume)) return entry.totalVolume;
+        return null;
+      })(),
+    }))
+    .filter((entry) => inRange(entry.date, opts.startYmd, opts.endYmd));
+
+  const meals = opts.mealEntries.filter((entry) => inRange(entry.date, opts.startYmd, opts.endYmd));
+  const proteinByDay = new Map<string, number>();
+  for (const meal of meals) {
+    if (meal.proteinG == null) continue;
+    proteinByDay.set(meal.date, Number(((proteinByDay.get(meal.date) ?? 0) + meal.proteinG).toFixed(2)));
+  }
+  const proteinTotals = Array.from(proteinByDay.values());
+
+  return {
+    days_with_recovery: recoveriesByDate.size,
+    avg_recovery: average(Array.from(recoveriesByDate.values()).map((row) => row.recovery)),
+    avg_hrv: average(Array.from(recoveriesByDate.values()).map((row) => row.hrv)),
+    avg_rhr: average(Array.from(recoveriesByDate.values()).map((row) => row.rhr)),
+    days_with_sleep: sleepByDate.size,
+    avg_sleep_hours: average(Array.from(sleepByDate.values()).map((row) => row.hours)),
+    avg_sleep_performance: average(Array.from(sleepByDate.values()).map((row) => row.perf)),
+    whoop_workouts: whoopWorkouts.length,
+    total_strain: sum(whoopWorkouts.map((row) => row.strain)),
+    avg_strain: average(whoopWorkouts.map((row) => row.strain)),
+    tonal_sessions: tonalWorkouts.length,
+    tonal_total_volume: sum(tonalWorkouts.map((row) => row.volume)),
+    avg_tonal_volume: average(tonalWorkouts.map((row) => row.volume)),
+    meals_logged: meals.length,
+    protein_days_logged: proteinByDay.size,
+    protein_avg_daily: average(proteinTotals),
+    protein_days_on_target: proteinTotals.filter((protein) => protein >= 112 && protein <= 140).length,
+  };
+}
+
+function hardTruthRiskBand(trends: {
+  recovery: MetricDelta;
+  sleepHours: MetricDelta;
+  strainLoad: MetricDelta;
+}): ReadinessBand {
+  const recoveryDown = (trends.recovery.delta ?? 0) <= -4;
+  const sleepDown = (trends.sleepHours.delta ?? 0) <= -0.4;
+  const strainUp = (trends.strainLoad.delta ?? 0) >= 8;
+  if ((recoveryDown && strainUp) || (sleepDown && strainUp)) return "red";
+  if (recoveryDown || sleepDown || strainUp) return "yellow";
+  return "green";
+}
+
 function main(): void {
   const errors: string[] = [];
   const today = localYmd();
@@ -49,51 +195,76 @@ function main(): void {
   const tonal = /healthy/i.test(tonalHealthRaw) ? curlJson("http://127.0.0.1:3033/tonal/data?fresh=true", 20) : {};
   if (!/healthy/i.test(tonalHealthRaw)) errors.push("tonal_not_healthy");
 
-  const recoveries = extractRecoveryEntries(whoop);
-  const sleeps = extractSleepEntries(whoop);
-  const workouts = extractWhoopWorkouts(whoop);
-  const whoopWeekly = summarizeWhoopWeekly(whoop, today);
-  const tonalWeekly = summarizeTonalWeekly(tonal);
-  const recoveryTrend = computeTrend(recoveries.map((entry) => entry.recoveryScore));
-  const hrvTrend = computeTrend(recoveries.map((entry) => entry.hrv));
-  const rhrTrend = computeTrend(recoveries.map((entry) => entry.rhr));
-  const sleepPerformance = sleeps[0]?.sleepPerformance ?? null;
-  const totalStrainToday = Number(workouts.filter((entry) => entry.date === today).reduce((sum, entry) => sum + (entry.strain ?? 0), 0).toFixed(2));
-  const yesterday = localYmd("America/New_York", new Date(Date.now() - 24 * 3600 * 1000));
-  const yesterdayStrain = Number(workouts.filter((entry) => entry.date === yesterday).reduce((sum, entry) => sum + (entry.strain ?? 0), 0).toFixed(2));
-  const readiness = buildReadinessSignal({
-    recoveryTrend,
-    hrvTrend,
-    rhrTrend,
-    sleepPerformance,
-    freshnessHours: dataFreshnessHours(recoveries[0]?.createdAt ?? null),
-    totalStrainToday,
-    yesterdayStrain,
+  const currentStart = ymdDaysAgo(6);
+  const currentEnd = today;
+  const previousStart = ymdDaysAgo(13);
+  const previousEnd = ymdDaysAgo(7);
+
+  const mealEntries = collectRecentMealEntries({ days: 14, agentId: "spartan" });
+  const currentMetrics = windowMetrics({
+    startYmd: currentStart,
+    endYmd: currentEnd,
+    whoop,
+    tonal,
+    mealEntries,
+  });
+  const previousMetrics = windowMetrics({
+    startYmd: previousStart,
+    endYmd: previousEnd,
+    whoop,
+    tonal,
+    mealEntries,
   });
 
-  const mealEntries = collectRecentMealEntries({ days: 7, agentId: "spartan" });
-  const mealRollup = summarizeMealRollup(mealEntries, today);
+  if (currentMetrics.days_with_recovery === 0) errors.push("whoop_recovery_missing");
+  if (currentMetrics.days_with_sleep === 0) errors.push("whoop_sleep_missing");
+
+  const trendSignals = {
+    recovery: compareMetric(currentMetrics.avg_recovery, previousMetrics.avg_recovery),
+    sleep_hours: compareMetric(currentMetrics.avg_sleep_hours, previousMetrics.avg_sleep_hours),
+    sleep_performance: compareMetric(currentMetrics.avg_sleep_performance, previousMetrics.avg_sleep_performance),
+    strain_load: compareMetric(currentMetrics.total_strain, previousMetrics.total_strain),
+    tonal_volume: compareMetric(currentMetrics.tonal_total_volume, previousMetrics.tonal_total_volume),
+    protein_avg_daily: compareMetric(currentMetrics.protein_avg_daily, previousMetrics.protein_avg_daily),
+  };
+
+  const riskBand = hardTruthRiskBand({
+    recovery: trendSignals.recovery,
+    sleepHours: trendSignals.sleep_hours,
+    strainLoad: trendSignals.strain_load,
+  });
+
   const pendingInsights = fetchPendingHealthInsights(8);
-  const surfacedInsightIds = chooseSurfacedInsightIds(pendingInsights, readiness.band, 2);
+  const surfacedInsightIds = chooseSurfacedInsightIds(pendingInsights, riskBand, 2);
   const isoWeek = currentIsoWeekTag();
   const weeklyFilePath = path.join("/Users/hd/Developer/cortana/memory/fitness/weekly", `${isoWeek}.md`);
-
-  if (recoveries.length === 0) errors.push("whoop_recovery_missing");
-  if (sleeps.length === 0) errors.push("whoop_sleep_missing");
 
   const out = {
     generated_at: new Date().toISOString(),
     date: today,
     iso_week: isoWeek,
     weekly_file_path: weeklyFilePath,
-    readiness,
-    whoop_weekly: whoopWeekly,
-    tonal_weekly: tonalWeekly,
-    meal_rollup: mealRollup,
-    trends: {
-      recovery: recoveryTrend,
-      hrv: hrvTrend,
-      rhr: rhrTrend,
+    windows: {
+      current: { start: currentStart, end: currentEnd },
+      previous: { start: previousStart, end: previousEnd },
+    },
+    weekly_metrics: {
+      current: currentMetrics,
+      previous: previousMetrics,
+    },
+    trend_signals: trendSignals,
+    hard_truth_inputs: {
+      risk_band: riskBand,
+      biggest_regression:
+        trendSignals.recovery.delta != null && trendSignals.recovery.delta < 0
+          ? "recovery"
+          : trendSignals.sleep_hours.delta != null && trendSignals.sleep_hours.delta < 0
+            ? "sleep"
+            : "none",
+      load_vs_recovery_tension:
+        (trendSignals.strain_load.delta ?? 0) > 0 && (trendSignals.recovery.delta ?? 0) < 0
+          ? "strain_up_recovery_down"
+          : "stable_or_improving",
     },
     pending_health_insights: pendingInsights,
     surfaced_insight_ids: surfacedInsightIds,
@@ -105,4 +276,3 @@ function main(): void {
 }
 
 main();
-

@@ -49,7 +49,7 @@ describe("fitness evening recap tonal payload handling", () => {
     expect(todays[0].duration_minutes).toBe(15);
   });
 
-  it("summarizes whoop recovery, sleep, and strain for today", () => {
+  it("summarizes whoop strain and workout context for today", () => {
     const whoop = {
       recovery: [{ created_at: "2026-03-10T09:00:00Z", score: { recovery_score: 63 } }],
       sleep: [{ created_at: "2026-03-10T09:00:00Z", score: { sleep_performance_percentage: 78 } }],
@@ -60,10 +60,8 @@ describe("fitness evening recap tonal payload handling", () => {
     };
 
     const summary = buildWhoopSummary(whoop, "2026-03-10");
-    expect(summary).toEqual({
-      recovery: 63,
-      sleep_performance: 78,
-      total_strain_today: 13,
-    });
+    expect(summary.total_strain_today).toBe(13);
+    expect(summary.whoop_workouts_today).toBe(2);
+    expect(summary.top_sports_today.sort()).toEqual(["lift", "run"]);
   });
 });
