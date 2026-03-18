@@ -30,10 +30,7 @@ start_service_if_needed() {
   echo "Service not running. Starting fitness service..."
   (
     cd "$BASE_DIR" || exit 1
-    set -a
-    source ./.env
-    set +a
-    nohup go run main.go >/tmp/cortana-external.log 2>&1 &
+    nohup ./launchd-run.sh >/tmp/cortana-external.log 2>&1 &
   )
 
   for _ in {1..30}; do

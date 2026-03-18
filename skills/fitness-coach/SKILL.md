@@ -36,15 +36,14 @@ curl -s http://localhost:3033/tonal/data
 
 **If Tonal unhealthy:** Auto-heal first, then retry:
 ```bash
-# Self-heal: delete tokens to force re-auth
+# TS service self-heals on 401/403. Manual nudge if still unhealthy:
 rm -f ~/Developer/cortana-external/tonal_tokens.json
+launchctl kickstart -k gui/$(id -u)/com.cortana.fitness-service
+sleep 5
 
 # Log the self-heal
 export PATH="/opt/homebrew/opt/postgresql@17/bin:$PATH"
 psql cortana -c "INSERT INTO cortana_events (event_type, source, severity, message) VALUES ('auto_heal', 'tonal_auth', 'info', 'Deleted tonal_tokens.json to force re-auth');" 2>/dev/null
-
-# Wait for service to re-auth on next call (give it a moment)
-sleep 2
 
 # Retry health check
 curl -s http://localhost:3033/tonal/health | jq -r '.status'
@@ -169,7 +168,8 @@ These are already set up:
 
 ## Service Details
 
-**Location:** `~/Developer/cortana-external/`
+**Service package:** `@cortana/external-service`
+**Location:** `~/Developer/cortana-external/apps/external-service/`
 
 **Endpoints:**
 - `http://localhost:3033/whoop/data` — All Whoop data (30 days cached)
@@ -222,5 +222,14 @@ curl -s http://localhost:3033/tonal/health >/dev/null || launchctl kickstart -k 
 
 **Check logs:**
 ```bash
-tail -50 /tmp/services.log
+tail -50 /tmp/fitness-service.log
+tail -50 /tmp/fitness-service-error.log
+```
+
+**TypeScript service debugging:**
+```bash
+cd ~/Developer/cortana-external
+pnpm --filter @cortana/external-service dev
+pnpm --filter @cortana/external-service test
+pnpm --filter @cortana/external-service typecheck
 ```

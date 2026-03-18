@@ -737,7 +737,7 @@ Output flows into:
 ### 4.6 Fitness / finance / calendar integrations
 
 - **Fitness**
-  - External fitness service (Go, in `cortana-external`) for Whoop/Tonal
+  - External fitness service (TypeScript Hono, in `cortana-external/apps/external-service`) for Whoop/Tonal
   - Skills + tools here handle briefings, alerts, and pattern analysis
 - **Finance**
   - Market/stock tools, X sentiment, portfolio overlay (via local Alpaca endpoint)
