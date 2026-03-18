@@ -6,6 +6,7 @@ import { upsertFitnessDailySnapshot } from "./facts-db.js";
 import {
   computeTrend,
   dataFreshnessHours,
+  extractDailyStepCount,
   extractRecoveryEntries,
   extractSleepEntries,
   extractWhoopWorkouts,
@@ -190,6 +191,7 @@ function main(): void {
   const recoveries = extractRecoveryEntries(whoop);
   const sleeps = extractSleepEntries(whoop);
   const whoopWorkouts = extractWhoopWorkouts(whoop).filter((entry) => entry.date === today);
+  const stepSummary = extractDailyStepCount(whoop, today);
   const tonalWorkouts = tonalTodayWorkoutsWithFallback(tonal, today);
   const latestRecovery = recoveries[0] ?? null;
   const latestSleep = sleeps[0] ?? null;
@@ -227,6 +229,8 @@ function main(): void {
     rhr: readinessSupport.rhr_latest,
     whoopStrain: Number(whoopWorkouts.reduce((sum, entry) => sum + (entry.strain ?? 0), 0).toFixed(2)),
     whoopStrainSource: "workouts_sum",
+    stepCount: stepSummary.stepCount,
+    stepSource: stepSummary.source,
     whoopWorkouts: whoopWorkouts.length,
     tonalSessions: tonalWorkouts.length,
     tonalVolume: Number(tonalWorkouts.reduce((sum, entry) => sum + (entry.volume ?? 0), 0).toFixed(2)),
@@ -265,6 +269,8 @@ function main(): void {
     today_training_context: {
       whoop_workouts_today: whoopWorkouts.length,
       whoop_total_strain_today: Number(whoopWorkouts.reduce((sum, entry) => sum + (entry.strain ?? 0), 0).toFixed(2)),
+      whoop_steps_today: stepSummary.stepCount,
+      whoop_steps_source: stepSummary.source,
       tonal_sessions_today: tonalWorkouts.length,
       tonal_total_volume_today: Number(tonalWorkouts.reduce((sum, entry) => sum + (entry.volume ?? 0), 0).toFixed(2)),
       tonal_workouts: tonalWorkouts.slice(0, 5).map((entry) => ({

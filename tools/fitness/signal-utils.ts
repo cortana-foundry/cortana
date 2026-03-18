@@ -26,6 +26,11 @@ export type WorkoutEntry = {
   avgHr: number | null;
 };
 
+export type DailyStepSummary = {
+  stepCount: number | null;
+  source: "cycle" | "workouts_sum" | "steps_collection" | null;
+};
+
 export type TrendSnapshot = {
   latest: number | null;
   baseline7: number | null;
@@ -234,6 +239,89 @@ export function extractWhoopWorkouts(payload: unknown, timeZone = "America/New_Y
     })
     .filter((row) => row.date.length > 0)
     .sort((a, b) => String(b.start ?? "").localeCompare(String(a.start ?? "")));
+}
+
+function toRoundedInt(value: number | null): number | null {
+  if (value == null || !Number.isFinite(value)) return null;
+  return Math.max(0, Math.round(value));
+}
+
+function sumNumbers(values: Array<number | null>): number | null {
+  const nums = values.filter((value): value is number => typeof value === "number" && Number.isFinite(value));
+  if (!nums.length) return null;
+  return nums.reduce((total, value) => total + value, 0);
+}
+
+export function extractDailyStepCount(payload: unknown, today = localYmd(), timeZone = "America/New_York"): DailyStepSummary {
+  const root = toObj(payload);
+
+  const stepsCollection = toArr(root.steps)
+    .map((item) => {
+      const row = toObj(item);
+      const ts =
+        safeTimestamp(row.timestamp) ??
+        safeTimestamp(row.created_at) ??
+        safeTimestamp(row.updated_at) ??
+        safeTimestamp(row.start) ??
+        (typeof row.date === "string" ? `${row.date}T12:00:00-05:00` : null);
+      return {
+        date: ts ? toIsoDate(ts, timeZone) : "",
+        steps: toNumber(row.steps) ?? toNumber(row.step_count) ?? toNumber(row.total_steps) ?? toNumber(row.count),
+      };
+    })
+    .filter((row) => row.date === today);
+  const stepsCollectionSum = sumNumbers(stepsCollection.map((row) => row.steps));
+  if (stepsCollectionSum != null) {
+    return {
+      stepCount: toRoundedInt(stepsCollectionSum),
+      source: "steps_collection",
+    };
+  }
+
+  const cycles = toArr(root.cycles)
+    .map((item) => {
+      const row = toObj(item);
+      const score = toObj(row.score);
+      const ts = safeTimestamp(row.start) ?? safeTimestamp(row.created_at) ?? safeTimestamp(row.updated_at);
+      return {
+        date: ts ? toIsoDate(ts, timeZone) : "",
+        updated: safeTimestamp(row.updated_at) ?? safeTimestamp(row.created_at) ?? safeTimestamp(row.start) ?? "",
+        steps: toNumber(score.steps) ?? toNumber(row.steps) ?? toNumber(row.step_count) ?? toNumber(row.total_steps),
+      };
+    })
+    .filter((row) => row.date === today)
+    .sort((a, b) => b.updated.localeCompare(a.updated));
+  const cycleStep = cycles.find((row) => row.steps != null)?.steps ?? null;
+  if (cycleStep != null) {
+    return {
+      stepCount: toRoundedInt(cycleStep),
+      source: "cycle",
+    };
+  }
+
+  const workouts = toArr(root.workouts)
+    .map((item) => {
+      const row = toObj(item);
+      const score = toObj(row.score);
+      const ts = safeTimestamp(row.start);
+      return {
+        date: ts ? toIsoDate(ts, timeZone) : "",
+        steps: toNumber(score.steps) ?? toNumber(row.steps) ?? toNumber(row.step_count) ?? toNumber(row.total_steps),
+      };
+    })
+    .filter((row) => row.date === today);
+  const workoutStepSum = sumNumbers(workouts.map((row) => row.steps));
+  if (workoutStepSum != null) {
+    return {
+      stepCount: toRoundedInt(workoutStepSum),
+      source: "workouts_sum",
+    };
+  }
+
+  return {
+    stepCount: null,
+    source: null,
+  };
 }
 
 export function tonalWorkoutsFromPayload(payload: unknown): Array<Record<string, unknown>> {

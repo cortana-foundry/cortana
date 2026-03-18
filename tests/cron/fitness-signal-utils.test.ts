@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildReadinessSignal,
   computeTrend,
+  extractDailyStepCount,
   overreachFlags,
   summarizeWhoopWeekly,
   summarizeTonalWeekly,
@@ -89,5 +90,32 @@ describe("fitness signal utils", () => {
     expect(tonalWeekly.workouts).toBe(2);
     expect(tonalWeekly.totalVolume).toBe(22000);
   });
-});
 
+  it("extracts daily steps from cycle first, then falls back to workouts sum", () => {
+    const cyclePayload = {
+      cycles: [
+        {
+          start: "2026-03-18T01:00:00-04:00",
+          updated_at: "2026-03-18T21:00:00-04:00",
+          score: { steps: 12456 },
+        },
+      ],
+      workouts: [
+        { start: "2026-03-18T12:00:00-04:00", score: { steps: 2200 } },
+      ],
+    };
+    const cycleSteps = extractDailyStepCount(cyclePayload, "2026-03-18");
+    expect(cycleSteps.stepCount).toBe(12456);
+    expect(cycleSteps.source).toBe("cycle");
+
+    const workoutPayload = {
+      workouts: [
+        { start: "2026-03-18T08:00:00-04:00", score: { steps: 3200 } },
+        { start: "2026-03-18T18:00:00-04:00", score: { steps: 4100 } },
+      ],
+    };
+    const workoutSteps = extractDailyStepCount(workoutPayload, "2026-03-18");
+    expect(workoutSteps.stepCount).toBe(7300);
+    expect(workoutSteps.source).toBe("workouts_sum");
+  });
+});

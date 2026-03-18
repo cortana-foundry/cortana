@@ -11,6 +11,8 @@ export type FitnessDailySnapshot = {
   rhr?: number | null;
   whoopStrain?: number | null;
   whoopStrainSource?: "cycle" | "workouts_sum" | "unknown" | null;
+  stepCount?: number | null;
+  stepSource?: "cycle" | "workouts_sum" | "steps_collection" | "unknown" | null;
   whoopWorkouts?: number | null;
   tonalSessions?: number | null;
   tonalVolume?: number | null;
@@ -33,6 +35,7 @@ export type FitnessWindowSummary = {
   days_with_sleep: number;
   days_with_protein: number;
   days_with_hydration: number;
+  days_with_steps: number;
   avg_readiness: number | null;
   avg_sleep_hours: number | null;
   avg_sleep_performance: number | null;
@@ -44,6 +47,8 @@ export type FitnessWindowSummary = {
   avg_protein_g: number | null;
   protein_days_on_target: number;
   avg_hydration_liters: number | null;
+  total_steps: number;
+  avg_daily_steps: number | null;
 };
 
 type UpsertResult = {
@@ -63,6 +68,8 @@ CREATE TABLE IF NOT EXISTS cortana_fitness_daily_facts (
   rhr NUMERIC(8,2),
   whoop_strain NUMERIC(8,2),
   whoop_strain_source TEXT,
+  step_count INT,
+  step_source TEXT,
   whoop_workouts INT,
   tonal_sessions INT,
   tonal_volume NUMERIC(12,2),
@@ -78,6 +85,9 @@ CREATE TABLE IF NOT EXISTS cortana_fitness_daily_facts (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+ALTER TABLE cortana_fitness_daily_facts ADD COLUMN IF NOT EXISTS step_count INT;
+ALTER TABLE cortana_fitness_daily_facts ADD COLUMN IF NOT EXISTS step_source TEXT;
 `;
 
 let schemaEnsured = false;
@@ -115,7 +125,7 @@ export function buildUpsertFitnessDailySnapshotSql(snapshot: FitnessDailySnapsho
   return `
 INSERT INTO cortana_fitness_daily_facts (
   snapshot_date, generated_at, readiness_score, readiness_band, sleep_hours, sleep_performance,
-  hrv, rhr, whoop_strain, whoop_strain_source, whoop_workouts, tonal_sessions, tonal_volume,
+  hrv, rhr, whoop_strain, whoop_strain_source, step_count, step_source, whoop_workouts, tonal_sessions, tonal_volume,
   meals_logged, protein_g, protein_status, nutrition_confidence, hydration_liters, hydration_source,
   data_is_stale, quality_flags, raw
 )
@@ -130,6 +140,8 @@ VALUES (
   ${sqlNum(snapshot.rhr)},
   ${sqlNum(snapshot.whoopStrain)},
   ${sqlText(snapshot.whoopStrainSource ?? null)},
+  ${sqlInt(snapshot.stepCount)},
+  ${sqlText(snapshot.stepSource ?? null)},
   ${sqlInt(snapshot.whoopWorkouts)},
   ${sqlInt(snapshot.tonalSessions)},
   ${sqlNum(snapshot.tonalVolume)},
@@ -154,6 +166,8 @@ SET
   rhr = COALESCE(EXCLUDED.rhr, cortana_fitness_daily_facts.rhr),
   whoop_strain = COALESCE(EXCLUDED.whoop_strain, cortana_fitness_daily_facts.whoop_strain),
   whoop_strain_source = COALESCE(EXCLUDED.whoop_strain_source, cortana_fitness_daily_facts.whoop_strain_source),
+  step_count = COALESCE(EXCLUDED.step_count, cortana_fitness_daily_facts.step_count),
+  step_source = COALESCE(EXCLUDED.step_source, cortana_fitness_daily_facts.step_source),
   whoop_workouts = COALESCE(EXCLUDED.whoop_workouts, cortana_fitness_daily_facts.whoop_workouts),
   tonal_sessions = COALESCE(EXCLUDED.tonal_sessions, cortana_fitness_daily_facts.tonal_sessions),
   tonal_volume = COALESCE(EXCLUDED.tonal_volume, cortana_fitness_daily_facts.tonal_volume),
@@ -182,6 +196,7 @@ FROM (
     COUNT(sleep_hours)::int AS days_with_sleep,
     COUNT(protein_g)::int AS days_with_protein,
     COUNT(hydration_liters)::int AS days_with_hydration,
+    COUNT(step_count)::int AS days_with_steps,
     ROUND(AVG(readiness_score)::numeric, 2) AS avg_readiness,
     ROUND(AVG(sleep_hours)::numeric, 2) AS avg_sleep_hours,
     ROUND(AVG(sleep_performance)::numeric, 2) AS avg_sleep_performance,
@@ -192,7 +207,9 @@ FROM (
     ROUND(COALESCE(SUM(tonal_volume), 0)::numeric, 2) AS total_tonal_volume,
     ROUND(AVG(protein_g)::numeric, 2) AS avg_protein_g,
     COUNT(*) FILTER (WHERE protein_g BETWEEN 112 AND 140)::int AS protein_days_on_target,
-    ROUND(AVG(hydration_liters)::numeric, 2) AS avg_hydration_liters
+    ROUND(AVG(hydration_liters)::numeric, 2) AS avg_hydration_liters,
+    COALESCE(SUM(step_count), 0)::int AS total_steps,
+    ROUND(AVG(step_count)::numeric, 2) AS avg_daily_steps
   FROM cortana_fitness_daily_facts
   WHERE snapshot_date BETWEEN '${esc(startYmd)}'::date AND '${esc(endYmd)}'::date
 ) t;
@@ -244,6 +261,7 @@ export function fetchFitnessWindowSummary(startYmd: string, endYmd: string): Fit
       days_with_sleep: 0,
       days_with_protein: 0,
       days_with_hydration: 0,
+      days_with_steps: 0,
       avg_readiness: null,
       avg_sleep_hours: null,
       avg_sleep_performance: null,
@@ -255,6 +273,8 @@ export function fetchFitnessWindowSummary(startYmd: string, endYmd: string): Fit
       avg_protein_g: null,
       protein_days_on_target: 0,
       avg_hydration_liters: null,
+      total_steps: 0,
+      avg_daily_steps: null,
     };
   }
 

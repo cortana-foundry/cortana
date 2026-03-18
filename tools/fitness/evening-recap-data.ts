@@ -6,6 +6,7 @@ import { chooseSurfacedInsightIds, fetchPendingHealthInsights, markInsightsSql }
 import { upsertFitnessDailySnapshot } from "./facts-db.js";
 import {
   dataFreshnessHours,
+  extractDailyStepCount,
   extractRecoveryEntries,
   extractSleepEntries,
   extractWhoopWorkouts,
@@ -284,6 +285,7 @@ function main(): void {
   if (!/healthy/i.test(tonalHealthRaw)) errors.push("tonal_not_healthy");
 
   const whoopSummary = buildWhoopSummary(whoop, today);
+  const stepSummary = extractDailyStepCount(whoop, today);
   const todayWorkouts = tonalTodayWorkouts(tonal, today);
   const totalTonalVolume = Number(todayWorkouts.reduce((sum, item) => sum + (item.volume ?? 0), 0).toFixed(2));
   const totalTonalDuration = Number(todayWorkouts.reduce((sum, item) => sum + (item.duration_minutes ?? 0), 0).toFixed(2));
@@ -325,6 +327,8 @@ function main(): void {
     generatedAt: new Date().toISOString(),
     whoopStrain: whoopSummary.total_strain_today,
     whoopStrainSource: whoopSummary.strain_source,
+    stepCount: stepSummary.stepCount,
+    stepSource: stepSummary.source,
     whoopWorkouts: whoopSummary.whoop_workouts_today,
     tonalSessions: todayWorkouts.length,
     tonalVolume: totalTonalVolume,
@@ -355,6 +359,10 @@ function main(): void {
     date: today,
     today_training_output: {
       whoop: whoopSummary,
+      steps: {
+        daily_steps: stepSummary.stepCount,
+        source: stepSummary.source,
+      },
       tonal: {
         sessions_today: todayWorkouts.length,
         total_volume_today: totalTonalVolume,
