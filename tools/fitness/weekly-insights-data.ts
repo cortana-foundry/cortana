@@ -52,6 +52,7 @@ function curlJson(url: string, timeoutSec: number): unknown {
   const r = spawnSync("curl", ["-s", "--max-time", String(timeoutSec), url], {
     encoding: "utf8",
     stdio: ["ignore", "pipe", "ignore"],
+    maxBuffer: 16 * 1024 * 1024,
   });
   if ((r.status ?? 1) !== 0) return {};
   try {
@@ -107,6 +108,15 @@ function compareMetric(current: number | null, previous: number | null): MetricD
   return { current, previous, delta, delta_pct: deltaPct };
 }
 
+function numberOrNull(value: unknown): number | null {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string") {
+    const n = Number.parseFloat(value);
+    return Number.isFinite(n) ? n : null;
+  }
+  return null;
+}
+
 function ymdFromTimestamp(time: string | null, timeZone = "America/New_York"): string {
   if (!time) return "";
   const d = new Date(time);
@@ -153,9 +163,7 @@ function windowMetrics(opts: {
       date: ymdFromTimestamp(typeof entry.beginTime === "string" ? entry.beginTime : null),
       volume: (() => {
         const stats = entry.stats as Record<string, unknown> | undefined;
-        if (stats && typeof stats.totalVolume === "number" && Number.isFinite(stats.totalVolume)) return stats.totalVolume;
-        if (typeof entry.totalVolume === "number" && Number.isFinite(entry.totalVolume)) return entry.totalVolume;
-        return null;
+        return numberOrNull(stats?.totalVolume) ?? numberOrNull(entry.totalVolume);
       })(),
     }))
     .filter((entry) => inRange(entry.date, opts.startYmd, opts.endYmd));
@@ -304,6 +312,16 @@ function main(): void {
     weekly_metrics: {
       current: currentMetrics,
       previous: previousMetrics,
+    },
+    strength_context: {
+      tonal: {
+        current_sessions: currentMetrics.tonal_sessions,
+        current_total_volume: currentMetrics.tonal_total_volume,
+        previous_sessions: previousMetrics.tonal_sessions,
+        previous_total_volume: previousMetrics.tonal_total_volume,
+        sessions_delta: compareMetric(currentMetrics.tonal_sessions, previousMetrics.tonal_sessions).delta,
+        total_volume_delta: compareMetric(currentMetrics.tonal_total_volume, previousMetrics.tonal_total_volume).delta,
+      },
     },
     trend_signals: trendSignals,
     protein_adherence_assumption: proteinAssumption,
