@@ -9,46 +9,60 @@ type MonthWindow = {
   end: string;
 };
 
-function asYmd(date: Date): string {
-  return localYmd("America/New_York", date);
+type YearMonth = {
+  year: number;
+  month: number; // 1-12
+};
+
+function parseAnchor(anchorYmd: string): YearMonth {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(anchorYmd);
+  if (!m) {
+    const fallback = new Date();
+    return { year: fallback.getUTCFullYear(), month: fallback.getUTCMonth() + 1 };
+  }
+  return {
+    year: Number.parseInt(m[1], 10),
+    month: Number.parseInt(m[2], 10),
+  };
 }
 
-function firstOfMonth(date: Date): Date {
-  return new Date(date.getFullYear(), date.getMonth(), 1);
+function shiftMonth(input: YearMonth, offset: number): YearMonth {
+  const idx = (input.year * 12) + (input.month - 1) + offset;
+  const year = Math.floor(idx / 12);
+  const month = (idx % 12) + 1;
+  return { year, month };
 }
 
-function addMonths(date: Date, amount: number): Date {
-  return new Date(date.getFullYear(), date.getMonth() + amount, 1);
+function monthDays(year: number, month: number): number {
+  return new Date(Date.UTC(year, month, 0, 12, 0, 0)).getUTCDate();
 }
 
-function endOfMonth(date: Date): Date {
-  return new Date(date.getFullYear(), date.getMonth() + 1, 0);
+function fmtYmd(year: number, month: number, day: number): string {
+  return `${String(year).padStart(4, "0")}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
 }
 
-function monthLabel(date: Date): string {
+function monthLabel(year: number, month: number): string {
+  const anchor = new Date(Date.UTC(year, month - 1, 15, 12, 0, 0));
   return new Intl.DateTimeFormat("en-US", {
     timeZone: "America/New_York",
     month: "long",
     year: "numeric",
-  }).format(date);
+  }).format(anchor);
 }
 
 export function monthlyWindows(anchorYmd = localYmd()): { current: MonthWindow; previous: MonthWindow } {
-  const anchor = new Date(`${anchorYmd}T12:00:00`);
-  const currentStart = firstOfMonth(anchor);
-  const currentEnd = endOfMonth(anchor);
-  const previousStart = addMonths(currentStart, -1);
-  const previousEnd = endOfMonth(previousStart);
+  const current = parseAnchor(anchorYmd);
+  const previous = shiftMonth(current, -1);
   return {
     current: {
-      label: monthLabel(currentStart),
-      start: asYmd(currentStart),
-      end: asYmd(currentEnd),
+      label: monthLabel(current.year, current.month),
+      start: fmtYmd(current.year, current.month, 1),
+      end: fmtYmd(current.year, current.month, monthDays(current.year, current.month)),
     },
     previous: {
-      label: monthLabel(previousStart),
-      start: asYmd(previousStart),
-      end: asYmd(previousEnd),
+      label: monthLabel(previous.year, previous.month),
+      start: fmtYmd(previous.year, previous.month, 1),
+      end: fmtYmd(previous.year, previous.month, monthDays(previous.year, previous.month)),
     },
   };
 }
