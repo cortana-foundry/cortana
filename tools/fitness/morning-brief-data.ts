@@ -2,6 +2,7 @@
 
 import { spawnSync } from "node:child_process";
 import { chooseSurfacedInsightIds, fetchPendingHealthInsights, markInsightsSql } from "./insights-db.js";
+import { upsertFitnessDailySnapshot } from "./facts-db.js";
 import {
   computeTrend,
   dataFreshnessHours,
@@ -215,6 +216,34 @@ function main(): void {
   if (recoveryFreshnessHours != null && recoveryFreshnessHours > 18) errors.push("whoop_recovery_stale");
   if (sleepFreshnessHours != null && sleepFreshnessHours > 18) errors.push("whoop_sleep_stale");
 
+  const snapshotWrite = upsertFitnessDailySnapshot({
+    snapshotDate: today,
+    generatedAt: new Date().toISOString(),
+    readinessScore: latestRecovery?.recoveryScore ?? null,
+    readinessBand,
+    sleepHours: latestSleep?.sleepHours ?? null,
+    sleepPerformance: latestSleep?.sleepPerformance ?? null,
+    hrv: readinessSupport.hrv_latest,
+    rhr: readinessSupport.rhr_latest,
+    whoopStrain: Number(whoopWorkouts.reduce((sum, entry) => sum + (entry.strain ?? 0), 0).toFixed(2)),
+    whoopStrainSource: "workouts_sum",
+    whoopWorkouts: whoopWorkouts.length,
+    tonalSessions: tonalWorkouts.length,
+    tonalVolume: Number(tonalWorkouts.reduce((sum, entry) => sum + (entry.volume ?? 0), 0).toFixed(2)),
+    dataIsStale: isStale,
+    qualityFlags: {
+      has_whoop: recoveries.length > 0 && sleeps.length > 0,
+      has_recovery_score: latestRecovery?.recoveryScore != null,
+      has_sleep_signal: latestSleep?.sleepPerformance != null,
+      has_tonal_today: tonalWorkouts.length > 0,
+    },
+    raw: {
+      source: "morning_brief",
+      errors,
+    },
+  });
+  if (!snapshotWrite.ok) errors.push(`fitness_daily_snapshot_upsert_failed:${snapshotWrite.error ?? "unknown"}`);
+
   const out = {
     generated_at: new Date().toISOString(),
     date: today,
@@ -255,6 +284,11 @@ function main(): void {
     pending_health_insights: pendingInsights,
     surfaced_insight_ids: surfacedInsightIds,
     insight_mark_sql: markInsightsSql(surfacedInsightIds),
+    db_snapshot: {
+      table: "cortana_fitness_daily_facts",
+      status: snapshotWrite.ok ? "ok" : "error",
+      error: snapshotWrite.ok ? null : snapshotWrite.error ?? "unknown",
+    },
     errors,
     quality_flags: {
       has_whoop: recoveries.length > 0 && sleeps.length > 0,

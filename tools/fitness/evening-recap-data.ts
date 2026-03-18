@@ -3,6 +3,7 @@
 import { spawnSync } from "node:child_process";
 import { collectRecentMealEntries, summarizeMealRollup } from "./meal-log.js";
 import { chooseSurfacedInsightIds, fetchPendingHealthInsights, markInsightsSql } from "./insights-db.js";
+import { upsertFitnessDailySnapshot } from "./facts-db.js";
 import {
   dataFreshnessHours,
   extractRecoveryEntries,
@@ -244,6 +245,24 @@ export function buildNutritionAssumption(opts: {
   };
 }
 
+function extractWhoopHydrationLiters(payload: unknown): { liters: number | null; source: string | null } {
+  const root = toObj(payload);
+  const hydration = toObj(root.hydration);
+  const score = toObj(hydration.score);
+  const directLiters =
+    numberOrNull(hydration.water_liters) ??
+    numberOrNull(hydration.hydration_liters) ??
+    numberOrNull(score.water_liters) ??
+    numberOrNull(score.hydration_liters);
+  if (directLiters != null) return { liters: Number(directLiters.toFixed(3)), source: "whoop_payload.hydration" };
+
+  const body = toObj(root.body_measurement);
+  const bodyHydrationPct = numberOrNull(body.hydration_percent ?? body.hydration_percentage);
+  if (bodyHydrationPct != null) return { liters: null, source: "whoop_payload.body_measurement_pct_only" };
+
+  return { liters: null, source: null };
+}
+
 function main(): void {
   const errors: string[] = [];
   const today = localYmd();
@@ -283,6 +302,7 @@ function main(): void {
     proteinStatus: mealRollup.today.proteinStatus,
   });
   const loadBand = strainBand(whoopSummary.total_strain_today);
+  const hydration = extractWhoopHydrationLiters(whoop);
 
   const recoveries = extractRecoveryEntries(whoop);
   const sleeps = extractSleepEntries(whoop);
@@ -299,6 +319,36 @@ function main(): void {
     loadBand === "green" ? "yellow" : loadBand,
     1,
   );
+
+  const snapshotWrite = upsertFitnessDailySnapshot({
+    snapshotDate: today,
+    generatedAt: new Date().toISOString(),
+    whoopStrain: whoopSummary.total_strain_today,
+    whoopStrainSource: whoopSummary.strain_source,
+    whoopWorkouts: whoopSummary.whoop_workouts_today,
+    tonalSessions: todayWorkouts.length,
+    tonalVolume: totalTonalVolume,
+    mealsLogged: mealRollup.today.mealsLogged,
+    proteinG: mealRollup.today.proteinG,
+    proteinStatus: mealRollup.today.proteinStatus,
+    nutritionConfidence: nutritionAssumption.confidence,
+    hydrationLiters: hydration.liters,
+    hydrationSource: hydration.source,
+    dataIsStale: (recoveryFreshnessHours ?? 99) > 18 || (sleepFreshnessHours ?? 99) > 18,
+    qualityFlags: {
+      has_whoop_training: whoopSummary.whoop_workouts_today > 0,
+      has_tonal_training: todayWorkouts.length > 0,
+      has_meal_logs: mealEntries.length > 0,
+      has_hydration_signal: hydration.liters != null,
+    },
+    raw: {
+      source: "evening_recap",
+      load_band: loadBand,
+      nutrition_assumption: nutritionAssumption,
+      errors,
+    },
+  });
+  if (!snapshotWrite.ok) errors.push(`fitness_daily_snapshot_upsert_failed:${snapshotWrite.error ?? "unknown"}`);
 
   const out = {
     generated_at: new Date().toISOString(),
@@ -339,6 +389,15 @@ function main(): void {
     pending_health_insights: pendingInsights,
     surfaced_insight_ids: surfacedInsightIds,
     insight_mark_sql: markInsightsSql(surfacedInsightIds),
+    hydration_signal: {
+      liters: hydration.liters,
+      source: hydration.source,
+    },
+    db_snapshot: {
+      table: "cortana_fitness_daily_facts",
+      status: snapshotWrite.ok ? "ok" : "error",
+      error: snapshotWrite.ok ? null : snapshotWrite.error ?? "unknown",
+    },
     errors,
     quality_flags: {
       has_whoop_training: whoopSummary.whoop_workouts_today > 0,
