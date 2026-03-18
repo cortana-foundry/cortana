@@ -24,11 +24,13 @@ describe("fitness cron contract", () => {
     const morning = jobs.find((job) => job.id === "a519512a-5fb8-459f-8780-31e53793c1d4");
     const evening = jobs.find((job) => job.id === "e4db8a8d-945c-4af2-a8d5-e54f2fb4e792");
     const weekly = jobs.find((job) => job.id === "5aa1f47e-27e6-49cd-a20d-3dac0f1b8428");
+    const monthly = jobs.find((job) => job.id === "monthly-fitness-overview-20260318");
     const healthcheck = jobs.find((job) => job.id === "661b21f1-741e-41a1-b41e-f413abeb2cdd");
 
     expect(morning?.delivery?.accountId).toBe("spartan");
     expect(evening?.delivery?.accountId).toBe("spartan");
     expect(weekly?.delivery?.accountId).toBe("spartan");
+    expect(monthly?.delivery?.accountId).toBe("spartan");
     expect(healthcheck?.delivery?.accountId).toBe("monitor");
   });
 
@@ -93,5 +95,22 @@ describe("fitness cron contract", () => {
     expect(freshness?.schedule?.expr).toBe("20 6,12,18 * * *");
     expect(recoveryRisk?.schedule?.expr).toBe("5 9 * * *");
     expect(overreach?.schedule?.expr).toBe("15 19 * * *");
+  });
+
+  it("defines monthly fitness overview cron with DB artifact contract", () => {
+    const jobs = loadJobs();
+    const monthly = jobs.find((job) => job.id === "monthly-fitness-overview-20260318");
+    const message = String(monthly?.payload?.message ?? "");
+
+    expect(monthly?.agentId).toBe("cron-fitness");
+    expect(monthly?.delivery?.accountId).toBe("spartan");
+    expect(monthly?.schedule?.expr).toBe("5 20 1 * *");
+    expect(monthly?.schedule?.tz).toBe("America/New_York");
+    expect(monthly?.payload?.model).toBe("openai-codex/gpt-5.3-codex");
+    expect(message).toContain("tools/fitness/monthly-overview-data.ts");
+    expect(message).toContain("current.total_steps");
+    expect(message).toContain("current.avg_daily_steps");
+    expect(message).toContain("data_quality.step_coverage_days");
+    expect(message).toContain("age-100 objective");
   });
 });
