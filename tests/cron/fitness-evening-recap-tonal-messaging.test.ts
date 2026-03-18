@@ -19,8 +19,10 @@ describe("Fitness Evening Recap Tonal tomorrow messaging", () => {
     expect(message).toContain("start with `Load:`");
     expect(message).toContain("today_nutrition");
     expect(message).toContain("tonight_sleep_target");
+    expect(message).toContain("Longevity impact:");
     expect(message).toContain("one concrete action");
     expect(message).toContain("Do not call evening load signal \"readiness\"");
+    expect(message).toContain("age-100 objective");
     expect(message).toContain("Do not rehash morning readiness details or weekly trends");
     expect(message).toContain("pending_health_insights");
     expect(message).toContain("insight_mark_sql");
