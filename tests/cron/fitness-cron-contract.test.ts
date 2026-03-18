@@ -49,6 +49,8 @@ describe("fitness cron contract", () => {
     expect(morningMessage).toContain("today_training_context");
     expect(morningMessage).toContain("Longevity impact:");
     expect(morningMessage).toContain("age-100 objective");
+    expect(morningMessage).toContain("tonal_sessions_today");
+    expect(morningMessage).toContain("tonal_total_volume_today");
     expect(morningMessage).toContain("insight_mark_sql");
     expect(morningMessage).not.toContain("'health' = ANY(domains)");
 
@@ -67,10 +69,14 @@ describe("fitness cron contract", () => {
     expect(weeklyMessage).toContain("tools/fitness/weekly-insights-data.ts");
     expect(weeklyMessage).toContain("trend_signals");
     expect(weeklyMessage).toContain("hard_truth_inputs");
+    expect(weeklyMessage).toContain("strength_context.tonal");
+    expect(weeklyMessage).toContain("current_sessions");
+    expect(weeklyMessage).toContain("current_total_volume");
     expect(weeklyMessage).toContain("age-100 objective");
     expect(weeklyMessage).toContain("112-140g/day");
     expect(weeklyMessage).toContain("protein_adherence_assumption");
     expect(weeklyMessage).toContain("do not output only \"unknown\"");
+    expect(weeklyMessage).toContain("state uncertainty rather than claiming zero strength output");
     expect(weeklyMessage).toContain("next 24h");
     expect(weeklyMessage).toContain("weekly_file_path");
     expect(weeklyMessage).toContain("weekly_repo_file_path");
