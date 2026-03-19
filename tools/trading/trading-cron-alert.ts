@@ -7,6 +7,8 @@ import { runTradingPipeline, type RunCommandOptions } from "./trading-pipeline";
 export const BACKTESTER_CWD = "/Users/hd/Developer/cortana-external/backtester";
 export const PYTHON_BIN = resolve(BACKTESTER_CWD, ".venv/bin/python");
 const DEFAULT_SCAN_TIMEOUT_MS = 360_000;
+const COMPACT_WATCHLIST_FULL_LIMIT = 7;
+const COMPACT_WATCHLIST_TRUNCATED_LIMIT = 5;
 const DEFAULT_CRON_RELIABILITY_ENV = {
   TRADING_SCAN_CHUNK_SIZE_CANSLIM: "20",
   TRADING_SCAN_CHUNK_PARALLELISM_CANSLIM: "2",
@@ -196,8 +198,10 @@ export function buildCronAlertFromPipelineReport(report: string): string {
 
   const formatWatch = (items: ParsedSignal[]): string => {
     if (!items.length) return " —";
-    const shown = items.slice(0, 3).map((s) => `${s.ticker} ${s.score}/12`).join(" · ");
-    const remaining = items.length - 3;
+    const displayLimit =
+      items.length <= COMPACT_WATCHLIST_FULL_LIMIT ? items.length : COMPACT_WATCHLIST_TRUNCATED_LIMIT;
+    const shown = items.slice(0, displayLimit).map((s) => `${s.ticker} ${s.score}/12`).join(" · ");
+    const remaining = items.length - displayLimit;
     return remaining > 0 ? ` ${shown} [+${remaining} more]` : ` ${shown}`;
   };
 

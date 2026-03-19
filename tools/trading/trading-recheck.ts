@@ -76,6 +76,8 @@ const MAX_BASE_AGE_MS = Number(process.env.TRADING_RECHECK_MAX_BASE_AGE_MS || 4 
 const COOLDOWN_MS = Number(process.env.TRADING_RECHECK_COOLDOWN_MS || 4 * 60 * 60 * 1000);
 const MAX_ALERT_CHANGES = Number(process.env.TRADING_RECHECK_MAX_ALERT_CHANGES || 6);
 const QUICK_CHECK_COMMAND = process.env.TRADING_RECHECK_COMMAND?.trim();
+const EXCLUDE_SYMBOLS_RAW = process.env.TRADING_RECHECK_EXCLUDE_SYMBOLS || "";
+const EXCLUDE_FILE = process.env.TRADING_RECHECK_EXCLUDE_FILE?.trim();
 
 function readJson<T>(file: string): T | null {
   try {
@@ -134,6 +136,41 @@ export function extractTrackedSymbols(report: string): TrackedSymbol[] {
     byTicker.set(signal.ticker, current);
   }
   return [...byTicker.values()].sort((a, b) => a.ticker.localeCompare(b.ticker));
+}
+
+function parseSymbolTokens(raw: string): string[] {
+  return raw
+    .split(/[,\s]+/)
+    .map((value) => value.trim().toUpperCase())
+    .filter((value) => Boolean(value));
+}
+
+export function loadRecheckExcludedSymbols(
+  rawList: string = EXCLUDE_SYMBOLS_RAW,
+  filePath: string | undefined = EXCLUDE_FILE,
+): Set<string> {
+  const excluded = new Set<string>(parseSymbolTokens(rawList));
+  if (!filePath) return excluded;
+
+  try {
+    const lines = readFileSync(filePath, "utf8").split(/\r?\n/);
+    for (const line of lines) {
+      const withoutComment = line.replace(/#.*/, "").trim();
+      if (!withoutComment) continue;
+      for (const symbol of parseSymbolTokens(withoutComment)) {
+        excluded.add(symbol);
+      }
+    }
+  } catch {
+    return excluded;
+  }
+
+  return excluded;
+}
+
+export function applyTrackedSymbolExclusions(tracked: TrackedSymbol[], excluded: Set<string>): TrackedSymbol[] {
+  if (!excluded.size) return tracked;
+  return tracked.filter((item) => !excluded.has(item.ticker.toUpperCase()));
 }
 
 function defaultBatchCommand(symbols: string[]): { command: string; args: string[]; cwd: string } {
@@ -304,7 +341,8 @@ function main(): void {
   }
 
   const report = readFileSync(picked.summary.artifacts.stdout!, "utf8");
-  const tracked = extractTrackedSymbols(report);
+  const excludedSymbols = loadRecheckExcludedSymbols();
+  const tracked = applyTrackedSymbolExclusions(extractTrackedSymbols(report), excludedSymbols);
   if (!tracked.length) {
     console.log("NO_REPLY");
     return;

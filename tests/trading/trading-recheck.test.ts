@@ -2,10 +2,12 @@ import { describe, expect, it } from "vitest";
 import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import {
+  applyTrackedSymbolExclusions,
   evaluateRecheckChanges,
   extractTrackedSymbols,
   formatRecheckAlert,
   loadState,
+  loadRecheckExcludedSymbols,
   pickEligibleBaseRun,
   type RecheckChange,
 } from "../../tools/trading/trading-recheck";
@@ -73,16 +75,42 @@ describe("trading re-check base run selection", () => {
 });
 
 describe("trading re-check signal extraction", () => {
-  it("extracts only BUY and WATCH names from the pipeline report", () => {
+  it("extracts current BUY/WATCH names from persisted pipeline output", () => {
     const tracked = extractTrackedSymbols(`
 Decision: BUY
 CANSLIM: scanned 120 | evaluated 3 | threshold-passed 2 | BUY 1 | WATCH 1 | NO_BUY 1
-• NVDA (9/12) → BUY | • TSLA (8/12) → WATCH | • SHOP (5/12) → NO_BUY
+• AAPL (9/12) → BUY | • MSFT (8/12) → WATCH | • SHOP (5/12) → NO_BUY
 Dip Buyer: scanned 120 | evaluated 2 | threshold-passed 1 | BUY 0 | WATCH 1 | NO_BUY 1
-• HOOD (7/12) → WATCH | • COIN (4/12) → NO_BUY
+• ROKU (7/12) → WATCH | • COIN (4/12) → NO_BUY
 `);
 
-    expect(tracked.map((item) => item.ticker)).toEqual(["HOOD", "NVDA", "TSLA"]);
+    expect(tracked.map((item) => item.ticker)).toEqual(["AAPL", "MSFT", "ROKU"]);
+  });
+
+  it("applies explicit exclusions from env and file-backed symbol lists", () => {
+    const root = mkdtempSync(path.join(process.cwd(), "tmp-recheck-exclude-"));
+    const file = path.join(root, "exclude.txt");
+    writeFileSync(
+      file,
+      `
+# Ignore stale names from manual overrides
+MSFT
+ROKU, NVAX
+`,
+      "utf8",
+    );
+    const tracked = extractTrackedSymbols(`
+Decision: BUY
+CANSLIM: scanned 120 | evaluated 2 | threshold-passed 2 | BUY 1 | WATCH 1 | NO_BUY 0
+• AAPL (9/12) → BUY | • MSFT (8/12) → WATCH
+Dip Buyer: scanned 120 | evaluated 2 | threshold-passed 1 | BUY 0 | WATCH 1 | NO_BUY 1
+• ROKU (7/12) → WATCH | • SHOP (4/12) → NO_BUY
+`);
+    const excluded = loadRecheckExcludedSymbols("PLTR, aapl", file);
+    const filtered = applyTrackedSymbolExclusions(tracked, excluded);
+
+    expect([...excluded].sort()).toEqual(["AAPL", "MSFT", "NVAX", "PLTR", "ROKU"]);
+    expect(filtered).toEqual([]);
   });
 
   it("returns no tracked symbols when the report has no BUY or WATCH names", () => {
@@ -101,14 +129,14 @@ describe("trading re-check change detection", () => {
     const evaluation = evaluateRecheckChanges(
       loadState("/tmp/does-not-exist"),
       [
-        { symbol: "NVDA", verdict: "needs confirmation", reason: "watch", base_action: "WATCH", score: 8, confidence: 67 },
+        { symbol: "AAPL", verdict: "needs confirmation", reason: "watch", base_action: "WATCH", score: 8, confidence: 67 },
       ],
       Date.parse("2026-03-19T15:00:00.000Z"),
       4 * 60 * 60 * 1000,
     );
 
     expect(evaluation.changes).toEqual([]);
-    expect(evaluation.nextState.symbols.NVDA.verdict).toBe("needs confirmation");
+    expect(evaluation.nextState.symbols.AAPL.verdict).toBe("needs confirmation");
   });
 
   it("emits an actionable upgrade when the verdict improves", () => {
@@ -117,7 +145,7 @@ describe("trading re-check change detection", () => {
         schemaVersion: 1,
         updatedAt: "2026-03-19T15:00:00.000Z",
         symbols: {
-          NVDA: {
+          AAPL: {
             verdict: "needs confirmation",
             lastSeenAt: "2026-03-19T15:00:00.000Z",
             lastAlertedAt: null,
@@ -126,7 +154,7 @@ describe("trading re-check change detection", () => {
         },
       },
       [
-        { symbol: "NVDA", verdict: "actionable", reason: "breakout confirmed", base_action: "BUY", score: 9, confidence: 79 },
+        { symbol: "AAPL", verdict: "actionable", reason: "breakout confirmed", base_action: "BUY", score: 9, confidence: 79 },
       ],
       Date.parse("2026-03-19T16:00:00.000Z"),
       4 * 60 * 60 * 1000,
@@ -134,7 +162,7 @@ describe("trading re-check change detection", () => {
 
     expect(evaluation.changes).toHaveLength(1);
     expect(evaluation.changes[0]).toMatchObject({
-      symbol: "NVDA",
+      symbol: "AAPL",
       previousVerdict: "needs confirmation",
       verdict: "actionable",
       direction: "upgrade",
@@ -147,16 +175,16 @@ describe("trading re-check change detection", () => {
         schemaVersion: 1,
         updatedAt: "2026-03-19T15:00:00.000Z",
         symbols: {
-          NVDA: {
+          AAPL: {
             verdict: "needs confirmation",
             lastSeenAt: "2026-03-19T15:00:00.000Z",
             lastAlertedAt: "2026-03-19T15:30:00.000Z",
-            lastAlertSignature: "NVDA:needs confirmation->actionable",
+            lastAlertSignature: "AAPL:needs confirmation->actionable",
           },
         },
       },
       [
-        { symbol: "NVDA", verdict: "actionable", reason: "breakout confirmed", base_action: "BUY", score: 9, confidence: 79 },
+        { symbol: "AAPL", verdict: "actionable", reason: "breakout confirmed", base_action: "BUY", score: 9, confidence: 79 },
       ],
       Date.parse("2026-03-19T16:00:00.000Z"),
       4 * 60 * 60 * 1000,
@@ -170,7 +198,7 @@ describe("trading re-check alert formatting", () => {
   it("renders a compact operator summary", () => {
     const changes: RecheckChange[] = [
       {
-        symbol: "NVDA",
+        symbol: "AAPL",
         previousVerdict: "needs confirmation",
         verdict: "actionable",
         direction: "upgrade",
@@ -180,7 +208,7 @@ describe("trading re-check alert formatting", () => {
         confidence: 79,
       },
       {
-        symbol: "TSLA",
+        symbol: "MSFT",
         previousVerdict: "actionable",
         verdict: "avoid for now",
         direction: "downgrade",
@@ -194,8 +222,8 @@ describe("trading re-check alert formatting", () => {
     const text = formatRecheckAlert(
       "20260319-143000",
       [
-        { ticker: "NVDA", sections: ["CANSLIM"], actions: ["WATCH"] },
-        { ticker: "TSLA", sections: ["CANSLIM"], actions: ["BUY"] },
+        { ticker: "AAPL", sections: ["CANSLIM"], actions: ["WATCH"] },
+        { ticker: "MSFT", sections: ["CANSLIM"], actions: ["BUY"] },
       ],
       changes,
       6,
@@ -203,7 +231,7 @@ describe("trading re-check alert formatting", () => {
 
     expect(text).toContain("📈 Trading Re-check");
     expect(text).toContain("Base run: 20260319-143000");
-    expect(text).toContain("Upgrades: NVDA needs confirmation -> actionable");
-    expect(text).toContain("Downgrades: TSLA actionable -> avoid for now");
+    expect(text).toContain("Upgrades: AAPL needs confirmation -> actionable");
+    expect(text).toContain("Downgrades: MSFT actionable -> avoid for now");
   });
 });
