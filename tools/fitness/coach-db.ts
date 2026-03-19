@@ -1,0 +1,289 @@
+import { runPsql } from "../lib/db.js";
+
+export type CoachDecisionInput = {
+  tsUtc?: string;
+  readinessCall: "Green" | "Yellow" | "Red" | "Unknown";
+  longevityImpact: "positive" | "neutral" | "negative";
+  topRisk: string;
+  reasonSummary: string;
+  prescribedAction: string;
+  actualDayStrain?: number | null;
+  sleepPerfPct?: number | null;
+  recoveryScore?: number | null;
+  complianceStatus?: string | null;
+};
+
+
+export type CoachConversationInput = {
+  sourceKey: string;
+  tsUtc?: string;
+  channel: string;
+  direction: "inbound" | "outbound";
+  messageText: string;
+  intent?: string | null;
+  tags?: Record<string, unknown> | null;
+};
+
+export type CoachWeeklyScoreInput = {
+  isoWeek: string;
+  weekStart: string;
+  weekEnd: string;
+  score: number;
+  summary?: string | null;
+  details?: Record<string, unknown> | null;
+};
+
+export type CoachNutritionInput = {
+  dateLocal: string;
+  proteinTargetG: number;
+  proteinActualG?: number | null;
+  hydrationStatus: string;
+  notes?: string | null;
+};
+
+let schemaEnsured = false;
+
+function esc(value: string): string {
+  return value.replace(/'/g, "''");
+}
+
+function sqlText(value: string | null | undefined): string {
+  if (!value) return "NULL";
+  return `'${esc(value)}'`;
+}
+
+function sqlJson(value: Record<string, unknown> | null | undefined): string {
+  if (!value || typeof value !== "object") return "'{}'::jsonb";
+  return `'${esc(JSON.stringify(value))}'::jsonb`;
+}
+
+function sqlNum(value: number | null | undefined): string {
+  if (value == null || !Number.isFinite(value)) return "NULL";
+  return String(value);
+}
+
+function ensureCoachSchema(): void {
+  if (schemaEnsured) return;
+  const sql = `
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'coach_direction') THEN
+    CREATE TYPE coach_direction AS ENUM ('inbound','outbound');
+  END IF;
+END$$;
+
+CREATE TABLE IF NOT EXISTS coach_conversation_log (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  source_key text UNIQUE,
+  ts_utc timestamptz NOT NULL DEFAULT now(),
+  channel text NOT NULL,
+  direction coach_direction NOT NULL,
+  message_text text NOT NULL,
+  intent text,
+  tags jsonb NOT NULL DEFAULT '{}'::jsonb,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
+ALTER TABLE coach_conversation_log ADD COLUMN IF NOT EXISTS source_key text;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_coach_conversation_source_key ON coach_conversation_log(source_key);
+
+CREATE TABLE IF NOT EXISTS coach_decision_log (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  ts_utc timestamptz NOT NULL DEFAULT now(),
+  readiness_call text NOT NULL CHECK (readiness_call IN ('Green','Yellow','Red','Unknown')),
+  longevity_impact text NOT NULL CHECK (longevity_impact IN ('positive','neutral','negative')),
+  top_risk text NOT NULL,
+  reason_summary text NOT NULL,
+  prescribed_action text NOT NULL,
+  actual_day_strain numeric(6,3),
+  sleep_perf_pct numeric(5,2),
+  recovery_score numeric(5,2),
+  compliance_status text,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS coach_nutrition_log (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  date_local date NOT NULL UNIQUE,
+  protein_target_g int NOT NULL CHECK (protein_target_g > 0),
+  protein_actual_g int CHECK (protein_actual_g >= 0),
+  hydration_status text NOT NULL,
+  notes text,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS coach_weekly_score (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  iso_week text NOT NULL UNIQUE,
+  week_start date NOT NULL,
+  week_end date NOT NULL,
+  score int NOT NULL CHECK (score >= 0 AND score <= 100),
+  summary text,
+  details jsonb NOT NULL DEFAULT '{}'::jsonb,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+`;
+  const result = runPsql(sql);
+  if (result.status !== 0) {
+    throw new Error((result.stderr || "failed to ensure coach schema").trim());
+  }
+  schemaEnsured = true;
+}
+
+
+export function upsertCoachConversation(input: CoachConversationInput): { ok: boolean; error?: string } {
+  try {
+    ensureCoachSchema();
+    const sql = `
+INSERT INTO coach_conversation_log (
+  source_key, ts_utc, channel, direction, message_text, intent, tags
+) VALUES (
+  ${sqlText(input.sourceKey)},
+  COALESCE(${sqlText(input.tsUtc)}::timestamptz, now()),
+  ${sqlText(input.channel)},
+  ${sqlText(input.direction)}::coach_direction,
+  ${sqlText(input.messageText)},
+  ${sqlText(input.intent ?? null)},
+  ${sqlJson(input.tags ?? null)}
+)
+ON CONFLICT (source_key) DO UPDATE
+SET
+  ts_utc = EXCLUDED.ts_utc,
+  channel = EXCLUDED.channel,
+  direction = EXCLUDED.direction,
+  message_text = EXCLUDED.message_text,
+  intent = COALESCE(EXCLUDED.intent, coach_conversation_log.intent),
+  tags = COALESCE(coach_conversation_log.tags, '{}'::jsonb) || COALESCE(EXCLUDED.tags, '{}'::jsonb);`;
+    const result = runPsql(sql);
+    if (result.status !== 0) {
+      return { ok: false, error: (result.stderr || "coach conversation upsert failed").trim() };
+    }
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : String(error) };
+  }
+}
+
+export function upsertCoachDecision(input: CoachDecisionInput): { ok: boolean; error?: string } {
+  try {
+    ensureCoachSchema();
+    const sql = `
+INSERT INTO coach_decision_log (
+  ts_utc, readiness_call, longevity_impact, top_risk, reason_summary, prescribed_action,
+  actual_day_strain, sleep_perf_pct, recovery_score, compliance_status
+) VALUES (
+  COALESCE(${sqlText(input.tsUtc)}::timestamptz, now()),
+  ${sqlText(input.readinessCall)},
+  ${sqlText(input.longevityImpact)},
+  ${sqlText(input.topRisk)},
+  ${sqlText(input.reasonSummary)},
+  ${sqlText(input.prescribedAction)},
+  ${sqlNum(input.actualDayStrain)},
+  ${sqlNum(input.sleepPerfPct)},
+  ${sqlNum(input.recoveryScore)},
+  ${sqlText(input.complianceStatus ?? null)}
+);`;
+    const result = runPsql(sql);
+    if (result.status !== 0) {
+      return { ok: false, error: (result.stderr || "coach decision insert failed").trim() };
+    }
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : String(error) };
+  }
+}
+
+
+export function upsertCoachWeeklyScore(input: CoachWeeklyScoreInput): { ok: boolean; error?: string } {
+  try {
+    ensureCoachSchema();
+    const safeScore = Math.max(0, Math.min(100, Math.round(input.score)));
+    const sql = `
+INSERT INTO coach_weekly_score (
+  iso_week, week_start, week_end, score, summary, details
+) VALUES (
+  ${sqlText(input.isoWeek)},
+  ${sqlText(input.weekStart)}::date,
+  ${sqlText(input.weekEnd)}::date,
+  ${safeScore},
+  ${sqlText(input.summary ?? null)},
+  ${sqlJson(input.details ?? null)}
+)
+ON CONFLICT (iso_week) DO UPDATE
+SET
+  week_start = EXCLUDED.week_start,
+  week_end = EXCLUDED.week_end,
+  score = EXCLUDED.score,
+  summary = COALESCE(EXCLUDED.summary, coach_weekly_score.summary),
+  details = COALESCE(EXCLUDED.details, coach_weekly_score.details),
+  updated_at = now();`;
+    const result = runPsql(sql);
+    if (result.status !== 0) {
+      return { ok: false, error: (result.stderr || "coach weekly score upsert failed").trim() };
+    }
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : String(error) };
+  }
+}
+
+
+
+export function updateLatestDecisionCompliance(input: {
+  status: string;
+  tsUtc?: string;
+  note?: string | null;
+}): { ok: boolean; error?: string } {
+  try {
+    ensureCoachSchema();
+    const sql = `
+UPDATE coach_decision_log
+SET
+  compliance_status = ${sqlText(input.status)},
+  reason_summary = CASE
+    WHEN ${sqlText(input.note ?? null)} IS NULL THEN reason_summary
+    ELSE CONCAT(reason_summary, ' | compliance_note: ', ${sqlText(input.note ?? null)})
+  END
+WHERE id = (SELECT id FROM coach_decision_log ORDER BY ts_utc DESC LIMIT 1);`;
+    const result = runPsql(sql);
+    if (result.status !== 0) {
+      return { ok: false, error: (result.stderr || "coach decision compliance update failed").trim() };
+    }
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : String(error) };
+  }
+}
+
+export function upsertCoachNutrition(input: CoachNutritionInput): { ok: boolean; error?: string } {
+  try {
+    ensureCoachSchema();
+    const sql = `
+INSERT INTO coach_nutrition_log (
+  date_local, protein_target_g, protein_actual_g, hydration_status, notes
+) VALUES (
+  ${sqlText(input.dateLocal)}::date,
+  ${Math.trunc(input.proteinTargetG)},
+  ${input.proteinActualG == null ? "NULL" : Math.max(0, Math.trunc(input.proteinActualG))},
+  ${sqlText(input.hydrationStatus)},
+  ${sqlText(input.notes ?? null)}
+)
+ON CONFLICT (date_local) DO UPDATE
+SET
+  protein_target_g = EXCLUDED.protein_target_g,
+  protein_actual_g = COALESCE(EXCLUDED.protein_actual_g, coach_nutrition_log.protein_actual_g),
+  hydration_status = COALESCE(NULLIF(EXCLUDED.hydration_status, ''), coach_nutrition_log.hydration_status),
+  notes = COALESCE(EXCLUDED.notes, coach_nutrition_log.notes);
+`;
+    const result = runPsql(sql);
+    if (result.status !== 0) {
+      return { ok: false, error: (result.stderr || "coach nutrition upsert failed").trim() };
+    }
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : String(error) };
+  }
+}

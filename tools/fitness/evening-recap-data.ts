@@ -4,6 +4,7 @@ import { spawnSync } from "node:child_process";
 import { collectRecentMealEntries, summarizeMealRollup } from "./meal-log.js";
 import { chooseSurfacedInsightIds, fetchPendingHealthInsights, markInsightsSql } from "./insights-db.js";
 import { upsertFitnessDailySnapshot } from "./facts-db.js";
+import { upsertCoachDecision, upsertCoachNutrition } from "./coach-db.js";
 import {
   dataFreshnessHours,
   extractDailyStepCount,
@@ -91,6 +92,20 @@ function strainBand(totalStrain: number): ReadinessBand {
   if (totalStrain >= 16) return "red";
   if (totalStrain >= 10) return "yellow";
   return "green";
+}
+
+
+function toCoachReadiness(band: ReadinessBand): "Green" | "Yellow" | "Red" | "Unknown" {
+  if (band === "green") return "Green";
+  if (band === "yellow") return "Yellow";
+  if (band === "red") return "Red";
+  return "Unknown";
+}
+
+function longevityFromLoad(totalStrain: number): "positive" | "neutral" | "negative" {
+  if (totalStrain >= 18) return "negative";
+  if (totalStrain >= 12) return "neutral";
+  return "positive";
 }
 
 export function tonalWorkoutsFromPayload(payload: unknown): JsonObject[] {
@@ -354,6 +369,39 @@ function main(): void {
   });
   if (!snapshotWrite.ok) errors.push(`fitness_daily_snapshot_upsert_failed:${snapshotWrite.error ?? "unknown"}`);
 
+  const hydrationStatus = hydration.liters == null
+    ? "unknown"
+    : hydration.liters >= 2.5
+      ? "on_track"
+      : hydration.liters >= 1.5
+        ? "moderate"
+        : "low";
+
+  const nutritionWrite = upsertCoachNutrition({
+    dateLocal: today,
+    proteinTargetG: mealRollup.target.proteinMinG,
+    proteinActualG: mealRollup.today.proteinG == null ? null : Math.round(mealRollup.today.proteinG),
+    hydrationStatus,
+    notes: nutritionAssumption.coaching_note,
+  });
+  if (!nutritionWrite.ok) errors.push(`coach_nutrition_upsert_failed:${nutritionWrite.error ?? "unknown"}`);
+
+  const overreachWarning = whoopSummary.total_strain_today >= 14;
+  const decisionWrite = upsertCoachDecision({
+    tsUtc: new Date().toISOString(),
+    readinessCall: toCoachReadiness(loadBand),
+    longevityImpact: longevityFromLoad(whoopSummary.total_strain_today),
+    topRisk: overreachWarning
+      ? "Stacking another hard session before recovery closes."
+      : "Inconsistent sleep and nutrition reducing adaptation quality.",
+    reasonSummary: `Evening load band ${loadBand} from strain ${whoopSummary.total_strain_today} and nutrition status ${mealRollup.today.proteinStatus}.`,
+    prescribedAction: sleepTarget.concrete_action,
+    actualDayStrain: whoopSummary.total_strain_today,
+    sleepPerfPct: sleeps[0]?.sleepPerformance ?? null,
+    recoveryScore: recoveries[0]?.recoveryScore ?? null,
+  });
+  if (!decisionWrite.ok) errors.push(`coach_decision_upsert_failed:${decisionWrite.error ?? "unknown"}`);
+
   const out = {
     generated_at: new Date().toISOString(),
     date: today,
@@ -400,11 +448,25 @@ function main(): void {
     hydration_signal: {
       liters: hydration.liters,
       source: hydration.source,
+      status: hydrationStatus,
     },
+    proactive_warning: overreachWarning
+      ? "High strain detected — avoid additional high intensity until next recovery check."
+      : null,
     db_snapshot: {
       table: "cortana_fitness_daily_facts",
       status: snapshotWrite.ok ? "ok" : "error",
       error: snapshotWrite.ok ? null : snapshotWrite.error ?? "unknown",
+    },
+    coach_decision_log: {
+      table: "coach_decision_log",
+      status: decisionWrite.ok ? "ok" : "error",
+      error: decisionWrite.ok ? null : decisionWrite.error ?? "unknown",
+    },
+    coach_nutrition_log: {
+      table: "coach_nutrition_log",
+      status: nutritionWrite.ok ? "ok" : "error",
+      error: nutritionWrite.ok ? null : nutritionWrite.error ?? "unknown",
     },
     errors,
     quality_flags: {
