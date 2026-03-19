@@ -99,7 +99,8 @@
         "lastDelivered": false
       },
       "delivery": {
-        "mode": "none"
+        "mode": "none",
+        "accountId": "monitor"
       }
     },
     {
