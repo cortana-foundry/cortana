@@ -121,7 +121,7 @@
         "kind": "agentTurn",
         "message": "OUTPUT LIMIT: Any user-visible message or summary must be 150 words or less. If it would be longer, compress it. Do not send multi-part cron messages.\n\nRouting owner:\n- Monitor is the user-facing owner lane for inbox/email ops and operational maintenance alerts.\n- Healthy/no-reminder path must stay silent as NO_REPLY.\n\nRun this exact command via the `exec` tool, non-interactively:\n- command: npx tsx /Users/hd/Developer/cortana/tools/reminders/apple-reminders-monitor.ts\n- workdir: /Users/hd/.openclaw/workspaces/cron-comms\n- host: gateway\n- security: full\n- ask: off\n- timeout: 120\n- yieldMs: 20000\n\nPolicy:\n- Watch all Apple Reminders lists.\n- Alert on overdue reminders and reminders due in the next 60 minutes only.\n- No morning digest in this lane.\n- Deduplicate using memory/apple-reminders-sent.json.\n- If script outputs exactly NO_REPLY: return exactly NO_REPLY and do not send a message.\n- If script outputs alert text: send it exactly once via message tool to telegram target 8171372724 with accountId monitor.\n- Keep healthy/empty paths silent.",
         "model": "openai-codex/gpt-5.1",
-        "timeoutSeconds": 90
+        "timeoutSeconds": 150
       },
       "state": {
         "lastStatus": "ok",
@@ -1018,6 +1018,31 @@
         "model": "openai-codex/gpt-5.1",
         "timeoutSeconds": 600,
         "message": "OUTPUT LIMIT: Any user-visible message or summary must be 150 words or less. If it would be longer, compress it. Do not send multi-part cron messages.\n\nThis is the trading precompute refresh lane. It prepares non-blocking buy-decision artifacts for the live trading stack.\nMonitor is the user-facing owner lane for trading alert scans, but this job does not send Telegram messages.\n\nRun exactly:\nbash /Users/hd/Developer/cortana/tools/trading/run-trading-precompute.sh\n\nRules:\n- Refresh the nightly discovery feature snapshot first.\n- Then settle experimental alpha outcomes.\n- Then refresh the buy-decision calibration artifact.\n- Do not use the message tool.\n- This job is precompute only and must not change live run status.\n- If the wrapper exits 0, return exactly: trading-precompute complete\n- If the wrapper exits non-zero, return the wrapper stderr only."
+      },
+      "delivery": {
+        "mode": "none",
+        "accountId": "monitor"
+      }
+    },
+    {
+      "id": "polymarket-market-intel-20260319",
+      "agentId": "cron-market",
+      "name": "🧠 Polymarket Market Intel Refresh",
+      "enabled": true,
+      "createdAtMs": 1773960000000,
+      "updatedAtMs": 1773960000000,
+      "schedule": {
+        "kind": "cron",
+        "expr": "30 8 * * 1-5",
+        "tz": "America/New_York"
+      },
+      "sessionTarget": "isolated",
+      "wakeMode": "now",
+      "payload": {
+        "kind": "agentTurn",
+        "model": "openai-codex/gpt-5.1",
+        "timeoutSeconds": 300,
+        "message": "OUTPUT LIMIT: Any user-visible message or summary must be 150 words or less. If it would be longer, compress it. Do not send multi-part cron messages.\n\nThis is the production Polymarket market-intel refresh lane.\nIt prepares fresh external market-intel artifacts for the Python trading alerts and must run before market-session scans.\nIt does not send Telegram messages directly.\n\nRun exactly:\ncd /Users/hd/Developer/cortana-external && ./tools/market-intel/run_market_intel.sh\n\nRules:\n- Refresh the Python SPY regime snapshot first via the wrapper.\n- Rebuild Polymarket artifacts under /Users/hd/Developer/cortana-external/var/market-intel/polymarket.\n- Verify the Python bridge can consume the fresh artifacts.\n- Do not use the message tool.\n- If the wrapper exits 0, return exactly: market-intel refresh complete\n- If the wrapper exits non-zero, return the wrapper stderr only."
       },
       "delivery": {
         "mode": "none",

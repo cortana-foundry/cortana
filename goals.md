@@ -1,27 +1,5 @@
 # 2026 Goals
 
-## 🏈 Learn Football (NFL)
-**Goal:** Go from amateur to pro-level knowledge by start of 2026 season (September)
-
-**What to master:**
-- Players: names, positions, stats, playing styles, contracts
-- Teams: rosters, histories, rivalries, coaching staff, schemes
-- Strategy: offensive/defensive schemes, play calling, situational football
-- Stats: how to read and interpret advanced metrics (PFF, EPA, DVOA)
-- Draft/trades: understand player evaluation, salary cap, roster building
-- Culture: storylines, podcasts, media, fantasy football
-
-**Timeline:**
-- Feb 2026: Super Bowl LX (Patriots vs Seahawks) — watch with context
-- Feb-Mar: Deep dive on current docs, build foundation
-- Apr: NFL Draft — follow along with understanding
-- May-Aug: Offseason content, team previews
-- Sep: Season starts — watch games with real knowledge
-
-**Resources:** ~/Developer/cortana/learning/football/
-
----
-
 ## 💪 Fitness
 - Complete "12 Weeks to Jacked" Tonal program (Week 8/12)
 - Maintain daily workout streak
