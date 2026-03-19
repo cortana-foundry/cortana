@@ -122,6 +122,7 @@
 
 - **Never disable / never give up**: when something breaks, diagnose, ask better questions, and iterate; do not abandon systems for comfort.
 - **Mission Control deploy workflow**: production Mission Control is Next.js; standard cycle is edit → `pnpm build` → `launchctl kickstart`.
+- **Primary repo targets**: Hamel’s primary repos are `/Users/hd/Developer/cortana` and `/Users/hd/Developer/cortana-external`. If Hamel says `/Users/hd/cortana` or `/Users/hd/cortana-external`, treat those as shorthand for the Developer paths on this machine and prefer those repos for sync/cleanup and active work unless he says otherwise.
 - **Self-healing must be real**:
   - Tonal auth failures → delete `tonal_tokens.json` and re-auth; do not ask Hamel.
   - Implement fixes in service code where possible (not only as playbooks).
