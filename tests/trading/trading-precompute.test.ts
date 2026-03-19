@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildTradingPrecomputeSummary,
+  extractJsonPayload,
   formatTradingPrecomputeSummary,
   summarizeCalibrationArtifact,
   summarizeNightlyDiscoveryReport,
@@ -33,6 +34,12 @@ describe("trading precompute", () => {
 
     expect(summary.status).toBe("fresh");
     expect(summary.settledCandidates).toBe(24);
+  });
+
+  it("extracts JSON from noisy command output", () => {
+    const payload = extractJsonPayload(`warning line\n\u001b[33mnotice\u001b[0m\n{\n  "feature_snapshot": {"symbol_count": 120}\n}\n`);
+
+    expect(payload).toBe('{\n  "feature_snapshot": {"symbol_count": 120}\n}');
   });
 
   it("builds and formats a combined precompute summary from command results", () => {
