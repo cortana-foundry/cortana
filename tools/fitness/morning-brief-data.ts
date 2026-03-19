@@ -3,6 +3,7 @@
 import { spawnSync } from "node:child_process";
 import { chooseSurfacedInsightIds, fetchPendingHealthInsights, markInsightsSql } from "./insights-db.js";
 import { upsertFitnessDailySnapshot } from "./facts-db.js";
+import { upsertCoachDecision } from "./coach-db.js";
 import {
   computeTrend,
   dataFreshnessHours,
@@ -132,6 +133,27 @@ type MorningRecommendation = {
   concrete_action: string;
 };
 
+
+function toCoachReadiness(band: ReadinessBand): "Green" | "Yellow" | "Red" | "Unknown" {
+  if (band === "green") return "Green";
+  if (band === "yellow") return "Yellow";
+  if (band === "red") return "Red";
+  return "Unknown";
+}
+
+function buildLongevityImpact(opts: { band: ReadinessBand; stale: boolean }): "positive" | "neutral" | "negative" {
+  if (opts.stale || opts.band === "unknown") return "neutral";
+  if (opts.band === "red") return "negative";
+  return "positive";
+}
+
+function buildTopRisk(opts: { band: ReadinessBand; stale: boolean; sleepPerf: number | null }): string {
+  if (opts.stale) return "Acting on stale readiness data and overreaching by mistake.";
+  if (opts.band === "red") return "Pushing intensity despite low readiness and impairing recovery.";
+  if ((opts.sleepPerf ?? 100) < 80) return "Sleep quality drag reducing adaptation and increasing injury risk.";
+  return "Turning a good readiness day into junk-volume fatigue.";
+}
+
 export function buildMorningTrainingRecommendation(opts: {
   readinessBand: ReadinessBand;
   sleepPerformance: number | null;
@@ -248,6 +270,20 @@ function main(): void {
   });
   if (!snapshotWrite.ok) errors.push(`fitness_daily_snapshot_upsert_failed:${snapshotWrite.error ?? "unknown"}`);
 
+  const todayWhoopStrain = Number(whoopWorkouts.reduce((sum, entry) => sum + (entry.strain ?? 0), 0).toFixed(2));
+  const decisionWrite = upsertCoachDecision({
+    tsUtc: new Date().toISOString(),
+    readinessCall: toCoachReadiness(readinessBand),
+    longevityImpact: buildLongevityImpact({ band: readinessBand, stale: isStale }),
+    topRisk: buildTopRisk({ band: readinessBand, stale: isStale, sleepPerf: latestSleep?.sleepPerformance ?? null }),
+    reasonSummary: recommendation.rationale,
+    prescribedAction: recommendation.concrete_action,
+    actualDayStrain: todayWhoopStrain,
+    sleepPerfPct: latestSleep?.sleepPerformance ?? null,
+    recoveryScore: latestRecovery?.recoveryScore ?? null,
+  });
+  if (!decisionWrite.ok) errors.push(`coach_decision_upsert_failed:${decisionWrite.error ?? "unknown"}`);
+
   const out = {
     generated_at: new Date().toISOString(),
     date: today,
@@ -294,6 +330,11 @@ function main(): void {
       table: "cortana_fitness_daily_facts",
       status: snapshotWrite.ok ? "ok" : "error",
       error: snapshotWrite.ok ? null : snapshotWrite.error ?? "unknown",
+    },
+    coach_decision_log: {
+      table: "coach_decision_log",
+      status: decisionWrite.ok ? "ok" : "error",
+      error: decisionWrite.ok ? null : decisionWrite.error ?? "unknown",
     },
     errors,
     quality_flags: {

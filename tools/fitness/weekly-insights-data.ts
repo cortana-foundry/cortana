@@ -5,6 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import { collectRecentMealEntries } from "./meal-log.js";
 import { chooseSurfacedInsightIds, fetchPendingHealthInsights, markInsightsSql } from "./insights-db.js";
+import { upsertCoachWeeklyScore } from "./coach-db.js";
 import {
   extractRecoveryEntries,
   extractSleepEntries,
@@ -239,6 +240,32 @@ export function buildWeeklyProteinAssumption(opts: {
   };
 }
 
+
+
+function weeklyAge100Score(input: {
+  avgSleepHours: number | null;
+  avgRecovery: number | null;
+  strainDelta: number | null;
+  proteinDaysOnTarget: number;
+  proteinDaysLogged: number;
+  errors: string[];
+}): { score: number; components: Record<string, number>; summary: string } {
+  const sleepScore = input.avgSleepHours == null ? 12 : Math.max(0, Math.min(30, Math.round((input.avgSleepHours / 8) * 30)));
+  const recoveryScore = input.avgRecovery == null ? 10 : Math.max(0, Math.min(25, Math.round((input.avgRecovery / 100) * 25)));
+  const strainPenalty = input.strainDelta != null && input.strainDelta > 8 ? 12 : input.strainDelta != null && input.strainDelta > 3 ? 6 : 0;
+  const loadScore = Math.max(0, 20 - strainPenalty);
+  const proteinScoreBase = input.proteinDaysLogged === 0 ? 6 : Math.round((input.proteinDaysOnTarget / 7) * 25);
+  const proteinScore = Math.max(0, Math.min(25, proteinScoreBase));
+  const dataPenalty = input.errors.length > 0 ? 5 : 0;
+  const score = Math.max(0, Math.min(100, sleepScore + recoveryScore + loadScore + proteinScore - dataPenalty));
+  const summary = score >= 80 ? "strong alignment" : score >= 65 ? "moderate alignment" : "needs correction";
+  return {
+    score,
+    components: { sleep: sleepScore, recovery: recoveryScore, load: loadScore, protein: proteinScore, data_penalty: dataPenalty },
+    summary,
+  };
+}
+
 function main(): void {
   const errors: string[] = [];
   const today = localYmd();
@@ -299,6 +326,28 @@ function main(): void {
   const isoWeek = currentIsoWeekTag();
   const weeklyTarget = weeklyPaths(isoWeek);
 
+  const age100 = weeklyAge100Score({
+    avgSleepHours: currentMetrics.avg_sleep_hours,
+    avgRecovery: currentMetrics.avg_recovery,
+    strainDelta: trendSignals.strain_load.delta,
+    proteinDaysOnTarget: currentMetrics.protein_days_on_target,
+    proteinDaysLogged: currentMetrics.protein_days_logged,
+    errors,
+  });
+  const weeklyScoreWrite = upsertCoachWeeklyScore({
+    isoWeek,
+    weekStart: currentStart,
+    weekEnd: currentEnd,
+    score: age100.score,
+    summary: age100.summary,
+    details: {
+      components: age100.components,
+      trend_signals: trendSignals,
+      risk_band: riskBand,
+    },
+  });
+  if (!weeklyScoreWrite.ok) errors.push(`coach_weekly_score_upsert_failed:${weeklyScoreWrite.error ?? "unknown"}`);
+
   const out = {
     generated_at: new Date().toISOString(),
     date: today,
@@ -325,6 +374,13 @@ function main(): void {
     },
     trend_signals: trendSignals,
     protein_adherence_assumption: proteinAssumption,
+    age_100_alignment_score: {
+      score: age100.score,
+      summary: age100.summary,
+      components: age100.components,
+      db_status: weeklyScoreWrite.ok ? "ok" : "error",
+      db_error: weeklyScoreWrite.ok ? null : weeklyScoreWrite.error ?? "unknown",
+    },
     hard_truth_inputs: {
       risk_band: riskBand,
       biggest_regression:
