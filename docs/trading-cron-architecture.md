@@ -2,12 +2,13 @@
 
 ## Overview
 
-The trading alert pipeline now uses a **precompute + compute + notify + re-check** routine:
+The trading alert pipeline now uses a **precompute + market-intel + compute + notify + re-check** routine:
 
 1. Pre-market precompute refreshes feature-snapshot and calibration artifacts.
-2. Market-session compute runs the unified CANSLIM + Dip Buyer scan and writes the official base artifact.
-3. Notify delivers only finalized base runs.
-4. Midday re-checks revisit the current `BUY/WATCH` basket without rerunning the full scan.
+2. Polymarket market-intel refresh rebuilds the external macro/context artifacts consumed by the Python bridge.
+3. Market-session compute runs the unified CANSLIM + Dip Buyer scan and writes the official base artifact.
+4. Notify delivers only finalized base runs.
+5. Midday re-checks revisit the current `BUY/WATCH` basket without rerunning the full scan.
 
 This keeps research and calibration inputs fresh while preserving the production rule that only the base compute run decides trading-run success or failure.
 
@@ -30,6 +31,20 @@ This keeps research and calibration inputs fresh while preserving the production
 - Live market-session scans stay deterministic and do not have to rebuild research artifacts inline.
 - The unified report can surface calibration freshness from the latest artifact without changing decision authority.
 - Experimental-alpha settlement and buy-decision calibration become part of the routine instead of manual operator steps.
+
+## Cron P — Polymarket Context (`🧠 Polymarket Market Intel Refresh`)
+
+- **Job ID:** `polymarket-market-intel-20260319`
+- **Agent:** `cron-market`
+- **Schedule:** `30 8 * * 1-5` ET (8:30 AM on weekdays)
+- **Timeout:** 300s
+- **What it does:**
+  1. Runs `/Users/hd/Developer/cortana-external/tools/market-intel/run_market_intel.sh`
+  2. Refreshes the Python SPY regime snapshot first via the wrapper
+  3. Rebuilds Polymarket latest/history/watchlist artifacts under `/Users/hd/Developer/cortana-external/var/market-intel/polymarket`
+  4. Verifies the Python bridge can consume the resulting compact/report/watchlist outputs
+- **Does NOT** send Telegram messages directly
+- **Healthy state:** returns `market-intel refresh complete`
 
 ## Cron A — Compute (`📈 CANSLIM Alert Scan`)
 
@@ -105,9 +120,10 @@ If exclusions remove all candidates, Cron C returns `NO_REPLY` and sends no aler
 
 ## Artifact Boundary
 
-The key design principle: **Precompute prepares side artifacts, Cron A writes the official base run, Cron B reads only finalized base-run files.** They share no in-memory runtime state — only filesystem artifacts. This means:
+The key design principle: **Precompute prepares side artifacts, Cron P refreshes external Polymarket context, Cron A writes the official base run, Cron B reads only finalized base-run files.** They share no in-memory runtime state — only filesystem artifacts. This means:
 
 - Precompute can fail without turning a market-session run into a false failure
+- Cron P can fail without blocking the base trading pipeline; stale Polymarket context should be suppressed by the Python bridge
 - Cron A can be retried or run manually without triggering duplicate notifications
 - Cron B can be retried without re-running expensive compute
 - A failed Cron A still leaves partial artifacts for debugging
@@ -139,11 +155,13 @@ The compute step uses a **chunked full-universe scan** (per Hamel's preference t
 Weekday routine:
 
 1. `8:10 AM ET` — Cron 0 refreshes discovery, settlement, and calibration artifacts
-2. `9:30 AM / 12:30 PM / 3:30 PM ET` — Cron A writes official market-session base runs
-3. `Every 5 min during market hours` — Cron B notifies exactly one finalized base run at a time
-4. `11:00 AM / 3:00 PM ET` — Cron C re-checks only the latest live `BUY/WATCH` basket
+2. `8:30 AM ET` — Cron P refreshes Polymarket market-intel artifacts and verifies the bridge
+3. `9:30 AM / 12:30 PM / 3:30 PM ET` — Cron A writes official market-session base runs
+4. `Every 5 min during market hours` — Cron B notifies exactly one finalized base run at a time
+5. `11:00 AM / 3:00 PM ET` — Cron C re-checks only the latest live `BUY/WATCH` basket
 
 If Cron 0 fails, live trading still runs. The consequence is stale or missing calibration annotation, not a blocked market-session alert.
+If Cron P fails, live trading still runs. The consequence is stale or missing Polymarket context, which the Python bridge should ignore as unavailable.
 
 ## Change Log
 
