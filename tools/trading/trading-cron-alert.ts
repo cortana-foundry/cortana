@@ -212,9 +212,12 @@ export function buildCronAlertFromPipelineReport(report: string): string {
     const availableCount = items.length;
     const totalCount = declaredWatchCount > 0 ? declaredWatchCount : availableCount;
     const hasFullList = declaredWatchCount <= 0 || availableCount >= declaredWatchCount;
-    const title = hasFullList
-      ? `👀 ${section} Watchlist (${totalCount}):`
-      : `👀 ${section} Watchlist (showing ${availableCount} of ${totalCount}):`;
+    const collapsedFullList = hasFullList && totalCount > COMPACT_WATCHLIST_FULL_LIMIT;
+    const title = !hasFullList
+      ? `👀 ${section} Watchlist (showing ${availableCount} of ${totalCount}):`
+      : collapsedFullList
+        ? `👀 ${section} Watchlist (top ${Math.min(totalCount, COMPACT_WATCHLIST_TRUNCATED_LIMIT)} of ${totalCount}):`
+        : `👀 ${section} Watchlist (${totalCount}):`;
 
     if (!availableCount) return { title, body: " —" };
 

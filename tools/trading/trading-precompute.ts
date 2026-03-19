@@ -29,6 +29,33 @@ export type TradingPrecomputeSummary = {
   calibration: CalibrationArtifactSummary;
 };
 
+function stripAnsi(text: string): string {
+  return text.replace(/\u001B\[[0-9;]*[A-Za-z]/g, "");
+}
+
+export function extractJsonPayload(raw: string): string | null {
+  const text = stripAnsi(raw).replace(/\uFEFF/g, "").trim();
+  if (!text) return null;
+
+  for (const [open, close] of [
+    ["{", "}"],
+    ["[", "]"],
+  ] as const) {
+    const start = text.indexOf(open);
+    const end = text.lastIndexOf(close);
+    if (start === -1 || end === -1 || end <= start) continue;
+    const candidate = text.slice(start, end + 1).trim();
+    try {
+      JSON.parse(candidate);
+      return candidate;
+    } catch {
+      // keep trying narrower fallbacks
+    }
+  }
+
+  return text;
+}
+
 function runPythonJson(args: string[], timeoutMs = DEFAULT_TIMEOUT_MS): unknown {
   const result = spawnSync(resolvePythonBin(), args, {
     cwd: resolveBacktesterCwd(),
@@ -42,7 +69,7 @@ function runPythonJson(args: string[], timeoutMs = DEFAULT_TIMEOUT_MS): unknown 
     throw new Error((result.stderr || result.stdout || `python command failed: ${args.join(" ")}`).trim());
   }
 
-  const stdout = (result.stdout || "").trim();
+  const stdout = extractJsonPayload(result.stdout || "");
   if (!stdout) return null;
   try {
     return JSON.parse(stdout);

@@ -130,7 +130,7 @@ Dip Buyer: scanned 120 | evaluated 8 | threshold-passed 8 | emitted BUY 0 / WATC
 
     const alert = buildCronAlertFromPipelineReport(report);
 
-    expect(alert).toContain("👀 Dip Buyer Watchlist (8):");
+    expect(alert).toContain("👀 Dip Buyer Watchlist (top 5 of 8):");
     expect(alert).toContain(" ALGN 7/12 · AEP 8/12 · ADSK 9/12 · ANET 7/12 · AMAT 7/12 [+3 more]");
   });
 
