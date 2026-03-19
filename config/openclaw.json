@@ -68,7 +68,7 @@
   "agents": {
     "defaults": {
       "model": {
-        "primary": "openai-codex/gpt-5.4-codex",
+        "primary": "openai-codex/gpt-5.3-codex",
         "fallbacks": [
           "openai-codex/gpt-5.3-codex",
           "openai-codex/gpt-5.2-codex"
@@ -201,7 +201,7 @@
       {
         "id": "arbiter",
         "workspace": "/Users/hd/Developer/cortana/identities/arbiter",
-        "model": "openai-codex/gpt-5.4"
+        "model": "openai-codex/gpt-5.3-codex"
       },
       {
         "id": "spartan",
