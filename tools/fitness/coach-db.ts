@@ -33,6 +33,25 @@ export type CoachWeeklyScoreInput = {
   details?: Record<string, unknown> | null;
 };
 
+
+export type CoachCaffeineInput = {
+  sourceKey: string;
+  dateLocal: string;
+  consumedAtUtc: string;
+  amountMg: number;
+  source?: string | null;
+  notes?: string | null;
+};
+
+export type CoachCaffeineDaySummary = {
+  date_local: string;
+  total_mg: number;
+  entries: number;
+  latest_consumed_at_utc: string | null;
+  latest_local_time: string | null;
+  latest_after_cutoff: boolean;
+};
+
 export type CoachNutritionInput = {
   dateLocal: string;
   proteinTargetG: number;
@@ -55,6 +74,16 @@ function sqlText(value: string | null | undefined): string {
 function sqlJson(value: Record<string, unknown> | null | undefined): string {
   if (!value || typeof value !== "object") return "'{}'::jsonb";
   return `'${esc(JSON.stringify(value))}'::jsonb`;
+}
+
+function parseSingleJsonLine<T>(raw: string): T | null {
+  const line = String(raw ?? "").trim();
+  if (!line) return null;
+  try {
+    return JSON.parse(line) as T;
+  } catch {
+    return null;
+  }
 }
 
 function sqlNum(value: number | null | undefined): string {
@@ -125,6 +154,20 @@ CREATE TABLE IF NOT EXISTS coach_weekly_score (
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now()
 );
+
+CREATE TABLE IF NOT EXISTS coach_caffeine_log (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  source_key text UNIQUE,
+  date_local date NOT NULL,
+  consumed_at_utc timestamptz NOT NULL,
+  amount_mg int NOT NULL CHECK (amount_mg > 0 AND amount_mg <= 1200),
+  source text,
+  notes text,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_coach_caffeine_date ON coach_caffeine_log(date_local DESC);
+CREATE INDEX IF NOT EXISTS idx_coach_caffeine_consumed_at ON coach_caffeine_log(consumed_at_utc DESC);
 `;
   const result = runPsql(sql);
   if (result.status !== 0) {
@@ -286,4 +329,110 @@ SET
   } catch (error) {
     return { ok: false, error: error instanceof Error ? error.message : String(error) };
   }
+}
+
+export function upsertCoachCaffeine(input: CoachCaffeineInput): { ok: boolean; error?: string } {
+  try {
+    ensureCoachSchema();
+    const safeAmount = Math.max(1, Math.min(1200, Math.round(input.amountMg)));
+    const sql = `
+INSERT INTO coach_caffeine_log (
+  source_key, date_local, consumed_at_utc, amount_mg, source, notes
+) VALUES (
+  ${sqlText(input.sourceKey)},
+  ${sqlText(input.dateLocal)}::date,
+  ${sqlText(input.consumedAtUtc)}::timestamptz,
+  ${safeAmount},
+  ${sqlText(input.source ?? null)},
+  ${sqlText(input.notes ?? null)}
+)
+ON CONFLICT (source_key) DO UPDATE
+SET
+  date_local = EXCLUDED.date_local,
+  consumed_at_utc = EXCLUDED.consumed_at_utc,
+  amount_mg = EXCLUDED.amount_mg,
+  source = COALESCE(EXCLUDED.source, coach_caffeine_log.source),
+  notes = COALESCE(EXCLUDED.notes, coach_caffeine_log.notes);`;
+    const result = runPsql(sql);
+    if (result.status !== 0) {
+      return { ok: false, error: (result.stderr || "coach caffeine upsert failed").trim() };
+    }
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : String(error) };
+  }
+}
+
+export function fetchCoachCaffeineDaySummary(dateLocal: string): CoachCaffeineDaySummary {
+  ensureCoachSchema();
+  const sql = `
+SELECT COALESCE(row_to_json(t)::text, '{}') AS payload
+FROM (
+  SELECT
+    ${sqlText(dateLocal)}::text AS date_local,
+    COALESCE(SUM(amount_mg), 0)::int AS total_mg,
+    COUNT(*)::int AS entries,
+    MAX(consumed_at_utc)::text AS latest_consumed_at_utc,
+    to_char(MAX(consumed_at_utc) AT TIME ZONE 'America/New_York', 'HH24:MI') AS latest_local_time,
+    COALESCE(MAX(((consumed_at_utc AT TIME ZONE 'America/New_York')::time > TIME '13:00')), FALSE) AS latest_after_cutoff
+  FROM coach_caffeine_log
+  WHERE date_local = ${sqlText(dateLocal)}::date
+) t;`;
+  const result = runPsql(sql);
+  if (result.status !== 0) {
+    return {
+      date_local: dateLocal,
+      total_mg: 0,
+      entries: 0,
+      latest_consumed_at_utc: null,
+      latest_local_time: null,
+      latest_after_cutoff: false,
+    };
+  }
+  const parsed = parseSingleJsonLine<CoachCaffeineDaySummary>(String(result.stdout ?? ""));
+  return parsed ?? {
+    date_local: dateLocal,
+    total_mg: 0,
+    entries: 0,
+    latest_consumed_at_utc: null,
+    latest_local_time: null,
+    latest_after_cutoff: false,
+  };
+}
+
+export function fetchCoachCaffeineWindowSummary(startYmd: string, endYmd: string): {
+  days_with_entries: number;
+  total_mg: number;
+  avg_daily_mg: number | null;
+  late_intake_days: number;
+} {
+  ensureCoachSchema();
+  const sql = `
+SELECT COALESCE(row_to_json(t)::text, '{}') AS payload
+FROM (
+  SELECT
+    COUNT(DISTINCT date_local)::int AS days_with_entries,
+    COALESCE(SUM(amount_mg), 0)::int AS total_mg,
+    CASE WHEN COUNT(DISTINCT date_local) = 0 THEN NULL
+      ELSE ROUND((SUM(amount_mg)::numeric / COUNT(DISTINCT date_local)), 2)
+    END AS avg_daily_mg,
+    COUNT(DISTINCT date_local) FILTER (
+      WHERE (consumed_at_utc AT TIME ZONE 'America/New_York')::time > TIME '13:00'
+    )::int AS late_intake_days
+  FROM coach_caffeine_log
+  WHERE date_local BETWEEN ${sqlText(startYmd)}::date AND ${sqlText(endYmd)}::date
+) t;`;
+  const result = runPsql(sql);
+  if (result.status !== 0) {
+    return { days_with_entries: 0, total_mg: 0, avg_daily_mg: null, late_intake_days: 0 };
+  }
+  const parsed = parseSingleJsonLine<{ days_with_entries?: number; total_mg?: number; avg_daily_mg?: number | null; late_intake_days?: number }>(
+    String(result.stdout ?? ""),
+  );
+  return {
+    days_with_entries: Number(parsed?.days_with_entries ?? 0),
+    total_mg: Number(parsed?.total_mg ?? 0),
+    avg_daily_mg: parsed?.avg_daily_mg == null ? null : Number(parsed.avg_daily_mg),
+    late_intake_days: Number(parsed?.late_intake_days ?? 0),
+  };
 }

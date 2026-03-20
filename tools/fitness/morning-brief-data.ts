@@ -3,7 +3,7 @@
 import { spawnSync } from "node:child_process";
 import { chooseSurfacedInsightIds, fetchPendingHealthInsights, markInsightsSql } from "./insights-db.js";
 import { upsertFitnessDailySnapshot } from "./facts-db.js";
-import { upsertCoachDecision } from "./coach-db.js";
+import { fetchCoachCaffeineDaySummary, upsertCoachDecision } from "./coach-db.js";
 import {
   computeTrend,
   dataFreshnessHours,
@@ -147,9 +147,10 @@ function buildLongevityImpact(opts: { band: ReadinessBand; stale: boolean }): "p
   return "positive";
 }
 
-function buildTopRisk(opts: { band: ReadinessBand; stale: boolean; sleepPerf: number | null }): string {
+function buildTopRisk(opts: { band: ReadinessBand; stale: boolean; sleepPerf: number | null; caffeineYesterdayMg: number; caffeineLateYesterday: boolean }): string {
   if (opts.stale) return "Acting on stale readiness data and overreaching by mistake.";
   if (opts.band === "red") return "Pushing intensity despite low readiness and impairing recovery.";
+  if (opts.caffeineLateYesterday || opts.caffeineYesterdayMg >= 300) return "High or late caffeine intake may suppress sleep recovery carryover.";
   if ((opts.sleepPerf ?? 100) < 80) return "Sleep quality drag reducing adaptation and increasing injury risk.";
   return "Turning a good readiness day into junk-volume fatigue.";
 }
@@ -190,6 +191,7 @@ export function buildMorningTrainingRecommendation(opts: {
 function main(): void {
   const errors: string[] = [];
   const today = localYmd();
+  const yesterday = localYmd("America/New_York", new Date(Date.now() - 24 * 3600 * 1000));
   const whoop = curlJson("http://localhost:3033/whoop/data", 12);
 
   const tonHealthRaw = spawnSync("curl", ["-s", "--max-time", "5", "http://localhost:3033/tonal/health"], {
@@ -222,6 +224,7 @@ function main(): void {
   const recoveryFreshnessHours = dataFreshnessHours(latestRecovery?.createdAt ?? null);
   const sleepFreshnessHours = dataFreshnessHours(latestSleep?.createdAt ?? null);
   const isStale = (recoveryFreshnessHours ?? 99) > 18 || (sleepFreshnessHours ?? 99) > 18;
+  const caffeineYesterday = fetchCoachCaffeineDaySummary(yesterday);
   const recommendation = buildMorningTrainingRecommendation({
     readinessBand,
     sleepPerformance: latestSleep?.sleepPerformance ?? null,
@@ -275,7 +278,7 @@ function main(): void {
     tsUtc: new Date().toISOString(),
     readinessCall: toCoachReadiness(readinessBand),
     longevityImpact: buildLongevityImpact({ band: readinessBand, stale: isStale }),
-    topRisk: buildTopRisk({ band: readinessBand, stale: isStale, sleepPerf: latestSleep?.sleepPerformance ?? null }),
+    topRisk: buildTopRisk({ band: readinessBand, stale: isStale, sleepPerf: latestSleep?.sleepPerformance ?? null, caffeineYesterdayMg: caffeineYesterday.total_mg, caffeineLateYesterday: caffeineYesterday.latest_after_cutoff }),
     reasonSummary: recommendation.rationale,
     prescribedAction: recommendation.concrete_action,
     actualDayStrain: todayWhoopStrain,
@@ -302,6 +305,12 @@ function main(): void {
       freshness_hours: sleepFreshnessHours,
     },
     readiness_support_signals: readinessSupport,
+    caffeine_context: {
+      yesterday_total_mg: caffeineYesterday.total_mg,
+      yesterday_entries: caffeineYesterday.entries,
+      yesterday_after_1pm: caffeineYesterday.latest_after_cutoff,
+      yesterday_latest_local_time: caffeineYesterday.latest_local_time,
+    },
     today_training_context: {
       whoop_workouts_today: whoopWorkouts.length,
       whoop_total_strain_today: Number(whoopWorkouts.reduce((sum, entry) => sum + (entry.strain ?? 0), 0).toFixed(2)),

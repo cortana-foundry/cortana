@@ -4,7 +4,7 @@ import { spawnSync } from "node:child_process";
 import { collectRecentMealEntries, summarizeMealRollup } from "./meal-log.js";
 import { chooseSurfacedInsightIds, fetchPendingHealthInsights, markInsightsSql } from "./insights-db.js";
 import { upsertFitnessDailySnapshot } from "./facts-db.js";
-import { upsertCoachDecision, upsertCoachNutrition } from "./coach-db.js";
+import { fetchCoachCaffeineDaySummary, upsertCoachDecision, upsertCoachNutrition } from "./coach-db.js";
 import {
   dataFreshnessHours,
   extractDailyStepCount,
@@ -320,6 +320,7 @@ function main(): void {
   });
   const loadBand = strainBand(whoopSummary.total_strain_today);
   const hydration = extractWhoopHydrationLiters(whoop);
+  const caffeineSummary = fetchCoachCaffeineDaySummary(today);
 
   const recoveries = extractRecoveryEntries(whoop);
   const sleeps = extractSleepEntries(whoop);
@@ -386,13 +387,19 @@ function main(): void {
   });
   if (!nutritionWrite.ok) errors.push(`coach_nutrition_upsert_failed:${nutritionWrite.error ?? "unknown"}`);
 
-  const overreachWarning = whoopSummary.total_strain_today >= 14;
+  const highCaffeine = caffeineSummary.total_mg >= 300;
+  const lateCaffeine = caffeineSummary.latest_after_cutoff;
+  const overreachWarning = whoopSummary.total_strain_today >= 14 || highCaffeine || lateCaffeine;
   const decisionWrite = upsertCoachDecision({
     tsUtc: new Date().toISOString(),
     readinessCall: toCoachReadiness(loadBand),
     longevityImpact: longevityFromLoad(whoopSummary.total_strain_today),
     topRisk: overreachWarning
-      ? "Stacking another hard session before recovery closes."
+      ? (lateCaffeine
+          ? "Late caffeine plus training stress likely to reduce sleep quality and recovery."
+          : highCaffeine
+            ? "High caffeine load may mask fatigue and degrade sleep recovery."
+            : "Stacking another hard session before recovery closes.")
       : "Inconsistent sleep and nutrition reducing adaptation quality.",
     reasonSummary: `Evening load band ${loadBand} from strain ${whoopSummary.total_strain_today} and nutrition status ${mealRollup.today.proteinStatus}.`,
     prescribedAction: sleepTarget.concrete_action,
@@ -423,6 +430,12 @@ function main(): void {
       },
     },
     today_nutrition: {
+      caffeine: {
+        total_mg: caffeineSummary.total_mg,
+        entries: caffeineSummary.entries,
+        latest_local_time: caffeineSummary.latest_local_time,
+        after_1pm: caffeineSummary.latest_after_cutoff,
+      },
       protein_target_g: {
         min: mealRollup.target.proteinMinG,
         max: mealRollup.target.proteinMaxG,
@@ -451,7 +464,11 @@ function main(): void {
       status: hydrationStatus,
     },
     proactive_warning: overreachWarning
-      ? "High strain detected — avoid additional high intensity until next recovery check."
+      ? (lateCaffeine
+          ? "Late caffeine detected — cut caffeine now and protect sleep window tonight."
+          : highCaffeine
+            ? "High caffeine load detected — no more caffeine today and prioritize wind-down."
+            : "High strain detected — avoid additional high intensity until next recovery check.")
       : null,
     db_snapshot: {
       table: "cortana_fitness_daily_facts",

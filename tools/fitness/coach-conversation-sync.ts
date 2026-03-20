@@ -4,7 +4,8 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import crypto from "node:crypto";
-import { upsertCoachConversation, updateLatestDecisionCompliance } from "./coach-db.js";
+import { upsertCoachCaffeine, upsertCoachConversation, updateLatestDecisionCompliance } from "./coach-db.js";
+import { localYmd } from "./signal-utils.js";
 
 type ContentBlock = { type?: string; text?: string };
 type SessionLine = {
@@ -43,6 +44,34 @@ function classifyIntent(text: string): string | null {
   if (t.includes("meal") || t.includes("protein") || t.includes("diet") || t.includes("nutrition")) return "nutrition_check";
   if (t.includes("sleep")) return "sleep_check";
   return null;
+}
+
+
+
+function extractCaffeineEvents(text: string, tsUtc: string): Array<{ amountMg: number; source: string | null; consumedAtUtc: string; sourceKeySeed: string }> {
+  const out: Array<{ amountMg: number; source: string | null; consumedAtUtc: string; sourceKeySeed: string }> = [];
+  const lower = text.toLowerCase();
+  const lines = text.split(/\r?\n/).filter((l) => /caffeine|coffee|espresso|energy drink|matcha|pre[- ]?workout|tea/.test(l.toLowerCase()));
+  const sourceHints = ["coffee", "espresso", "energy drink", "matcha", "pre-workout", "tea", "caffeine"];
+
+  const harvest = (chunk: string) => {
+    const mgMatches = [...chunk.matchAll(/(\d{1,4})\s*mg\b/gi)];
+    if (!mgMatches.length) return;
+    const source = sourceHints.find((h) => chunk.toLowerCase().includes(h)) ?? null;
+    for (const m of mgMatches) {
+      const mg = Number.parseInt(m[1] ?? "", 10);
+      if (!Number.isFinite(mg) || mg <= 0) continue;
+      out.push({ amountMg: mg, source, consumedAtUtc: tsUtc, sourceKeySeed: `${tsUtc}|${chunk}|${mg}` });
+    }
+  };
+
+  if (lines.length) {
+    for (const l of lines) harvest(l);
+  } else if (/caffeine/.test(lower)) {
+    harvest(text);
+  }
+
+  return out;
 }
 
 function syncFile(filePath: string, cutoffMs: number): { scanned: number; upserted: number; errors: number } {
@@ -96,8 +125,21 @@ function syncFile(filePath: string, cutoffMs: number): { scanned: number; upsert
     if (role === "user") {
       const compliance = complianceFromText(text);
       if (compliance) {
-        const c = updateLatestDecisionCompliance({ status: compliance.status, tsUtc: ts, note: compliance.note });
+        const c = updateLatestDecisionCompliance({ status: compliance.status, note: compliance.note });
         if (!c.ok) errors += 1;
+      }
+
+      const caffeine = extractCaffeineEvents(text, ts);
+      for (const event of caffeine) {
+        const u = upsertCoachCaffeine({
+          sourceKey: `spartan:caffeine:${digest(event.sourceKeySeed)}`,
+          dateLocal: localYmd("America/New_York", new Date(event.consumedAtUtc)),
+          consumedAtUtc: event.consumedAtUtc,
+          amountMg: event.amountMg,
+          source: event.source,
+          notes: "parsed_from_chat",
+        });
+        if (!u.ok) errors += 1;
       }
     }
   }
