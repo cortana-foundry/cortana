@@ -5,7 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import { collectRecentMealEntries } from "./meal-log.js";
 import { chooseSurfacedInsightIds, fetchPendingHealthInsights, markInsightsSql } from "./insights-db.js";
-import { upsertCoachWeeklyScore } from "./coach-db.js";
+import { fetchCoachCaffeineWindowSummary, upsertCoachWeeklyScore } from "./coach-db.js";
 import {
   extractRecoveryEntries,
   extractSleepEntries,
@@ -249,6 +249,8 @@ function weeklyAge100Score(input: {
   proteinDaysOnTarget: number;
   proteinDaysLogged: number;
   errors: string[];
+  caffeineDailyAvgMg: number | null;
+  caffeineLateDays: number;
 }): { score: number; components: Record<string, number>; summary: string } {
   const sleepScore = input.avgSleepHours == null ? 12 : Math.max(0, Math.min(30, Math.round((input.avgSleepHours / 8) * 30)));
   const recoveryScore = input.avgRecovery == null ? 10 : Math.max(0, Math.min(25, Math.round((input.avgRecovery / 100) * 25)));
@@ -256,12 +258,14 @@ function weeklyAge100Score(input: {
   const loadScore = Math.max(0, 20 - strainPenalty);
   const proteinScoreBase = input.proteinDaysLogged === 0 ? 6 : Math.round((input.proteinDaysOnTarget / 7) * 25);
   const proteinScore = Math.max(0, Math.min(25, proteinScoreBase));
+  const caffeinePenalty = input.caffeineDailyAvgMg == null ? 0 : input.caffeineDailyAvgMg > 350 ? 8 : input.caffeineDailyAvgMg > 250 ? 4 : 0;
+  const latePenalty = input.caffeineLateDays >= 3 ? 6 : input.caffeineLateDays >= 1 ? 3 : 0;
   const dataPenalty = input.errors.length > 0 ? 5 : 0;
-  const score = Math.max(0, Math.min(100, sleepScore + recoveryScore + loadScore + proteinScore - dataPenalty));
+  const score = Math.max(0, Math.min(100, sleepScore + recoveryScore + loadScore + proteinScore - caffeinePenalty - latePenalty - dataPenalty));
   const summary = score >= 80 ? "strong alignment" : score >= 65 ? "moderate alignment" : "needs correction";
   return {
     score,
-    components: { sleep: sleepScore, recovery: recoveryScore, load: loadScore, protein: proteinScore, data_penalty: dataPenalty },
+    components: { sleep: sleepScore, recovery: recoveryScore, load: loadScore, protein: proteinScore, caffeine_penalty: caffeinePenalty, late_caffeine_penalty: latePenalty, data_penalty: dataPenalty },
     summary,
   };
 }
@@ -321,6 +325,9 @@ function main(): void {
     currentAvgProtein: currentMetrics.protein_avg_daily,
   });
 
+  const caffeineCurrent = fetchCoachCaffeineWindowSummary(currentStart, currentEnd);
+  const caffeinePrevious = fetchCoachCaffeineWindowSummary(previousStart, previousEnd);
+
   const pendingInsights = fetchPendingHealthInsights(8);
   const surfacedInsightIds = chooseSurfacedInsightIds(pendingInsights, riskBand, 2);
   const isoWeek = currentIsoWeekTag();
@@ -333,6 +340,8 @@ function main(): void {
     proteinDaysOnTarget: currentMetrics.protein_days_on_target,
     proteinDaysLogged: currentMetrics.protein_days_logged,
     errors,
+    caffeineDailyAvgMg: caffeineCurrent.avg_daily_mg,
+    caffeineLateDays: caffeineCurrent.late_intake_days,
   });
   const weeklyScoreWrite = upsertCoachWeeklyScore({
     isoWeek,
@@ -343,6 +352,10 @@ function main(): void {
     details: {
       components: age100.components,
       trend_signals: trendSignals,
+    caffeine_trends: {
+      current: caffeineCurrent,
+      previous: caffeinePrevious,
+    },
       risk_band: riskBand,
     },
   });
@@ -373,7 +386,15 @@ function main(): void {
       },
     },
     trend_signals: trendSignals,
+    caffeine_trends: {
+      current: caffeineCurrent,
+      previous: caffeinePrevious,
+    },
     protein_adherence_assumption: proteinAssumption,
+    caffeine_summary: {
+      current: caffeineCurrent,
+      previous: caffeinePrevious,
+    },
     age_100_alignment_score: {
       score: age100.score,
       summary: age100.summary,
