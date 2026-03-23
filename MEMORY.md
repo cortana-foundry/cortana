@@ -106,6 +106,7 @@
 - **Symlinks**: any repo↔runtime symlink must be documented in both MEMORY.md and TOOLS.md.
 - **Post-update integrity**: after every OpenClaw update, verify critical symlinks (especially `~/.openclaw/cron/jobs.json`) and self-heal drift immediately.
 - **Delivery integrity**: cron/heartbeat health checks must validate both run execution and message delivery (`lastDeliveryStatus` / `lastDelivered`), not execution alone.
+- **Cron stale-error guard (Mar 21, 2026)**: if a job shows historical `lastStatus=error` but was manually fixed/recovered, treat it as stale until reconfirmed by a fresh run/check; do not escalate stale auth failures as active incidents.
 - **Be predictive on wake**: proactive morning behavior (recovery, weather, calendar, open items, upcoming events) without waiting to be asked.
 
 ## Sleep & Health (Key Facts)
