@@ -259,9 +259,41 @@ async function fetchCalendar(): Promise<string> {
   }
 }
 
+type ReminderItem = {
+  title?: string;
+  isCompleted?: boolean;
+  listName?: string;
+};
+
+async function fetchReminders(): Promise<string> {
+  try {
+    const raw = await runCommand("remindctl", ["all", "--json"], 30_000);
+    const parsed = safeJsonParse(raw);
+    if (!Array.isArray(parsed)) return "Unavailable (invalid Reminders output).";
+
+    const open = (parsed as ReminderItem[])
+      .filter((item) => item && item.isCompleted === false)
+      .filter((item) => (item.listName ?? "") === "Cortana")
+      .map((item) => (item.title ?? "").trim())
+      .filter(Boolean);
+
+    if (open.length === 0) return "No open reminders in Cortana list.";
+
+    const top = open.slice(0, 8).map((title) => `- ${title}`);
+    const remainder = open.length - top.length;
+    if (remainder > 0) top.push(`- +${remainder} more`);
+
+    return top.join("\n");
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error);
+    return `Reminders unavailable (${msg})`;
+  }
+}
+
 function buildBrief(parts: {
   weather: string;
   calendar: string;
+  reminders: string;
   specialists: SpecialistResult[];
 }): string {
   const timestamp = new Date().toLocaleString("en-US", {
@@ -286,6 +318,9 @@ function buildBrief(parts: {
     "",
     "🗓️ Calendar (today → tomorrow):",
     parts.calendar,
+    "",
+    "⏰ Reminders (Cortana):",
+    parts.reminders,
     "",
     "📰 News (Researcher):",
     researcher,
@@ -320,13 +355,14 @@ async function sendTelegram(messageText: string): Promise<void> {
 }
 
 async function main(): Promise<void> {
-  const [specialists, weather, calendar] = await Promise.all([
+  const [specialists, weather, calendar, reminders] = await Promise.all([
     Promise.all(SPECIALIST_TASKS.map((task) => sessionsSend(task))),
     fetchWeather(),
     fetchCalendar(),
+    fetchReminders(),
   ]);
 
-  const brief = buildBrief({ specialists, weather, calendar });
+  const brief = buildBrief({ specialists, weather, calendar, reminders });
   await sendTelegram(brief);
   process.stdout.write(`${brief}\n`);
 }
