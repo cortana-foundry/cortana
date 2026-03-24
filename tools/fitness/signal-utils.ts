@@ -362,14 +362,13 @@ export function tonalTodayWorkouts(payload: unknown, today = localYmd(), timeZon
 }
 
 export function summarizeWhoopWeekly(payload: unknown, today = localYmd(), timeZone = "America/New_York"): WhoopWeeklySummary {
-  const weekStart = daysAgoYmd(6, timeZone);
+  const anchor = new Date(`${today}T12:00:00Z`);
+  const weekStart = daysAgoYmd(6, timeZone, Number.isNaN(anchor.getTime()) ? new Date() : anchor);
   const recoveries = uniqueLatestByDate(filterRecentByDate(extractRecoveryEntries(payload, timeZone), weekStart));
   const sleeps = uniqueLatestByDate(filterRecentByDate(extractSleepEntries(payload, timeZone), weekStart));
   const workouts = filterRecentByDate(extractWhoopWorkouts(payload, timeZone), weekStart);
   const strains = workouts.map((item) => item.strain);
   const totalStrain = strains.reduce((sum, n) => sum + (n ?? 0), 0);
-
-  void today;
 
   return {
     daysWithRecovery: new Set(recoveries.map((item) => item.date)).size,
@@ -388,8 +387,7 @@ export function summarizeWhoopWeekly(payload: unknown, today = localYmd(), timeZ
 }
 
 export function summarizeTonalWeekly(payload: unknown, timeZone = "America/New_York"): TonalWeeklySummary {
-  const weekStart = daysAgoYmd(6, timeZone);
-  const workouts = tonalWorkoutsFromPayload(payload)
+  const normalized = tonalWorkoutsFromPayload(payload)
     .map((item) => {
       const stats = toObj(item.stats);
       return {
@@ -402,7 +400,12 @@ export function summarizeTonalWeekly(payload: unknown, timeZone = "America/New_Y
         })(),
       };
     })
-    .filter((item) => item.date >= weekStart);
+    .filter((item) => item.date.length > 0);
+
+  const latestDate = normalized.reduce((max, item) => (item.date > max ? item.date : max), "");
+  const anchor = latestDate ? new Date(`${latestDate}T12:00:00Z`) : new Date();
+  const weekStart = daysAgoYmd(6, timeZone, Number.isNaN(anchor.getTime()) ? new Date() : anchor);
+  const workouts = normalized.filter((item) => item.date >= weekStart);
 
   const totalVolume = workouts.reduce((sum, item) => sum + (item.volume ?? 0), 0);
   return {
