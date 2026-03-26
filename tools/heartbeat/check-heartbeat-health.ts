@@ -1,7 +1,6 @@
 #!/usr/bin/env npx tsx
 
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import {
   HEARTBEAT_MAX_AGE_MS,
@@ -9,6 +8,7 @@ import {
   type HeartbeatState,
   validateHeartbeatState,
 } from "../lib/heartbeat-schema.js";
+import { defaultHeartbeatStatePath } from "../lib/paths.js";
 
 export type HeartbeatHealthStatus = "healthy" | "stale" | "invalid" | "missing";
 
@@ -42,9 +42,7 @@ function parsePositiveInt(value: string | undefined, fallback: number): number {
 
 function parseArgs(argv: string[], env: NodeJS.ProcessEnv): Args {
   let json = false;
-  let stateFile =
-    env.HEARTBEAT_STATE_FILE ||
-    path.join(os.homedir(), ".openclaw", "memory", "heartbeat-state.json");
+  let stateFile = env.HEARTBEAT_STATE_FILE || defaultHeartbeatStatePath();
   let freshnessThresholdMs = parsePositiveInt(
     env.HEARTBEAT_HEALTH_MAX_AGE_MS,
     DEFAULT_FRESHNESS_THRESHOLD_MS,

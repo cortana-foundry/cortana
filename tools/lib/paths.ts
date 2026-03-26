@@ -55,3 +55,7 @@ export function runtimeStateHome(): string {
 export function resolveRuntimeStatePath(...segments: string[]): string {
   return path.join(runtimeStateHome(), ".openclaw", ...segments);
 }
+
+export function defaultHeartbeatStatePath(): string {
+  return process.env.HEARTBEAT_STATE_FILE ?? resolveRepoPath("memory", "heartbeat-state.json");
+}

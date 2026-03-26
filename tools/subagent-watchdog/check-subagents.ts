@@ -14,7 +14,7 @@ import {
   touchHeartbeat,
   validateHeartbeatState,
 } from "../lib/heartbeat-schema.js";
-import { resolveRepoPath } from "../lib/paths.js";
+import { defaultHeartbeatStatePath, resolveRepoPath } from "../lib/paths.js";
 
 const TERMINAL_TIMEOUT_STATUSES = new Set(["timeout", "timed_out"]);
 const TERMINAL_KILLED_STATUSES = new Set(["killed", "kill", "terminated", "aborted", "cancelled", "canceled"]);
@@ -30,7 +30,7 @@ const COMPLETION_SYNC =
 const AGGRESSIVE_RECONCILE =
   process.env.CORTANA_AGGRESSIVE_RECONCILE_SCRIPT || resolveRepoPath("tools", "task-board", "aggressive-reconcile.sh");
 const DB_NAME = "cortana";
-const DEFAULT_HEARTBEAT_STATE_FILE = path.join(os.homedir(), ".openclaw", "memory", "heartbeat-state.json");
+const DEFAULT_HEARTBEAT_STATE_FILE = defaultHeartbeatStatePath();
 const DEFAULT_SESSION_ALERT_STATE_FILE = "/tmp/subagent-watchdog-cooldown.json";
 const SESSION_ALERT_COOLDOWN_MS = 15 * 60 * 1000;
 const RUN_STORE_PATH = process.env.OPENCLAW_SUBAGENT_RUNS_PATH
