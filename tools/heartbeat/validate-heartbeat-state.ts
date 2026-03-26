@@ -1,8 +1,6 @@
 #!/usr/bin/env npx tsx
 
 import fs from "node:fs";
-import path from "node:path";
-import os from "node:os";
 import { spawnSync } from "node:child_process";
 import { rotateBackupRing, withFileLock, writeJsonFileAtomic } from "../lib/json-file.js";
 import {
@@ -13,7 +11,7 @@ import {
   validateHeartbeatState,
 } from "../lib/heartbeat-schema.js";
 import { withPostgresPath } from "../lib/db.js";
-import { PSQL_BIN } from "../lib/paths.js";
+import { defaultHeartbeatStatePath, PSQL_BIN } from "../lib/paths.js";
 
 function logWriteTelemetry(source: string, dbName: string, oldHash: string | null, newHash: string): void {
   try {
@@ -38,7 +36,7 @@ function logWriteTelemetry(source: string, dbName: string, oldHash: string | nul
 }
 
 async function main(): Promise<void> {
-  const stateFile = process.env.HEARTBEAT_STATE_FILE || path.join(os.homedir(), ".openclaw", "memory", "heartbeat-state.json");
+  const stateFile = defaultHeartbeatStatePath();
   const dbName = process.env.DB_NAME || "cortana";
   const snapshotIntervalSec = Number(process.env.SNAPSHOT_INTERVAL_SEC || "21600");
   const nowMs = Date.now();
