@@ -13,6 +13,10 @@ function run(cmd: string, args: string[], env = process.env): { rc: number; out:
   return { rc: r.status ?? 1, out: r.stdout ?? "", err: r.stderr ?? "" };
 }
 
+function isLikelyKeyringFailure(text: string): boolean {
+  return /keyring|list keyring keys|not valid \(-50\)|security:/i.test(text);
+}
+
 async function main(): Promise<void> {
   const db = process.env.CORTANA_DB || "cortana";
   const calName = process.env.GOG_OAUTH_CHECK_CALENDAR || "Clawdbot-Calendar";
@@ -46,34 +50,29 @@ async function main(): Promise<void> {
     process.exit(1);
   }
 
-  const help = run("gog", ["auth", "--help"]);
-  if (!/^\s+refresh(\s|$)/m.test(`${help.out}${help.err}`)) {
-    logEvent("error", "gog auth refresh subcommand unavailable", `{"account":"${account}","calendar":"${calName}","probe_rc":${probe.rc},"error":"${sqlEscape(probeText)}"}`);
-    createAlert("gog OAuth refresh unavailable", "gog auth probe failed with auth error, but 'gog auth refresh' is not available in this gog build.", `{"account":"${account}","calendar":"${calName}","probe_rc":${probe.rc}}`);
-    console.error("gog oauth auth-error; refresh command unavailable");
-    process.exit(1);
+  const authList = run("gog", ["auth", "list", "--json", "--no-input"]);
+  const authListText = `${authList.out}${authList.err}`;
+  if (authList.rc !== 0 && isLikelyKeyringFailure(authListText)) {
+    const switchKeyring = run("gog", ["auth", "keyring", "file", "--no-input"]);
+    const switchText = `${switchKeyring.out}${switchKeyring.err}`;
+    if (switchKeyring.rc === 0) {
+      const probeAfterKeyringSwitch = run("gog", ["--account", account, "cal", "list", calName, "--from", "today", "--plain", "--no-input"]);
+      const probeAfterKeyringSwitchText = `${probeAfterKeyringSwitch.out}${probeAfterKeyringSwitch.err}`;
+      if (probeAfterKeyringSwitch.rc === 0) {
+        logEvent("info", "gog auth recovered via keyring backend switch", `{"account":"${account}","calendar":"${calName}"}`);
+        console.log("gog oauth recovered via keyring backend switch");
+        process.exit(0);
+      }
+      logEvent("error", "gog keyring backend switched but probe still failing", `{"account":"${account}","calendar":"${calName}","probe_rc":${probeAfterKeyringSwitch.rc},"error":"${sqlEscape(probeAfterKeyringSwitchText)}"}`);
+    } else {
+      logEvent("error", "gog keyring backend switch failed", `{"account":"${account}","calendar":"${calName}","error":"${sqlEscape(switchText)}"}`);
+    }
   }
 
-  const refresh = run("gog", ["--account", account, "auth", "refresh", "--no-input"]);
-  const refreshText = `${refresh.out}${refresh.err}`;
-  if (refresh.rc !== 0) {
-    logEvent("error", "gog auth refresh failed", `{"account":"${account}","calendar":"${calName}","refresh_rc":${refresh.rc},"error":"${sqlEscape(refreshText)}"}`);
-    createAlert("gog OAuth refresh failed", "gog auth probe failed and refresh attempt did not recover auth.", `{"account":"${account}","calendar":"${calName}","refresh_rc":${refresh.rc}}`);
-    console.error(`gog oauth refresh failed: ${refreshText}`);
-    process.exit(1);
-  }
-
-  const probe2 = run("gog", ["--account", account, "cal", "list", calName, "--from", "today", "--plain", "--no-input"]);
-  const probe2Text = `${probe2.out}${probe2.err}`;
-  if (probe2.rc === 0) {
-    logEvent("info", "gog auth refresh succeeded", `{"account":"${account}","calendar":"${calName}"}`);
-    console.log("gog oauth refreshed");
-    process.exit(0);
-  }
-
-  logEvent("error", "gog auth refresh completed but probe still failing", `{"account":"${account}","calendar":"${calName}","probe_rc":${probe2.rc},"error":"${sqlEscape(probe2Text)}"}`);
-  createAlert("gog OAuth still failing after refresh", "Refresh command returned success but auth probe still fails.", `{"account":"${account}","calendar":"${calName}","probe_rc":${probe2.rc}}`);
-  console.error(`gog oauth still failing after refresh: ${probe2Text}`);
+  const guidance = `Manual re-auth required: run 'gog auth add ${account} --services calendar,gmail' and retry.`;
+  logEvent("error", "gog auth requires manual reauthorization", `{"account":"${account}","calendar":"${calName}","probe_rc":${probe.rc},"error":"${sqlEscape(probeText)}"}`);
+  createAlert("gog OAuth requires manual re-auth", guidance, `{"account":"${account}","calendar":"${calName}","probe_rc":${probe.rc}}`);
+  console.error(`gog oauth auth-error: ${guidance} ${probeText}`);
   process.exit(1);
 }
 
