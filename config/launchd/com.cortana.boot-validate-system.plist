@@ -3,24 +3,17 @@
 <plist version="1.0">
   <dict>
     <key>Label</key>
-    <string>com.cortana.system-hygiene-sweep</string>
+    <string>com.cortana.boot-validate-system</string>
 
     <key>ProgramArguments</key>
     <array>
       <string>/usr/bin/env</string>
       <string>npx</string>
       <string>tsx</string>
-      <string>/Users/hd/Developer/cortana/tools/hygiene/sweep.ts</string>
-      <string>audit</string>
+      <string>/Users/hd/Developer/cortana/tools/qa/validate-system.ts</string>
+      <string>--json</string>
+      <string>--fix</string>
     </array>
-
-    <key>StartCalendarInterval</key>
-    <dict>
-      <key>Hour</key>
-      <integer>2</integer>
-      <key>Minute</key>
-      <integer>45</integer>
-    </dict>
 
     <key>WorkingDirectory</key>
     <string>/Users/hd/Developer/cortana</string>
@@ -34,9 +27,12 @@
     <key>RunAtLoad</key>
     <true/>
 
+    <key>StartInterval</key>
+    <integer>21600</integer>
+
     <key>StandardOutPath</key>
-    <string>/Users/hd/Developer/cortana/tmp/system-hygiene-sweep.stdout.log</string>
+    <string>/Users/hd/Developer/cortana/tmp/boot-validate-system.stdout.log</string>
     <key>StandardErrorPath</key>
-    <string>/Users/hd/Developer/cortana/tmp/system-hygiene-sweep.stderr.log</string>
+    <string>/Users/hd/Developer/cortana/tmp/boot-validate-system.stderr.log</string>
   </dict>
 </plist>
