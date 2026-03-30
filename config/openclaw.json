@@ -38,9 +38,9 @@
       "enabled": true
     },
     "backend": "acpx",
-    "defaultAgent": "cortana-acp",
+    "defaultAgent": "codex",
     "allowedAgents": [
-      "cortana-acp"
+      "codex"
     ],
     "runtime": {
       "ttlMinutes": 30
@@ -233,6 +233,8 @@
         "monitor",
         "arbiter",
         "spartan",
+        "codex",
+        "agent:codex:*",
         "cortana-acp",
         "agent:cortana-acp:*"
       ]
