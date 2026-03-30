@@ -80,6 +80,14 @@ function isControlPlaneIssue(text: string): boolean {
   return /gateway not reachable|gateway closed|econnrefused|timed out|service unavailable|not running|failed to start cli/i.test(text);
 }
 
+function isTelegramOkStatus(text: string): boolean {
+  return /(?:^|\n)[^\n]*Telegram[^\n]*(?:│|\|)\s*ON\s*(?:│|\|)\s*OK\b/im.test(text);
+}
+
+function isTelegramSpecificAuthIssue(text: string): boolean {
+  return /telegram[^\n]*(unauthori[sz]ed|invalid token|token expired|revoked|forbidden|auth failed)/i.test(text);
+}
+
 function probeGog(): ProbeResult {
   const r = run("gog", ["--account", GOG_ACCOUNT, "cal", "list", GOG_CALENDAR, "--from", "today", "--plain", "--no-input"]);
   const merged = `${r.stdout}\n${r.stderr}`;
@@ -112,22 +120,65 @@ function probeAppleReminders(): ProbeResult {
 }
 
 function probeTelegramDelivery(): ProbeResult {
-  const r = run("openclaw", ["status"]);
-  const merged = `${r.stdout}\n${r.stderr}`;
+  const jsonStatus = run("openclaw", ["status", "--json"]);
+  const textStatus = run("openclaw", ["status"]);
+  const merged = `${jsonStatus.stdout}\n${jsonStatus.stderr}\n${textStatus.stdout}\n${textStatus.stderr}`;
 
-  if (r.status !== 0) {
+  if (jsonStatus.status !== 0 && textStatus.status !== 0) {
     return { probe: "telegram_delivery", ok: false, category: "control_plane", actionable: true, detail: compact(merged) };
   }
-  if (/Telegram:\s*ok/i.test(merged)) {
+
+  if (isTelegramOkStatus(textStatus.stdout)) {
     return { probe: "telegram_delivery", ok: true };
   }
-  if (isAuthIssue(merged)) {
+
+  if (isTelegramSpecificAuthIssue(merged)) {
     return { probe: "telegram_delivery", ok: false, category: "human_auth", actionable: true, detail: compact(merged) };
   }
+
+  let gatewayReachable: boolean | null = null;
+  let gatewayError = "";
+  let telegramConfigured = false;
+  try {
+    const parsed = JSON.parse(jsonStatus.stdout || "{}") as { gateway?: { reachable?: boolean; error?: string | null }; channelSummary?: string[] };
+    gatewayReachable = typeof parsed.gateway?.reachable === "boolean" ? parsed.gateway.reachable : null;
+    gatewayError = String(parsed.gateway?.error ?? "");
+    telegramConfigured = Array.isArray(parsed.channelSummary) && parsed.channelSummary.some((line) => /^Telegram:\s*configured/i.test(String(line)));
+  } catch {
+    gatewayReachable = null;
+  }
+
+  if (gatewayReachable === false) {
+    return {
+      probe: "telegram_delivery",
+      ok: false,
+      category: "control_plane",
+      actionable: true,
+      detail: compact(gatewayError || merged),
+    };
+  }
+
+  if (!telegramConfigured) {
+    return {
+      probe: "telegram_delivery",
+      ok: false,
+      category: "repo_runtime_drift",
+      actionable: true,
+      detail: "telegram channel not configured in status output",
+    };
+  }
+
   if (isPermissionIssue(merged)) {
     return { probe: "telegram_delivery", ok: false, category: "human_permission", actionable: true, detail: compact(merged) };
   }
-  return { probe: "telegram_delivery", ok: false, category: "control_plane", actionable: true, detail: compact(merged) };
+
+  return {
+    probe: "telegram_delivery",
+    ok: false,
+    category: "control_plane",
+    actionable: true,
+    detail: "telegram status unavailable in current status output",
+  };
 }
 
 function probeCriticalCronLane(): ProbeResult {
