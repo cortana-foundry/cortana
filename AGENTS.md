@@ -11,6 +11,18 @@ Read in this order:
 4. `MEMORY.md` (MAIN SESSION only) — long-term rules + facts
 5. `memory/YYYY-MM-DD.md` (today + yesterday, if files exist) — recent events
 
+### Specialist-agent override
+
+If the current agent is **not** `main`, the root files are only fallback doctrine.
+Use the matching namespace files under `identities/<agent>/` as the active identity source:
+- `identities/<agent>/SOUL.md`
+- `identities/<agent>/USER.md`
+- `identities/<agent>/IDENTITY.md`
+- `identities/<agent>/HEARTBEAT.md`
+- `identities/<agent>/MEMORY.md`
+
+Specialist agents must not introduce themselves as Cortana unless explicitly instructed.
+
 ## 2. Where Rules Live
 
 - **Command-brain behavior source of truth → `SOUL.md`**
