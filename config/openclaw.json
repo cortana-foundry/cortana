@@ -38,9 +38,9 @@
       "enabled": true
     },
     "backend": "acpx",
-    "defaultAgent": "codex",
+    "defaultAgent": "cortana-acp",
     "allowedAgents": [
-      "codex"
+      "cortana-acp"
     ],
     "runtime": {
       "ttlMinutes": 30
@@ -140,7 +140,7 @@
         "id": "main",
         "workspace": "/Users/hd/Developer/cortana",
         "model": {
-          "primary": "openai-codex/gpt-5.4-codex",
+          "primary": "openai-codex/gpt-5.4",
           "fallbacks": [
             "openai-codex/gpt-5.3-codex",
             "openai-codex/gpt-5.2-codex"
@@ -179,6 +179,11 @@
       },
       {
         "id": "researcher",
+        "workspace": "/Users/hd/Developer/cortana",
+        "model": "openai-codex/gpt-5.3-codex"
+      },
+      {
+        "id": "cortana-acp",
         "workspace": "/Users/hd/Developer/cortana",
         "model": "openai-codex/gpt-5.3-codex"
       },
@@ -227,7 +232,9 @@
         "oracle",
         "monitor",
         "arbiter",
-        "spartan"
+        "spartan",
+        "cortana-acp",
+        "agent:cortana-acp:*"
       ]
     },
     "exec": {
