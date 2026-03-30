@@ -28,7 +28,7 @@ function mockDefaultPipeline(): void {
     if (cmd === "test") {
       return { status: 0, stdout: "", stderr: "" } as any;
     }
-    if (cmd === "python3") {
+    if (cmd === "npx" && Array.isArray(args) && args[0] === "tsx") {
       return { status: 0, stdout: '{"stats":{"orphan":0,"stale":0}}', stderr: "" } as any;
     }
     if (String(cmd).includes("psql")) {
@@ -45,8 +45,10 @@ describe("email-triage-autopilot", () => {
     await importFresh("../../tools/gmail/email-triage-autopilot.ts");
     await flushModuleSideEffects();
 
-    const pyCall = spawnSync.mock.calls.find((c) => c[0] === "python3");
-    const env = (pyCall?.[2] as any)?.env ?? {};
+    const inboxCall = spawnSync.mock.calls.find(
+      (c) => c[0] === "npx" && Array.isArray(c[1]) && c[1][0] === "tsx",
+    );
+    const env = (inboxCall?.[2] as any)?.env ?? {};
     expect(typeof env.PSQL_BIN).toBe("string");
     const psqlBin = String(env.PSQL_BIN);
     expect(
