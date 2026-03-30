@@ -332,6 +332,12 @@
       "maxEntries": 20,
       "rotateBytes": "10mb",
       "resetArchiveRetention": "7d"
+    },
+    "resetByType": {
+      "direct": {
+        "mode": "daily",
+        "atHour": 4
+      }
     }
   },
   "hooks": {
