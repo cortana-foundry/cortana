@@ -1,6 +1,6 @@
 # System Hygiene Sweep
 
-`tools/hygiene/sweep.py` runs a daily hygiene pass for low-risk system cleanup and drift detection.
+`tools/hygiene/sweep.ts` runs a daily hygiene pass for low-risk system cleanup and drift detection.
 
 ## What it checks
 
@@ -27,9 +27,9 @@
 Detect only:
 
 ```bash
-python3 tools/hygiene/sweep.py
+npx tsx tools/hygiene/sweep.ts
 # same as:
-python3 tools/hygiene/sweep.py audit
+npx tsx tools/hygiene/sweep.ts audit
 ```
 
 ### Clean (safe mode required)
@@ -38,20 +38,20 @@ Low-risk cleanup only:
 - truncate oversized session logs in place
 
 ```bash
-python3 tools/hygiene/sweep.py clean --safe
+npx tsx tools/hygiene/sweep.ts clean --safe
 ```
 
 Dry-run cleanup:
 
 ```bash
-python3 tools/hygiene/sweep.py clean --safe --dry-run
+npx tsx tools/hygiene/sweep.ts clean --safe --dry-run
 ```
 
 ### Report JSON
 Machine-readable output:
 
 ```bash
-python3 tools/hygiene/sweep.py report --json
+npx tsx tools/hygiene/sweep.ts report --json
 ```
 
 ## Risk scoring
@@ -65,14 +65,14 @@ Each finding is categorized (`info` / `warn` / `critical`) and contributes to an
 Each run inserts one event into `cortana_events`:
 
 - `event_type='system_hygiene'`
-- `source='tools/hygiene/sweep.py'`
+- `source='tools/hygiene/sweep.ts'` (wrapper entrypoint; emitted by the TypeScript command)
 - `severity=info|warning|critical` (derived from findings)
 - `metadata` JSON payload includes findings + risk score
 
 To skip DB logging:
 
 ```bash
-python3 tools/hygiene/sweep.py audit --no-log-event
+npx tsx tools/hygiene/sweep.ts audit --no-log-event
 ```
 
 ## launchd schedule
@@ -80,6 +80,7 @@ LaunchAgent plist:
 
 - `config/launchd/com.cortana.system-hygiene-sweep.plist`
 - Daily at **02:45** local time
+- Also runs on load (`RunAtLoad=true`) for out-of-band recovery after reboot/login
 
 Load and start:
 
@@ -94,4 +95,20 @@ Check status:
 
 ```bash
 launchctl list | grep com.cortana.system-hygiene-sweep
+```
+
+## Boot-time validation (out-of-band)
+LaunchAgent plist:
+
+- `config/launchd/com.cortana.boot-validate-system.plist`
+- Runs at load and every 6 hours (`StartInterval=21600`)
+- Command: `npx tsx tools/qa/validate-system.ts --json --fix`
+
+Load and start:
+
+```bash
+launchctl unload ~/Library/LaunchAgents/com.cortana.boot-validate-system.plist 2>/dev/null || true
+cp /Users/hd/Developer/cortana/config/launchd/com.cortana.boot-validate-system.plist ~/Library/LaunchAgents/
+launchctl load ~/Library/LaunchAgents/com.cortana.boot-validate-system.plist
+launchctl start com.cortana.boot-validate-system
 ```
