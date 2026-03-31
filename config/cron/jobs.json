@@ -171,6 +171,37 @@
       }
     },
     {
+      "id": "stock-market-brief-collect-20260331",
+      "agentId": "cron-market",
+      "name": "📈 Stock Market Brief (collect)",
+      "enabled": true,
+      "createdAtMs": 1774972800000,
+      "updatedAtMs": 1774972800000,
+      "schedule": {
+        "kind": "cron",
+        "expr": "45 7 * * 1-5",
+        "tz": "America/New_York"
+      },
+      "sessionTarget": "isolated",
+      "wakeMode": "now",
+      "payload": {
+        "kind": "agentTurn",
+        "message": "OUTPUT LIMIT: Keep this to one short line.\n\nThis is the stock-market brief collect phase.\nIt performs compute only and must NOT send Telegram messages directly.\n\nRun exactly:\n`npx tsx /Users/hd/Developer/cortana/tools/market-intel/stock-market-brief-collect.ts`\n\nRules:\n- The script writes `/tmp/cron-stock-market-brief.json`.\n- Artifact only: do not rewrite market commentary here.\n- Do not use the message tool.\n- If the script exits 0, return exactly: stock-market-brief collected\n- If the script exits non-zero, return stderr only.",
+        "model": "openai-codex/gpt-5.3-codex",
+        "timeoutSeconds": 120
+      },
+      "state": {
+        "consecutiveErrors": 0,
+        "lastRunStatus": "ok",
+        "lastDeliveryStatus": "not-delivered",
+        "lastDelivered": false
+      },
+      "delivery": {
+        "mode": "none",
+        "accountId": "default"
+      }
+    },
+    {
       "id": "a86ca3f9-38af-4672-ba3f-1911352f0319",
       "agentId": "cron-market",
       "name": "📈 Stock Market Brief (daily)",
@@ -180,13 +211,14 @@
       "schedule": {
         "kind": "cron",
         "expr": "55 7 * * 1-5",
+        "tz": "America/New_York",
         "staggerMs": 180000
       },
       "sessionTarget": "isolated",
       "wakeMode": "now",
       "payload": {
         "kind": "agentTurn",
-        "message": "⚠️ DELIVERY ROUTING (MANDATORY): Use the `message` tool for any user-visible output with exactly:\n- action: send\n- channel: telegram\n- target: 8171372724\n- accountId: default\nDo not rely on announce delivery.\n\nOUTPUT LIMIT: Any user-visible message or summary must be 150 words or less. If it would be longer, compress it. Do not send multi-part cron messages.\n\nStock Market Brief summarizer for Hamel.\nPrefix: 💹 Markets - Stock Market Brief. Delivery: send via message tool to telegram target 8171372724 using accountId default.\n\nUse pre-collected data first:\n- Preferred artifact: /tmp/cron-stock-market-brief.json\n- If artifact exists and is fresh (<3h), use it as primary source.\n- If artifact is missing/stale/invalid, do NOT try to fully rebuild the dataset inline.\n- Instead, do a minimal fallback only: MARKET_STATUS + any cheap postgres finance/insight reads that return quickly.\n- If rich market data is unavailable, still send a concise partial brief rather than timing out.\n\nFallback limits (strict):\n1) MARKET_STATUS=$(/Users/hd/Developer/cortana/skills/markets/check_market_status.sh)\n2) export PATH=\"/opt/homebrew/opt/postgresql@17/bin:$PATH\"\n3) Pull only cheap FINANCE / FINANCE_AGE / pending finance INSIGHTS reads from postgres\n4) Do NOT run broad ticker collection loops here\n5) Do NOT call web_search here unless there is one single clearly material missing item and time is ample\n\nCompose concise plain-text brief:\n- Include MARKET_STATUS\n- Include GLD / hedge context only if available in artifact or cheap reads\n- Beginner Corner (required): market health GOOD/SHAKY/BAD; BUY/WATCH/NO-BUY reason; one concept of day\n- If artifact has material events, summarize them briefly\n- If artifact is partial/missing, say so briefly and give the best available read instead of stalling\n- Include portfolio values + weights and finance insights when available\n\nAfter successful summary, mark finance insights delivered:\npsql cortana -c \"UPDATE cortana_insights SET acted_on = TRUE, acted_at = NOW() WHERE acted_on = FALSE AND 'finance' = ANY(domains);\"\nWeekday only.\nKeep moving; partial > timeout.",
+        "message": "⚠️ DELIVERY ROUTING (MANDATORY): Use the `message` tool for any user-visible output with exactly:\n- action: send\n- channel: telegram\n- target: 8171372724\n- accountId: default\nDo not rely on announce delivery.\n\nOUTPUT LIMIT: Any user-visible message or summary must be 150 words or less. If it would be longer, compress it. Do not send multi-part cron messages.\n\nStock Market Brief summarizer for Hamel.\nPrefix: 💹 Markets - Stock Market Brief. Delivery: send via message tool to telegram target 8171372724 using accountId default.\n\nArtifact is source of truth:\n- Preferred artifact: /tmp/cron-stock-market-brief.json\n- If artifact exists and is fresh (<3h), use it as primary source.\n- If artifact is missing/stale/invalid, do NOT rebuild the full dataset inline.\n- Fallback only to `/Users/hd/Developer/cortana/skills/markets/check_market_status.sh` and explicitly say the market snapshot is unavailable.\n\nKeep this to market insight only. No portfolio section. No database padding. No filler sections.\n\nWrite a short plain-text brief with this exact shape:\n1) Line 1: `SESSION | REGIME | Size X%`\n2) Line 2: `Posture: ACTION. REASON`\n3) Line 3: `Tape: ...`\n4) Line 4: `Macro: ...`\n5) Line 5: `Focus: ...` (0-3 names max; if none, say `Focus: none yet.`)\n\nField mapping from the artifact:\n- Session: `session.phase`\n- Regime: `snapshot.regime.display`\n- Size: `snapshot.regime.position_sizing_pct`\n- Posture: `snapshot.posture.action` + `snapshot.posture.reason`\n- Tape: `snapshot.tape.summary_line`\n- Macro: `snapshot.macro.summary_line`\n- Focus: `snapshot.focus.symbols`\n\nFallback if artifact is unavailable:\n- Send a 2-3 line partial brief using MARKET_STATUS only.\n- Say the richer Schwab-backed market snapshot is unavailable right now.\n- Do not invent tape, holdings, or macro detail.\n\nWeekday only. Keep it concise and operator-facing.",
         "model": "openai-codex/gpt-5.3-codex",
         "timeoutSeconds": 120
       },

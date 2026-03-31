@@ -4,7 +4,7 @@ Unified market intelligence pipeline combining:
 - `bird` (X/Twitter sentiment and key account flow)
 - `stock-analysis` (quote pull)
 - `markets` skill (market open/close status)
-- Alpaca local endpoints for portfolio overlay
+- Schwab-backed market context from `cortana-external`
 
 This README documents the source repo layout. Legacy callers can still resolve the same relative paths via the `/Users/hd/openclaw` compatibility shim.
 
@@ -24,15 +24,7 @@ Output includes:
 - X sentiment scan from latest 20 cashtag tweets
 - Notable mentions from `@unusual_whales` and `@DeItaone`
 
-### 2) Portfolio sentiment scan
-```bash
-tools/market-intel/market-intel.sh --portfolio
-```
-- Pulls Alpaca positions from `http://localhost:3033/alpaca/portfolio`
-- Scans 5 X tweets per held ticker
-- Flags symbols with `>60%` bearish sentiment
-
-### 3) Market pulse
+### 2) Market pulse
 ```bash
 tools/market-intel/market-intel.sh --pulse
 ```
@@ -45,6 +37,28 @@ tools/market-intel/market-intel.sh --pulse
 - Cashtag queries are escaped as `\$TICKER` so shell expansion does not break searches.
 - If bird auth/cookies are unavailable, script still runs and reports missing social data gracefully.
 - Output is plain text and Telegram-paste friendly.
+
+## Stock Market Brief Collector
+
+The cron-facing stock market brief now uses a collect-and-summarize split:
+
+```bash
+npx tsx /Users/hd/Developer/cortana/tools/market-intel/stock-market-brief-collect.ts
+```
+
+What it does:
+- runs the Python market snapshot exporter in `/Users/hd/Developer/cortana-external/backtester`
+- writes `/tmp/cron-stock-market-brief.json`
+- stamps the artifact with a real market session label:
+  - `PREMARKET`
+  - `OPEN`
+  - `AFTER_HOURS`
+  - `CLOSED`
+
+What it does not do:
+- no portfolio section yet
+- no Alpaca dependency
+- no Telegram delivery; this is compute only
 
 ## Quick test
 ```bash
