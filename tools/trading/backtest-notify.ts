@@ -69,12 +69,39 @@ export function pickPendingFromCandidates(
   return latest;
 }
 
-function pickPending(): { file: string; summary: BacktestSummary } | null {
-  const candidates = listSummaries()
+function describeFailedPendingSummary(candidate: SummaryCandidate): string {
+  const summaryText = (
+    candidate.summary.error?.summary
+    || candidate.summary.error?.message
+    || "latest backtest run failed"
+  ).replace(/\s+/g, " ").trim().slice(0, 220);
+  const summaryPath = candidate.summary.artifacts.summary || candidate.file;
+  return `FAILED_PENDING_BACKTEST_SUMMARY run_id=${candidate.summary.runId} summary_path=${summaryPath} summary=${summaryText}`;
+}
+
+export function describePendingStateFromCandidates(
+  candidates: SummaryCandidate[],
+  options: { includeFailures?: boolean } = {},
+): string {
+  const includeFailures = options.includeFailures ?? false;
+  const latest = [...candidates].sort((a, b) =>
+    String(a.summary.completedAt).localeCompare(String(b.summary.completedAt)),
+  ).pop();
+
+  if (!latest) return "NO_PENDING_BACKTEST_SUMMARY";
+  if (latest.summary.notifiedAt != null) return "NO_PENDING_BACKTEST_SUMMARY";
+  if (!includeFailures && latest.summary.status !== "success") return describeFailedPendingSummary(latest);
+  return "NO_PENDING_BACKTEST_SUMMARY";
+}
+
+function loadCandidates(): SummaryCandidate[] {
+  return listSummaries()
     .map((file) => ({ file, summary: loadSummary(file) }))
     .filter((item): item is { file: string; summary: BacktestSummary } => Boolean(item.summary));
+}
 
-  return pickPendingFromCandidates(candidates, { includeFailures: INCLUDE_FAILURES });
+function pickPending(): { file: string; summary: BacktestSummary } | null {
+  return pickPendingFromCandidates(loadCandidates(), { includeFailures: INCLUDE_FAILURES });
 }
 
 function compactMetrics(metrics: Record<string, string | number | boolean | null> | undefined): string {
@@ -123,7 +150,7 @@ function markNotified(file: string, summary: BacktestSummary): void {
 function main(): void {
   const picked = pickPending();
   if (!picked) {
-    console.log("NO_PENDING_BACKTEST_SUMMARY");
+    console.log(describePendingStateFromCandidates(loadCandidates(), { includeFailures: INCLUDE_FAILURES }));
     return;
   }
 
