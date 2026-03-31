@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { execSync } from "node:child_process";
 import { mkdtempSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
-import { pickPendingFromCandidates, type SummaryCandidate } from "../../tools/trading/backtest-notify";
+import { describePendingStateFromCandidates, pickPendingFromCandidates, type SummaryCandidate } from "../../tools/trading/backtest-notify";
 
 function candidate(
   file: string,
@@ -84,6 +84,16 @@ describe("backtest notify selection", () => {
     ]);
 
     expect(picked?.summary.runId).toBe("success-new");
+  });
+
+  it("surfaces failed latest runs clearly when failures are excluded", () => {
+    const state = describePendingStateFromCandidates([
+      candidate("failed-new", { status: "failed", completedAt: "2026-03-14T17:23:20.539Z" }),
+      candidate("success-old", { status: "success", completedAt: "2026-03-13T23:31:34.666Z" }),
+    ]);
+
+    expect(state).toContain("FAILED_PENDING_BACKTEST_SUMMARY");
+    expect(state).toContain("run_id=failed-new");
   });
 
   it("does not fall back to older pending successes when the latest run is already notified", () => {

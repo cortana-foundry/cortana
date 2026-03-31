@@ -50,8 +50,12 @@ type BacktestSummary = {
   };
   error?: {
     message: string;
+    summary: string;
     exitCode: number | null;
     signal: string | null;
+    stage: "market-regime" | "scanner" | "pipeline" | "command" | "unknown";
+    kind: "transient" | "timeout" | "command-error" | "unknown";
+    transient: boolean;
   };
 };
 
@@ -119,6 +123,12 @@ type CommandResult = {
   signal: string | null;
   metrics: Record<string, BacktestMetricValue>;
   notes: string[];
+  failure?: {
+    summary: string;
+    stage: "market-regime" | "scanner" | "pipeline" | "command" | "unknown";
+    kind: "transient" | "timeout" | "command-error" | "unknown";
+    transient: boolean;
+  };
 };
 
 function nowIso(): string {
@@ -430,11 +440,63 @@ export function formatFullWatchlistArtifactText(artifact: FullWatchlistArtifact)
   ].join("\n");
 }
 
-function buildFailureMessage(strategy: string, message: string): string {
+function compactFailure(raw: string): {
+  summary: string;
+  stage: "market-regime" | "scanner" | "pipeline" | "command" | "unknown";
+  kind: "transient" | "timeout" | "command-error" | "unknown";
+  transient: boolean;
+} {
+  const normalized = raw.replace(/\s+/g, " ").trim() || "backtest failed";
+  const lower = normalized.toLowerCase();
+  const firstSentence = normalized.split(/(?<=[.!?])\s+/)[0] || normalized;
+  const transient = /cooldown|rate limit|429|503|504|transient|temporar|unavailable/.test(lower);
+
+  if (lower.includes("timeout") || lower.includes("timed out")) {
+    return {
+      summary: "Scanner timed out before producing a completed summary.",
+      stage: "scanner",
+      kind: "timeout",
+      transient: false,
+    };
+  }
+
+  if (
+    lower.includes("market regime")
+    || (lower.includes("spy") && lower.includes("90d"))
+    || lower.includes("distribution day")
+  ) {
+    return {
+      summary: transient
+        ? "Market regime refresh failed: transient SPY 90d provider cooldown blocked the scan."
+        : "Market regime refresh failed before the scanner could complete.",
+      stage: "market-regime",
+      kind: transient ? "transient" : "command-error",
+      transient,
+    };
+  }
+
+  if (lower.includes("canslim") || lower.includes("dip buyer") || lower.includes("dipbuyer") || lower.includes("chunk ")) {
+    return {
+      summary: firstSentence.slice(0, 220),
+      stage: "scanner",
+      kind: transient ? "transient" : "command-error",
+      transient,
+    };
+  }
+
+  return {
+    summary: firstSentence.slice(0, 220),
+    stage: lower.includes("python") || lower.includes("command") ? "command" : "pipeline",
+    kind: transient ? "transient" : "command-error",
+    transient,
+  };
+}
+
+function buildFailureMessage(strategy: string, failureSummary: string): string {
   return [
     `⚠️ Backtest - ${strategy}`,
     "Run failed.",
-    message.slice(0, 500),
+    failureSummary.slice(0, 500),
   ].join("\n");
 }
 
@@ -449,9 +511,10 @@ function runShellCommand(config: Extract<CommandConfig, { mode: "shell" }>): Com
   const stdout = child.stdout || "";
   const stderr = child.stderr || "";
   const success = child.status === 0 && !child.signal;
+  const failure = success ? undefined : compactFailure((stderr || stdout || "backtest failed").trim());
   const message = success
     ? (stdout.trim() || `Backtest completed successfully: ${config.strategy}`)
-    : buildFailureMessage(config.strategy, (stderr || stdout || "backtest failed").trim());
+    : buildFailureMessage(config.strategy, failure?.summary || "backtest failed");
 
   return {
     strategy: config.strategy,
@@ -464,6 +527,7 @@ function runShellCommand(config: Extract<CommandConfig, { mode: "shell" }>): Com
     signal: child.signal ?? null,
     metrics: {},
     notes: [],
+    failure,
   };
 }
 
@@ -503,6 +567,7 @@ async function runPreset(config: Extract<CommandConfig, { mode: "preset" }>): Pr
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
+    const failure = compactFailure(message);
     return {
       strategy: config.strategy,
       command: config.command,
@@ -510,11 +575,12 @@ async function runPreset(config: Extract<CommandConfig, { mode: "preset" }>): Pr
       cwd: config.cwd,
       stdout: "",
       stderr: message,
-      message: buildFailureMessage(config.strategy, message),
+      message: buildFailureMessage(config.strategy, failure.summary),
       exitCode: 1,
       signal: null,
       metrics: {},
       notes: config.notes,
+      failure,
     };
   }
 }
@@ -649,8 +715,12 @@ async function main(): Promise<void> {
       ? undefined
       : {
           message: (result.stderr || result.stdout || result.message || "backtest failed").trim().slice(0, 1000),
+          summary: result.failure?.summary || "backtest failed",
           exitCode: result.exitCode,
           signal: result.signal,
+          stage: result.failure?.stage || "unknown",
+          kind: result.failure?.kind || "unknown",
+          transient: result.failure?.transient === true,
         },
   };
 
@@ -658,6 +728,11 @@ async function main(): Promise<void> {
   renameSync(summaryTmpPath, summaryPath);
 
   process.stdout.write(`${summaryPath}\n`);
+  if (!success && summary.error) {
+    process.stderr.write(
+      `FAILED_BACKTEST_SUMMARY run_id=${id} summary_path=${summaryPath} stage=${summary.error.stage} transient=${summary.error.transient ? "true" : "false"} summary=${summary.error.summary}\n`,
+    );
+  }
   process.exit(success ? 0 : result.exitCode ?? 1);
 }
 

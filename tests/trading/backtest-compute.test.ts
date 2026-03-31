@@ -1,4 +1,7 @@
 import { describe, expect, it } from "vitest";
+import { execSync } from "node:child_process";
+import { mkdtempSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import path from "node:path";
 import { buildFullWatchlistArtifact, formatFullWatchlistArtifactText } from "../../tools/trading/backtest-compute";
 
 const UNIFIED_REPORT = `📈 Trading Advisor - Unified Pipeline
@@ -87,5 +90,43 @@ describe("backtest compute watchlist artifacts", () => {
     expect(artifact.summary).toEqual({ buy: 0, watch: 4, noBuy: 1 });
     expect(artifact.strategies.dipBuyer.watch.map((entry) => entry.ticker)).toEqual(["ACN", "ALGN", "ARES", "AMD"]);
     expect(artifact.strategies.dipBuyer.noBuy.map((entry) => entry.ticker)).toEqual(["BMRN"]);
+  });
+});
+
+describe("backtest compute failure artifacts", () => {
+  it("writes structured failure details and emits a concise stderr summary", () => {
+    const root = mkdtempSync(path.join(process.cwd(), "tmp-backtest-compute-"));
+    const scriptPath = path.join(root, "fail.sh");
+    mkdirSync(path.join(root, "runs"), { recursive: true });
+    writeFileSync(
+      scriptPath,
+      "#!/usr/bin/env bash\n>&2 echo 'Market regime refresh failed: transient provider cooldown while fetching SPY 90d.'\nexit 1\n",
+      { mode: 0o755 },
+    );
+
+    let stderr = "";
+    try {
+      execSync(
+        `BACKTEST_ROOT_DIR=${root} BACKTEST_CWD=${root} BACKTEST_COMPUTE_COMMAND='${scriptPath}' node --import tsx ./tools/trading/backtest-compute.ts`,
+        { cwd: process.cwd(), stdio: ["ignore", "pipe", "pipe"], encoding: "utf8" },
+      );
+    } catch (error: any) {
+      stderr = String(error?.stderr || "");
+    }
+
+    const runDirs = readdirSync(path.join(root, "runs"));
+    expect(runDirs.length).toBe(1);
+    const summaryPath = path.join(root, "runs", runDirs[0], "summary.json");
+    const summary = JSON.parse(readFileSync(summaryPath, "utf8"));
+    const message = readFileSync(path.join(root, "runs", runDirs[0], "message.txt"), "utf8");
+
+    expect(summary.status).toBe("failed");
+    expect(summary.error.summary).toBe("Market regime refresh failed: transient SPY 90d provider cooldown blocked the scan.");
+    expect(summary.error.stage).toBe("market-regime");
+    expect(summary.error.transient).toBe(true);
+    expect(message).toContain("Run failed.");
+    expect(message).toContain("Market regime refresh failed: transient SPY 90d provider cooldown blocked the scan.");
+    expect(stderr).toContain("FAILED_BACKTEST_SUMMARY");
+    expect(stderr).toContain("stage=market-regime");
   });
 });
