@@ -21,29 +21,33 @@ export type MarketBriefSnapshot = {
   degraded_status: "healthy" | "degraded_safe" | "degraded_risky";
   outcome_class: string;
   warnings?: string[];
+  session?: {
+    phase: string;
+    is_regular_hours: boolean;
+  };
   regime: {
-    label: string;
     display: string;
-    position_sizing_pct: number;
-    distribution_days: number;
-    regime_score: number;
-    notes: string;
-    status: string;
-    data_source: string;
+    label?: string;
+    position_sizing_pct?: number;
+    distribution_days?: number;
+    regime_score?: number;
+    notes?: string;
+    status?: string;
+    data_source?: string;
     degraded_reason?: string | null;
   };
-  posture: { action: string; reason: string };
+  posture: { action: string; reason?: string };
   macro: {
     state: string;
     conviction?: string;
-    summary_line: string;
+    summary_line?: string;
     theme_titles?: string[];
   };
   tape: {
-    summary_line: string;
-    risk_tone: string;
     primary_source: string;
-    symbols: Array<Record<string, unknown>>;
+    summary_line?: string;
+    risk_tone?: string;
+    symbols?: Array<Record<string, unknown>>;
   };
   focus: {
     symbols: string[];
@@ -123,28 +127,50 @@ export function parseSnapshotPayload(raw: string): MarketBriefSnapshot {
   assertString(payload.outcome_class, "snapshot.outcome_class");
 
   const regime = assertObject(payload.regime, "snapshot.regime");
-  assertString(regime.label, "snapshot.regime.label");
   assertString(regime.display, "snapshot.regime.display");
-  assertNumber(regime.position_sizing_pct, "snapshot.regime.position_sizing_pct");
-  assertNumber(regime.distribution_days, "snapshot.regime.distribution_days");
-  assertNumber(regime.regime_score, "snapshot.regime.regime_score");
-  assertString(regime.notes, "snapshot.regime.notes");
-  assertString(regime.status, "snapshot.regime.status");
-  assertString(regime.data_source, "snapshot.regime.data_source");
+  if (regime.label != null) {
+    assertString(regime.label, "snapshot.regime.label");
+  }
+  if (regime.position_sizing_pct != null) {
+    assertNumber(regime.position_sizing_pct, "snapshot.regime.position_sizing_pct");
+  }
+  if (regime.distribution_days != null) {
+    assertNumber(regime.distribution_days, "snapshot.regime.distribution_days");
+  }
+  if (regime.regime_score != null) {
+    assertNumber(regime.regime_score, "snapshot.regime.regime_score");
+  }
+  if (regime.notes != null) {
+    assertString(regime.notes, "snapshot.regime.notes");
+  }
+  if (regime.status != null) {
+    assertString(regime.status, "snapshot.regime.status");
+  }
+  if (regime.data_source != null) {
+    assertString(regime.data_source, "snapshot.regime.data_source");
+  }
 
   const posture = assertObject(payload.posture, "snapshot.posture");
   assertString(posture.action, "snapshot.posture.action");
-  assertString(posture.reason, "snapshot.posture.reason");
+  if (posture.reason != null) {
+    assertString(posture.reason, "snapshot.posture.reason");
+  }
 
   const macro = assertObject(payload.macro, "snapshot.macro");
   assertString(macro.state, "snapshot.macro.state");
-  assertString(macro.summary_line, "snapshot.macro.summary_line");
+  if (macro.summary_line != null) {
+    assertString(macro.summary_line, "snapshot.macro.summary_line");
+  }
 
   const tape = assertObject(payload.tape, "snapshot.tape");
-  assertString(tape.summary_line, "snapshot.tape.summary_line");
-  assertString(tape.risk_tone, "snapshot.tape.risk_tone");
   assertString(tape.primary_source, "snapshot.tape.primary_source");
-  if (!Array.isArray(tape.symbols)) {
+  if (tape.summary_line != null) {
+    assertString(tape.summary_line, "snapshot.tape.summary_line");
+  }
+  if (tape.risk_tone != null) {
+    assertString(tape.risk_tone, "snapshot.tape.risk_tone");
+  }
+  if (tape.symbols != null && !Array.isArray(tape.symbols)) {
     throw new Error("snapshot.tape.symbols must be an array");
   }
 
