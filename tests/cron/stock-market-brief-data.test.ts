@@ -11,7 +11,7 @@ import {
   writeArtifact,
 } from "../../tools/market-intel/stock-market-brief-collect.ts";
 
-const FIXTURE_DIR = "/Users/hd/Developer/cortana-external/backtester/tests/fixtures/consumer_contracts";
+const FIXTURE_DIR = path.resolve("tests/fixtures/consumer_contracts");
 const FIXTURE_PATH = (name: string) => path.join(FIXTURE_DIR, name);
 
 function loadSnapshotFixture(name: string) {
