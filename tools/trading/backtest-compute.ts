@@ -8,12 +8,17 @@ import {
   BACKTESTER_CWD,
   applyTradingCronReliabilityDefaults,
   boundedRunCommand,
-  buildCronAlertFromPipelineReport,
+  buildCronAlertFromPipelineSnapshot,
   extractSignalsFromPipelineReport,
   type ParsedSignal,
   resolvePythonBin,
 } from "./trading-cron-alert";
-import { runTradingPipeline, runTradingStrategy, type TradingStrategyName } from "./trading-pipeline";
+import {
+  runTradingPipelineDetailed,
+  runTradingStrategy,
+  type PipelineSnapshot,
+  type TradingStrategyName,
+} from "./trading-pipeline";
 
 type BacktestStatus = "success" | "failed";
 type BacktestMetricValue = string | number | boolean | null;
@@ -123,6 +128,7 @@ type CommandResult = {
   signal: string | null;
   metrics: Record<string, BacktestMetricValue>;
   notes: string[];
+  pipelineSnapshot?: PipelineSnapshot;
   failure?: {
     summary: string;
     stage: "market-regime" | "scanner" | "pipeline" | "command" | "unknown";
@@ -306,6 +312,32 @@ function extractUnifiedMetrics(report: string): Record<string, BacktestMetricVal
   return metrics;
 }
 
+export function extractUnifiedMetricsFromSnapshot(snapshot: PipelineSnapshot): Record<string, BacktestMetricValue> {
+  return {
+    decision: snapshot.decision,
+    confidence: snapshot.confidence,
+    risk: snapshot.risk,
+    correctionMode: snapshot.correctionMode,
+    buy: snapshot.summary.buy,
+    watch: snapshot.summary.watch,
+    noBuy: snapshot.summary.noBuy,
+    symbolsScanned: snapshot.strategies.canslim.scanned + snapshot.strategies.dipBuyer.scanned,
+    candidatesEvaluated: snapshot.relatedDetections,
+    canslimScanned: snapshot.strategies.canslim.scanned,
+    canslimEvaluated: snapshot.strategies.canslim.evaluated,
+    canslimThresholdPassed: snapshot.strategies.canslim.thresholdPassed,
+    canslimBuy: snapshot.strategies.canslim.buy,
+    canslimWatch: snapshot.strategies.canslim.watch,
+    canslimNoBuy: snapshot.strategies.canslim.noBuy,
+    dipBuyerScanned: snapshot.strategies.dipBuyer.scanned,
+    dipBuyerEvaluated: snapshot.strategies.dipBuyer.evaluated,
+    dipBuyerThresholdPassed: snapshot.strategies.dipBuyer.thresholdPassed,
+    dipBuyerBuy: snapshot.strategies.dipBuyer.buy,
+    dipBuyerWatch: snapshot.strategies.dipBuyer.watch,
+    dipBuyerNoBuy: snapshot.strategies.dipBuyer.noBuy,
+  };
+}
+
 function extractStrategyMetrics(report: string): Record<string, BacktestMetricValue> {
   const metrics: Record<string, BacktestMetricValue> = {};
   const summaryLine = report.split(/\r?\n/).find((line) => line.startsWith("Summary:")) || "";
@@ -402,6 +434,62 @@ export function buildFullWatchlistArtifact(
         buy: byAction(signals.dipBuyer, "BUY"),
         watch: byAction(signals.dipBuyer, "WATCH"),
         noBuy: byAction(signals.dipBuyer, "NO_BUY"),
+      },
+    },
+  };
+}
+
+function snapshotSignalToEntry(
+  signal: PipelineSnapshot["strategies"]["canslim"]["signals"][number],
+): FullWatchlistEntry {
+  return {
+    ticker: signal.ticker,
+    score: signal.score ?? 0,
+    action: signal.action,
+    strategy: signal.section,
+  };
+}
+
+export function buildFullWatchlistArtifactFromSnapshot(
+  runIdValue: string,
+  snapshot: PipelineSnapshot,
+  generatedAtValue = nowIso(),
+): FullWatchlistArtifact {
+  const allSignals = [...snapshot.strategies.canslim.signals, ...snapshot.strategies.dipBuyer.signals];
+  const buySignals = allSignals.filter((signal) => signal.action === "BUY");
+  const focusSignal =
+    buySignals[0] ??
+    [...snapshot.strategies.dipBuyer.signals, ...snapshot.strategies.canslim.signals].find((signal) => signal.action !== "NO_BUY") ??
+    null;
+  const byAction = (
+    items: PipelineSnapshot["strategies"]["canslim"]["signals"],
+    action: "BUY" | "WATCH" | "NO_BUY",
+  ): FullWatchlistEntry[] => items.filter((signal) => signal.action === action).map(snapshotSignalToEntry);
+
+  return {
+    schemaVersion: 1,
+    schema_version: 1,
+    runId: runIdValue,
+    run_id: runIdValue,
+    generatedAt: generatedAtValue,
+    decision: snapshot.decision,
+    correctionMode: snapshot.correctionMode,
+    summary: {
+      buy: snapshot.summary.buy,
+      watch: snapshot.summary.watch,
+      noBuy: snapshot.summary.noBuy,
+    },
+    focus: focusSignal ? snapshotSignalToEntry(focusSignal) : null,
+    strategies: {
+      canslim: {
+        buy: byAction(snapshot.strategies.canslim.signals, "BUY"),
+        watch: byAction(snapshot.strategies.canslim.signals, "WATCH"),
+        noBuy: byAction(snapshot.strategies.canslim.signals, "NO_BUY"),
+      },
+      dipBuyer: {
+        buy: byAction(snapshot.strategies.dipBuyer.signals, "BUY"),
+        watch: byAction(snapshot.strategies.dipBuyer.signals, "WATCH"),
+        noBuy: byAction(snapshot.strategies.dipBuyer.signals, "NO_BUY"),
       },
     },
   };
@@ -534,7 +622,7 @@ function runShellCommand(config: Extract<CommandConfig, { mode: "shell" }>): Com
 async function runPreset(config: Extract<CommandConfig, { mode: "preset" }>): Promise<CommandResult> {
   try {
     if (config.preset === "trading-unified") {
-      const report = await runTradingPipeline({ runCommand: boundedRunCommand, includeCouncil: false });
+      const { report, snapshot } = await runTradingPipelineDetailed({ runCommand: boundedRunCommand, includeCouncil: false });
       return {
         strategy: config.strategy,
         command: config.command,
@@ -542,11 +630,12 @@ async function runPreset(config: Extract<CommandConfig, { mode: "preset" }>): Pr
         cwd: config.cwd,
         stdout: report,
         stderr: "",
-        message: buildCronAlertFromPipelineReport(report),
+        message: buildCronAlertFromPipelineSnapshot(snapshot),
         exitCode: 0,
         signal: null,
-        metrics: extractUnifiedMetrics(report),
+        metrics: extractUnifiedMetricsFromSnapshot(snapshot),
         notes: config.notes,
+        pipelineSnapshot: snapshot,
       };
     }
 
@@ -621,7 +710,9 @@ async function main(): Promise<void> {
   let watchlistArtifactError: string | null = null;
   if (success) {
     try {
-      const watchlistArtifact = buildFullWatchlistArtifact(id, result.stdout, completedAt);
+      const watchlistArtifact = result.pipelineSnapshot
+        ? buildFullWatchlistArtifactFromSnapshot(id, result.pipelineSnapshot, completedAt)
+        : buildFullWatchlistArtifact(id, result.stdout, completedAt);
       if (watchlistArtifact) {
         writeAtomically(watchlistFullJsonPath, JSON.stringify(watchlistArtifact, null, 2) + "\n");
         writeAtomically(watchlistFullTxtPath, formatFullWatchlistArtifactText(watchlistArtifact) + "\n");

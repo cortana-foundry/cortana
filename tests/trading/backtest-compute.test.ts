@@ -2,7 +2,13 @@ import { describe, expect, it } from "vitest";
 import { execSync } from "node:child_process";
 import { mkdtempSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
-import { buildFullWatchlistArtifact, formatFullWatchlistArtifactText } from "../../tools/trading/backtest-compute";
+import {
+  buildFullWatchlistArtifact,
+  buildFullWatchlistArtifactFromSnapshot,
+  extractUnifiedMetricsFromSnapshot,
+  formatFullWatchlistArtifactText,
+} from "../../tools/trading/backtest-compute";
+import type { PipelineSnapshot } from "../../tools/trading/trading-pipeline";
 
 const UNIFIED_REPORT = `📈 Trading Advisor - Unified Pipeline
 Run: 3/19/2026, 3:30:00 PM ET
@@ -49,6 +55,47 @@ Guardrails: Dip correction profile: max BUY=1, min BUY score=8/12.
 
 ⚠️ Decision support only — strict risk gates unchanged.`;
 
+const PIPELINE_SNAPSHOT: PipelineSnapshot = {
+  decision: "BUY",
+  confidence: 0.61,
+  risk: "HIGH",
+  correctionMode: true,
+  regimeGates: "Regime/Gates: correction=YES | correction | 7 distribution days. Reduce exposure.",
+  summary: { buy: 1, watch: 4, noBuy: 1 },
+  strategies: {
+    canslim: {
+      scanned: 120,
+      evaluated: 1,
+      thresholdPassed: 1,
+      buy: 0,
+      watch: 1,
+      noBuy: 1,
+      signals: [
+        { ticker: "AAPL", score: 7, action: "WATCH", reason: "Watch setup", section: "CANSLIM" },
+        { ticker: "AMD", score: 6, action: "NO_BUY", reason: "Below threshold", section: "CANSLIM" },
+      ],
+    },
+    dipBuyer: {
+      scanned: 120,
+      evaluated: 5,
+      thresholdPassed: 5,
+      buy: 1,
+      watch: 3,
+      noBuy: 0,
+      signals: [
+        { ticker: "ARES", score: 10, action: "BUY", reason: "Setup", section: "Dip Buyer" },
+        { ticker: "ALGN", score: 7, action: "WATCH", reason: "Watch", section: "Dip Buyer" },
+        { ticker: "AEP", score: 8, action: "WATCH", reason: "Watch", section: "Dip Buyer" },
+        { ticker: "AXON", score: 9, action: "WATCH", reason: "Final correction cap", section: "Dip Buyer" },
+      ],
+    },
+  },
+  guardrailCount: 1,
+  relatedDetections: 18,
+  calibration: null,
+  failClosedScans: [],
+};
+
 describe("backtest compute watchlist artifacts", () => {
   it("builds a full watchlist artifact from the final post-guard signal set", () => {
     const artifact = buildFullWatchlistArtifact("20260319-211220", UNIFIED_REPORT, "2026-03-19T21:12:20.000Z");
@@ -90,6 +137,43 @@ describe("backtest compute watchlist artifacts", () => {
     expect(artifact.summary).toEqual({ buy: 0, watch: 4, noBuy: 1 });
     expect(artifact.strategies.dipBuyer.watch.map((entry) => entry.ticker)).toEqual(["ACN", "ALGN", "ARES", "AMD"]);
     expect(artifact.strategies.dipBuyer.noBuy.map((entry) => entry.ticker)).toEqual(["BMRN"]);
+  });
+
+  it("builds the same full watchlist artifact from a typed pipeline snapshot", () => {
+    const fromReport = buildFullWatchlistArtifact("20260319-211220", UNIFIED_REPORT, "2026-03-19T21:12:20.000Z");
+    const fromSnapshot = buildFullWatchlistArtifactFromSnapshot("20260319-211220", PIPELINE_SNAPSHOT, "2026-03-19T21:12:20.000Z");
+
+    expect(fromSnapshot).toEqual(fromReport);
+  });
+});
+
+describe("backtest compute unified metrics", () => {
+  it("extracts the same unified metric set from a typed pipeline snapshot", () => {
+    const metrics = extractUnifiedMetricsFromSnapshot(PIPELINE_SNAPSHOT);
+
+    expect(metrics).toEqual({
+      decision: "BUY",
+      confidence: 0.61,
+      risk: "HIGH",
+      correctionMode: true,
+      buy: 1,
+      watch: 4,
+      noBuy: 1,
+      symbolsScanned: 240,
+      candidatesEvaluated: 18,
+      canslimScanned: 120,
+      canslimEvaluated: 1,
+      canslimThresholdPassed: 1,
+      canslimBuy: 0,
+      canslimWatch: 1,
+      canslimNoBuy: 1,
+      dipBuyerScanned: 120,
+      dipBuyerEvaluated: 5,
+      dipBuyerThresholdPassed: 5,
+      dipBuyerBuy: 1,
+      dipBuyerWatch: 3,
+      dipBuyerNoBuy: 0,
+    });
   });
 });
 
