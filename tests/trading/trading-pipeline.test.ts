@@ -504,11 +504,26 @@ Summary: scanned 2 | evaluated 1 | threshold-passed 1 | BUY 0 | WATCH 1 | NO_BUY
     expect(snapshot.confidence).toBe(0.8);
     expect(snapshot.risk).toBe("LOW");
     expect(snapshot.summary).toEqual({ buy: 0, watch: 4, noBuy: 0 });
+    expect(snapshot.strategies.canslim.outcomeClass).toBe("healthy_candidates_found");
+    expect(snapshot.strategies.dipBuyer.outcomeClass).toBe("healthy_candidates_found");
     expect(snapshot.strategies.canslim.watch).toBe(1);
     expect(snapshot.strategies.dipBuyer.watch).toBe(3);
     expect(snapshot.strategies.canslim.signals.map((signal) => signal.ticker)).toEqual(["AAPL"]);
     expect(snapshot.strategies.dipBuyer.signals.map((signal) => signal.ticker)).toEqual(["GOOGL", "NFLX", "MSFT"]);
     expect(report).toContain("Summary: BUY 0 | WATCH 4 | NO_BUY 0");
+  });
+
+  it("preserves per-strategy outcomeClass in the structured snapshot", async () => {
+    const { snapshot } = await runTradingPipelineDetailed({
+      runCommand: (_cmd, args) =>
+        args[0] === "canslim_alert.py"
+          ? JSON.stringify(buildStrategyPayload("canslim", { outcome_class: "analysis_failed", summary: { scanned: 120, evaluated: 0, threshold_passed: 0, buy_count: 0, watch_count: 0, no_buy_count: 0 } }))
+          : JSON.stringify(buildStrategyPayload("dip_buyer", { outcome_class: "market_gate_blocked", summary: { scanned: 120, evaluated: 0, threshold_passed: 0, buy_count: 0, watch_count: 0, no_buy_count: 0 } })),
+      council: async () => ({ verdicts: [] }),
+    });
+
+    expect(snapshot.strategies.canslim.outcomeClass).toBe("analysis_failed");
+    expect(snapshot.strategies.dipBuyer.outcomeClass).toBe("market_gate_blocked");
   });
 
   it("returns a merged structured pipeline snapshot for chunked typed payloads", async () => {
