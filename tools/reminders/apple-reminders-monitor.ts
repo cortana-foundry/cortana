@@ -27,6 +27,7 @@ const TZ = "America/New_York";
 const SOON_WINDOW_MINUTES = Number(process.env.APPLE_REMINDERS_SOON_WINDOW_MINUTES ?? "60");
 const MAX_LINES = Number(process.env.APPLE_REMINDERS_MAX_LINES ?? "6");
 const ALERT_COOLDOWN_HOURS = Number(process.env.APPLE_REMINDERS_ALERT_COOLDOWN_HOURS ?? "12");
+const REMINDCTL_TIMEOUT_MS = Number(process.env.APPLE_REMINDERS_REMINDCTL_TIMEOUT_MS ?? "20000");
 const STATE_PATH = path.join(sourceRepoRoot(), "memory", "apple-reminders-sent.json");
 
 function isRecord(value: unknown): value is ReminderRecord {
@@ -141,12 +142,15 @@ function runRemindctl(filter: "upcoming" | "overdue"): { reminders: Reminder[]; 
   const run = spawnSync(
     "remindctl",
     ["show", filter, "--json", "--no-input", "--no-color"],
-    { encoding: "utf8" },
+    { encoding: "utf8", timeout: REMINDCTL_TIMEOUT_MS },
   );
 
   const stdout = (run.stdout ?? "").trim();
   const stderr = (run.stderr ?? "").trim();
-  const merged = `${stdout}\n${stderr}`.trim();
+  const timeoutError = run.error?.message?.includes("ETIMEDOUT")
+    ? `remindctl timed out after ${Math.round(REMINDCTL_TIMEOUT_MS / 1000)}s`
+    : "";
+  const merged = `${stdout}\n${stderr}\n${timeoutError}`.trim();
   const denied = /reminders access denied|run `remindctl authorize`|not determined/i.test(merged);
 
   if (denied) return { reminders: [], denied: true, error: merged || "Reminders access denied" };

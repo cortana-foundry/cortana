@@ -4,7 +4,11 @@ import path from "path";
 import os from "os";
 import { spawn, spawnSync } from "child_process";
 import { resolveHomePath, sourceRepoRoot } from "../lib/paths.js";
-import { readPlistEnvironmentVariables, reconcileGatewayPlistEnv } from "./gateway-env.js";
+import {
+  readMergedGatewayEnvSources,
+  reconcileGatewayPlistEnv,
+  writeGatewayEnvStateFile,
+} from "./gateway-env.js";
 
 const CANONICAL_REPO_ROOT = sourceRepoRoot();
 
@@ -186,7 +190,7 @@ async function main(): Promise<number> {
   const runtimeJobs = resolveHomePath(".openclaw", "cron", "jobs.json");
   const repoJobs = path.join(CANONICAL_REPO_ROOT, "config", "cron", "jobs.json");
   const gatewayPlistPath = path.join(os.homedir(), "Library", "LaunchAgents", "ai.openclaw.gateway.plist");
-  const preservedGatewayEnv = readPlistEnvironmentVariables(gatewayPlistPath);
+  const preservedGatewayEnv = readMergedGatewayEnvSources(gatewayPlistPath);
 
   log("Starting OpenClaw post-update...");
 
@@ -229,6 +233,10 @@ async function main(): Promise<number> {
   const gatewayEnvUpdate = reconcileGatewayPlistEnv(gatewayPlistPath, process.env, preservedGatewayEnv);
   if (gatewayEnvUpdate.updated) {
     log(`Reconciled preserved gateway env keys: ${Object.keys(gatewayEnvUpdate.applied).join(", ")}`);
+  }
+  const persistedGatewayEnv = writeGatewayEnvStateFile(process.env, preservedGatewayEnv);
+  if (Object.keys(persistedGatewayEnv).length > 0) {
+    log(`Persisted durable gateway env keys: ${Object.keys(persistedGatewayEnv).join(", ")}`);
   }
 
   if (!args.restartGateway) {

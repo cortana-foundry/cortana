@@ -1,0 +1,40 @@
+import fs from "node:fs";
+import path from "node:path";
+import { describe, expect, it } from "vitest";
+
+type CronJob = {
+  id?: string;
+  payload?: { message?: string; timeoutSeconds?: number };
+};
+
+function loadJobs(): CronJob[] {
+  const jobsPath = path.resolve("config/cron/jobs.json");
+  const raw = fs.readFileSync(jobsPath, "utf8");
+  const json = JSON.parse(raw) as { jobs: CronJob[] };
+  return json.jobs;
+}
+
+describe("reminder cron contract", () => {
+  it("keeps calendar reminders on the Gog helper with durable gateway env fallback wording", () => {
+    const jobs = loadJobs();
+    const calendar = jobs.find((job) => job.id === "9401d91c-5fa0-43a6-a18e-01030f9e5ba5");
+    const message = String(calendar?.payload?.message ?? "");
+
+    expect(message).toContain("tools/gog/calendar-events-json.ts");
+    expect(message).toContain("durable OpenClaw gateway env state");
+  });
+
+  it("forces Apple Reminders cron to exec the wrapper first with no pre-read drift", () => {
+    const jobs = loadJobs();
+    const reminders = jobs.find((job) => job.id === "1ee84e93-cae4-4469-8da4-313312bf06e2");
+    const message = String(reminders?.payload?.message ?? "");
+
+    expect(reminders?.payload?.timeoutSeconds).toBe(90);
+    expect(message).toContain("First action must be one `exec` tool call");
+    expect(message).toContain("Do not read files, search the repo, inspect skills");
+    expect(message).toContain("bash /Users/hd/Developer/cortana/tools/reminders/run-apple-reminders-monitor.sh");
+    expect(message).toContain("host: gateway");
+    expect(message).toContain("security: full");
+    expect(message).toContain("ask: off");
+  });
+});

@@ -1,6 +1,6 @@
 #!/usr/bin/env -S npx tsx
 import { spawnSync } from "node:child_process";
-import { readPlistEnvironmentVariables } from "../openclaw/gateway-env.js";
+import { readMergedGatewayEnvSources } from "../openclaw/gateway-env.js";
 
 export function buildGogEnv(
   currentEnv: NodeJS.ProcessEnv = process.env,
@@ -24,7 +24,7 @@ export function runCalendarEventsJson(
   env: NodeJS.ProcessEnv = process.env,
   plistPath: string = process.env.OPENCLAW_GATEWAY_PLIST || `${process.env.HOME}/Library/LaunchAgents/ai.openclaw.gateway.plist`,
 ) {
-  const mergedEnv = buildGogEnv(env, readPlistEnvironmentVariables(plistPath));
+  const mergedEnv = buildGogEnv(env, readMergedGatewayEnvSources(plistPath));
   return spawnSync("gog", args, {
     encoding: "utf8",
     stdio: ["ignore", "pipe", "pipe"],
