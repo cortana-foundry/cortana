@@ -1,8 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
+
 DEFAULT_SOURCE_REPO="/Users/hd/Developer/cortana"
-if [[ -d "/Users/hd/Developer/cortana-deploy/.git" ]]; then
+if [[ -d "/Users/hd/Developer/cortana-deploy/.git" || -f "/Users/hd/Developer/cortana-deploy/.git" ]]; then
   DEFAULT_SOURCE_REPO="/Users/hd/Developer/cortana-deploy"
 fi
 
@@ -13,7 +16,7 @@ if [[ ! -e "$DEFAULT_RUNTIME_REPO" && ! -L "$DEFAULT_RUNTIME_REPO" ]]; then
 fi
 
 RUNTIME_REPO="${RUNTIME_REPO:-$DEFAULT_RUNTIME_REPO}"
-MONITOR="${MONITOR:-$SOURCE_REPO/tools/monitoring/runtime-repo-drift-monitor.ts}"
+MONITOR="${MONITOR:-$ROOT_DIR/tools/monitoring/runtime-repo-drift-monitor.ts}"
 
 if [[ ! -f "$MONITOR" ]]; then
   echo "[repo-drift-watchdog] monitor missing: $MONITOR" >&2
