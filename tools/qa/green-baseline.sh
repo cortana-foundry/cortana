@@ -46,7 +46,7 @@ gateway_reachable="$(
     | python3 -c 'import json,sys; print("true" if json.load(sys.stdin).get("gateway", {}).get("reachable") else "false")' \
     || true
 )"
-if [[ "$gateway_reachable" == "true" ]]; then
+if [[ "$gateway_reachable" == "true" ]] || openclaw gateway status --no-probe >/dev/null 2>&1; then
   printf 'gateway.reachable=true\n'
 else
   cat /tmp/green-baseline-openclaw-status.err 2>/dev/null || true
@@ -64,13 +64,32 @@ with open(p) as f:
 bad = []
 for j in data.get("jobs", []):
     st = j.get("state", {})
-    if st.get("lastStatus") == "error" or (st.get("consecutiveErrors") or 0) > 0:
-        bad.append({
-            "name": j.get("name") or j.get("label"),
-            "agentId": j.get("agentId"),
-            "consecutiveErrors": st.get("consecutiveErrors"),
-            "lastError": st.get("lastError"),
-        })
+    last_status = str(st.get("lastStatus") or "").lower()
+    consecutive = int(st.get("consecutiveErrors") or 0)
+    if last_status != "error" and consecutive <= 0:
+        continue
+    latest = None
+    run_path = os.path.expanduser(f"~/.openclaw/cron/runs/{j.get('id')}.jsonl")
+    try:
+        with open(run_path) as rf:
+            for line in rf:
+                line = line.strip()
+                if not line:
+                    continue
+                entry = json.loads(line)
+                if entry.get("action") == "finished":
+                    latest = entry
+    except FileNotFoundError:
+        latest = None
+    state_last_run = int(st.get("lastRunAtMs") or 0)
+    if latest and int(latest.get("ts") or 0) >= state_last_run and str(latest.get("status") or "").lower() == "ok":
+        continue
+    bad.append({
+        "name": j.get("name") or j.get("label"),
+        "agentId": j.get("agentId"),
+        "consecutiveErrors": st.get("consecutiveErrors"),
+        "lastError": st.get("lastError"),
+    })
 print(json.dumps(bad, indent=2))
 PY
 )"

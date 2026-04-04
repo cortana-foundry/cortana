@@ -31,14 +31,25 @@ const PROBE_FRESHNESS_MS: Record<ProbeResult["probe"], number> = {
 };
 
 type RuntimeJob = {
+  id?: string;
   name?: string;
   enabled?: boolean;
   state?: {
     nextRunAtMs?: number;
+    lastRunAtMs?: number;
     lastStatus?: string;
     lastDeliveryStatus?: string;
     consecutiveErrors?: number;
   };
+};
+
+type CronRunEntry = {
+  ts?: number;
+  jobId?: string;
+  action?: string;
+  status?: string;
+  nextRunAtMs?: number;
+  deliveryStatus?: string;
 };
 
 type LanesConfig = {
@@ -93,6 +104,25 @@ function parseJsonFile<T>(filePath: string): T | null {
   } catch {
     return null;
   }
+}
+
+function readLatestCronRun(jobId: string | undefined): CronRunEntry | null {
+  if (!jobId) return null;
+  const runPath = path.join(os.homedir(), ".openclaw", "cron", "runs", `${jobId}.jsonl`);
+  try {
+    const raw = fs.readFileSync(runPath, "utf8").trim();
+    if (!raw) return null;
+    const lines = raw.split("\n");
+    for (let i = lines.length - 1; i >= 0; i -= 1) {
+      const line = lines[i]?.trim();
+      if (!line) continue;
+      const parsed = JSON.parse(line) as CronRunEntry;
+      if (parsed?.action === "finished") return parsed;
+    }
+  } catch {
+    return null;
+  }
+  return null;
 }
 
 function isAuthIssue(text: string): boolean {
@@ -273,11 +303,15 @@ function probeCriticalCronLane(): ProbeResult {
   }
 
   const now = Date.now();
-  const nextRunAtMs = Number(match.state?.nextRunAtMs ?? 0);
+  const latestRun = readLatestCronRun(match.id);
+  const latestRunTs = Number(latestRun?.ts ?? 0);
+  const stateLastRunAtMs = Number(match.state?.lastRunAtMs ?? 0);
+  const useLatestRun = latestRunTs > 0 && latestRunTs >= stateLastRunAtMs;
+  const nextRunAtMs = Number((useLatestRun ? latestRun?.nextRunAtMs : match.state?.nextRunAtMs) ?? 0);
   const overdue = nextRunAtMs > 0 && now - nextRunAtMs > 60 * 60 * 1000;
   const consecutiveErrors = Number(match.state?.consecutiveErrors ?? 0);
-  const lastStatus = String(match.state?.lastStatus ?? "").toLowerCase();
-  const lastDeliveryStatus = String(match.state?.lastDeliveryStatus ?? "").toLowerCase();
+  const lastStatus = String((useLatestRun ? latestRun?.status : match.state?.lastStatus) ?? "").toLowerCase();
+  const lastDeliveryStatus = String((useLatestRun ? latestRun?.deliveryStatus : match.state?.lastDeliveryStatus) ?? "").toLowerCase();
 
   if (overdue) {
     return {

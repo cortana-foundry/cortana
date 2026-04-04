@@ -43,8 +43,9 @@ describe("critical-synthetic-probe", () => {
         return JSON.stringify({
           jobs: [
             {
+              id: "job-1",
               name: "📅 Calendar reminders → Telegram (ALL calendars)",
-              state: { nextRunAtMs: Date.now() + 60_000, lastStatus: "ok", lastDeliveryStatus: "ok", consecutiveErrors: 0 },
+              state: { lastRunAtMs: Date.now(), nextRunAtMs: Date.now() + 60_000, lastStatus: "ok", lastDeliveryStatus: "ok", consecutiveErrors: 0 },
             },
           ],
         });
@@ -136,6 +137,68 @@ describe("critical-synthetic-probe", () => {
         expect(options?.env?.GOG_KEYRING_PASSWORD).toBe("secret-from-plist");
         return { status: 0, stdout: "ok", stderr: "" } as any;
       }
+      if (cmd === "remindctl") return { status: 0, stdout: "[]", stderr: "" } as any;
+      if (cmd === "openclaw" && joined === "status --json") {
+        return { status: 0, stdout: JSON.stringify({ gateway: { reachable: true }, channelSummary: ["Telegram: configured"] }), stderr: "" } as any;
+      }
+      if (cmd === "openclaw" && joined === "status") {
+        return { status: 0, stdout: "Telegram | ON | OK", stderr: "" } as any;
+      }
+      if (cmd === "openclaw" && joined === "gateway status --no-probe") {
+        return { status: 0, stdout: "running", stderr: "" } as any;
+      }
+      throw new Error(`unexpected spawn ${cmd} ${joined}`);
+    });
+
+    const consoleSpy = captureConsole();
+    await importFresh("../../tools/monitoring/critical-synthetic-probe.ts");
+    await flushModuleSideEffects();
+    consoleSpy.restore();
+
+    expect(consoleSpy.logs.join("\n")).toContain("NO_REPLY");
+  });
+
+  it("prefers fresh cron run history over stale job state for the critical lane", async () => {
+    fsMock.existsSync.mockReturnValue(false);
+    fsMock.readFileSync.mockImplementation((filePath: string) => {
+      if (String(filePath).endsWith("/.openclaw/cron/jobs.json")) {
+        return JSON.stringify({
+          jobs: [
+            {
+              id: "job-1",
+              name: "📅 Calendar reminders → Telegram (ALL calendars)",
+              state: {
+                lastRunAtMs: 1,
+                nextRunAtMs: 1,
+                lastStatus: "ok",
+                lastDeliveryStatus: "not-delivered",
+                consecutiveErrors: 0,
+              },
+            },
+          ],
+        });
+      }
+      if (String(filePath).endsWith("/.openclaw/cron/runs/job-1.jsonl")) {
+        return [
+          JSON.stringify({
+            ts: Date.now(),
+            action: "finished",
+            status: "ok",
+            deliveryStatus: "not-delivered",
+            nextRunAtMs: Date.now() + 60_000,
+          }),
+        ].join("\n");
+      }
+      if (String(filePath).endsWith("/config/autonomy-lanes.json")) {
+        return JSON.stringify({ familyCriticalCronNames: ["📅 Calendar reminders → Telegram (ALL calendars)"] });
+      }
+      throw new Error(`unexpected read ${filePath}`);
+    });
+    upsertOpenIncident.mockReturnValue("unchanged");
+
+    spawnSync.mockImplementation((cmd: string, args: string[]) => {
+      const joined = args.join(" ");
+      if (cmd === "gog") return { status: 0, stdout: "ok", stderr: "" } as any;
       if (cmd === "remindctl") return { status: 0, stdout: "[]", stderr: "" } as any;
       if (cmd === "openclaw" && joined === "status --json") {
         return { status: 0, stdout: JSON.stringify({ gateway: { reachable: true }, channelSummary: ["Telegram: configured"] }), stderr: "" } as any;
