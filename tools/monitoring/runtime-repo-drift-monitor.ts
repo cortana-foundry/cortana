@@ -34,12 +34,28 @@ type RepoState = {
   changedPaths: string[];
 };
 
-const DEFAULT_SOURCE_REPO = process.env.CORTANA_SOURCE_REPO || "/Users/hd/Developer/cortana";
-const DEFAULT_RUNTIME_REPO = process.env.CORTANA_RUNTIME_REPO || DEFAULT_SOURCE_REPO;
+const FALLBACK_SOURCE_REPO = "/Users/hd/Developer/cortana";
+const DEFAULT_DEPLOY_REPO = process.env.CORTANA_DEPLOY_REPO || "/Users/hd/Developer/cortana-deploy";
 const IGNORED_RUNTIME_STATE_PATHS = new Set([
   "memory/apple-reminders-sent.json",
   "var/backtests/rechecks/state.json",
 ]);
+
+function resolveDefaultSourceRepo(): string {
+  if (repoExists(DEFAULT_DEPLOY_REPO)) return DEFAULT_DEPLOY_REPO;
+  return process.env.CORTANA_SOURCE_REPO || FALLBACK_SOURCE_REPO;
+}
+
+function resolveDefaultRuntimeRepo(sourceRepo: string): string {
+  const configured = process.env.CORTANA_RUNTIME_REPO;
+  if (configured) return configured;
+  const compatRepo = "/Users/hd/openclaw";
+  if (repoExists(compatRepo) || pathExists(compatRepo)) return compatRepo;
+  return sourceRepo;
+}
+
+const DEFAULT_SOURCE_REPO = resolveDefaultSourceRepo();
+const DEFAULT_RUNTIME_REPO = resolveDefaultRuntimeRepo(DEFAULT_SOURCE_REPO);
 
 function parseArgs(): Args {
   const argv = process.argv.slice(2);
@@ -271,6 +287,9 @@ function main(): void {
     const actionable = assessSource(sourceState, args.sourceBranch);
     const payload = {
       status: actionable.length ? "needs_action" : "healthy",
+      sourceRepo: args.sourceRepo,
+      runtimeRepo: args.runtimeRepo,
+      sourceOfTruth: args.sourceRepo === DEFAULT_DEPLOY_REPO ? "deploy-worktree" : "primary-worktree",
       actionable,
       suppressed: [
         {
@@ -309,6 +328,9 @@ function main(): void {
 
   const payload = {
     status: actionable.length ? "needs_action" : "healthy",
+    sourceRepo: args.sourceRepo,
+    runtimeRepo: args.runtimeRepo,
+    sourceOfTruth: args.sourceRepo === DEFAULT_DEPLOY_REPO ? "deploy-worktree" : "primary-worktree",
     actionable,
     suppressed: [],
     missing: [],

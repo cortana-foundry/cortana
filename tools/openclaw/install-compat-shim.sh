@@ -64,7 +64,7 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-[[ -d "$SOURCE_REPO/.git" ]] || die "source repo missing: $SOURCE_REPO"
+[[ -d "$SOURCE_REPO/.git" || -f "$SOURCE_REPO/.git" ]] || die "source repo missing: $SOURCE_REPO"
 
 source_real="$(realpath_py "$SOURCE_REPO")"
 
@@ -95,7 +95,7 @@ if [[ -L "$COMPAT_REPO" ]]; then
   exit 0
 fi
 
-if [[ -d "$COMPAT_REPO/.git" ]]; then
+if [[ -d "$COMPAT_REPO/.git" || -f "$COMPAT_REPO/.git" ]]; then
   status="$(git -C "$COMPAT_REPO" status --porcelain --untracked-files=all)"
   [[ -z "$status" ]] || die "compat repo has local changes; refusing migration"
 fi

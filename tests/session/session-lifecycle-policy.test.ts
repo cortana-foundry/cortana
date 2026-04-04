@@ -67,8 +67,15 @@ describe('session lifecycle policy runtime behavior', () => {
     resetProcess();
   });
 
-  function sessionJson(keys: string[]) {
-    return JSON.stringify({ sessions: keys.map((key) => ({ sessionKey: key })) });
+  function sessionJson(keys: string[], updatedAt = Date.now()) {
+    return JSON.stringify({
+      sessions: keys.map((key, i) => ({
+        sessionKey: key,
+        agentId: key.split(':')[1] || 'main',
+        sessionId: `session-${i}`,
+        updatedAt: updatedAt - i * 1000,
+      })),
+    });
   }
 
   it('returns NO_REPLY when already healthy', async () => {
@@ -89,11 +96,12 @@ describe('session lifecycle policy runtime behavior', () => {
   it('auto-cleans and stays silent when the breach is remediated', async () => {
     const before = Array.from({ length: 150 }, (_, i) => `agent:cron:${i}`);
     const after = Array.from({ length: 8 }, (_, i) => `agent:cron:${i}`);
+    const oldTs = Date.now() - 13 * 60 * 60 * 1000;
 
     spawnSync
-      .mockReturnValueOnce({ status: 0, stdout: sessionJson(before), stderr: '' })
+      .mockReturnValueOnce({ status: 0, stdout: sessionJson(before, oldTs), stderr: '' })
       .mockReturnValueOnce({ status: 0, stdout: JSON.stringify({ changedCount: 4 }), stderr: '' })
-      .mockReturnValueOnce({ status: 0, stdout: sessionJson(after), stderr: '' });
+      .mockReturnValueOnce({ status: 0, stdout: sessionJson(after, oldTs), stderr: '' });
 
     setArgv([]);
     const consoleSpy = captureConsole();
@@ -110,11 +118,12 @@ describe('session lifecycle policy runtime behavior', () => {
   it('emits json status for remediated runs', async () => {
     const before = Array.from({ length: 150 }, (_, i) => `agent:cron:${i}`);
     const after = Array.from({ length: 8 }, (_, i) => `agent:cron:${i}`);
+    const oldTs = Date.now() - 13 * 60 * 60 * 1000;
 
     spawnSync
-      .mockReturnValueOnce({ status: 0, stdout: sessionJson(before), stderr: '' })
+      .mockReturnValueOnce({ status: 0, stdout: sessionJson(before, oldTs), stderr: '' })
       .mockReturnValueOnce({ status: 0, stdout: JSON.stringify({ changedCount: 4 }), stderr: '' })
-      .mockReturnValueOnce({ status: 0, stdout: sessionJson(after), stderr: '' });
+      .mockReturnValueOnce({ status: 0, stdout: sessionJson(after, oldTs), stderr: '' });
 
     setArgv(['--json']);
     const consoleSpy = captureConsole();

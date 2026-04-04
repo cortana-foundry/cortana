@@ -56,6 +56,7 @@ describe("autonomy family-critical failover", () => {
       if (cmd === "npx" && String(args[2]).includes("openai-cron-auth-guard.ts")) return { status: 0, stdout: JSON.stringify({ ok: true, affected: 0 }), stderr: "" } as any;
       if (cmd === "npx" && String(args[2]).includes("cron-auto-retry.ts")) return { status: 0, stdout: JSON.stringify({ retried: 1, skipped: 0, failedAgain: 1 }), stderr: "" } as any;
       if (cmd === "npx" && String(args[2]).includes("session-lifecycle-policy.ts")) return { status: 0, stdout: JSON.stringify({ status: "healthy" }), stderr: "" } as any;
+      if (cmd === "npx" && String(args[2]).includes("runtime-integrity-check.ts")) return { status: 0, stdout: JSON.stringify({ overall_ok: true, results: [] }), stderr: "" } as any;
       if (cmd === "/opt/homebrew/opt/postgresql@17/bin/psql") return { status: 0, stdout: "", stderr: "" } as any;
       throw new Error(`unexpected spawn ${cmd} ${joined}`);
     });
