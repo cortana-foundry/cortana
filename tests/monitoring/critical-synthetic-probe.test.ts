@@ -126,7 +126,11 @@ describe("critical-synthetic-probe", () => {
     spawnSync.mockImplementation((cmd: string, args: string[], options?: { env?: Record<string, string> }) => {
       const joined = args.join(" ");
       if (cmd === "plutil") {
-        return { status: 0, stdout: "secret-from-plist\n", stderr: "" } as any;
+        return {
+          status: 0,
+          stdout: JSON.stringify({ EnvironmentVariables: { GOG_KEYRING_PASSWORD: "secret-from-plist" } }),
+          stderr: "",
+        } as any;
       }
       if (cmd === "gog") {
         expect(options?.env?.GOG_KEYRING_PASSWORD).toBe("secret-from-plist");

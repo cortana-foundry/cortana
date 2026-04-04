@@ -4,6 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { sourceRepoRoot } from "../lib/paths.js";
+import { readMergedGatewayEnvSources } from "../openclaw/gateway-env.js";
 import { resolveIncident, upsertOpenIncident } from "./autonomy-incidents.ts";
 
 type FailureClass =
@@ -60,15 +61,8 @@ function run(cmd: string, args: string[], timeoutMs = 15000) {
 
 function readGatewayEnvValue(key: string): string | null {
   const gatewayPlist = process.env.OPENCLAW_GATEWAY_PLIST || path.join(os.homedir(), "Library", "LaunchAgents", "ai.openclaw.gateway.plist");
-  if (!fs.existsSync(gatewayPlist)) return null;
-  const r = spawnSync("plutil", ["-extract", `EnvironmentVariables.${key}`, "raw", "-o", "-", gatewayPlist], {
-    encoding: "utf8",
-    timeout: 5000,
-    stdio: ["ignore", "pipe", "pipe"],
-  });
-  if ((r.status ?? 1) !== 0) return null;
-  const value = String(r.stdout ?? "").trim();
-  return value.length ? value : null;
+  const value = readMergedGatewayEnvSources(gatewayPlist)[key];
+  return typeof value === "string" && value.trim().length > 0 ? value : null;
 }
 
 function gogProbeEnv(): NodeJS.ProcessEnv {

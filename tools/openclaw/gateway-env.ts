@@ -1,7 +1,11 @@
 import fs from "node:fs";
+import path from "node:path";
 import { spawnSync } from "node:child_process";
+import { resolveHomePath } from "../lib/paths.js";
 
 export const PRESERVED_GATEWAY_ENV_KEYS = ["GOG_KEYRING_PASSWORD"] as const;
+export const DEFAULT_GATEWAY_ENV_STATE_PATH =
+  process.env.OPENCLAW_GATEWAY_ENV_STATE_PATH ?? resolveHomePath(".openclaw", "state", "gateway-env.json");
 
 type GatewayEnv = Partial<Record<(typeof PRESERVED_GATEWAY_ENV_KEYS)[number], string>>;
 
@@ -43,6 +47,49 @@ export function readPlistEnvironmentVariables(plistPath: string): Record<string,
   } catch {
     return {};
   }
+}
+
+export function readGatewayEnvStateFile(statePath: string = DEFAULT_GATEWAY_ENV_STATE_PATH): Record<string, string> {
+  if (!fs.existsSync(statePath)) return {};
+  try {
+    const parsed = JSON.parse(fs.readFileSync(statePath, "utf8")) as Record<string, unknown>;
+    const out: Record<string, string> = {};
+    for (const key of PRESERVED_GATEWAY_ENV_KEYS) {
+      const value = parsed[key];
+      if (nonEmpty(typeof value === "string" ? value : undefined)) out[key] = value;
+    }
+    return out;
+  } catch {
+    return {};
+  }
+}
+
+export function readMergedGatewayEnvSources(
+  plistPath: string,
+  statePath: string = DEFAULT_GATEWAY_ENV_STATE_PATH,
+): Record<string, string> {
+  const plistEnv = readPlistEnvironmentVariables(plistPath);
+  const stateEnv = readGatewayEnvStateFile(statePath);
+  return {
+    ...plistEnv,
+    ...stateEnv,
+  };
+}
+
+export function writeGatewayEnvStateFile(
+  currentEnv: NodeJS.ProcessEnv = process.env,
+  preservedSource: Record<string, string> = {},
+  statePath: string = DEFAULT_GATEWAY_ENV_STATE_PATH,
+): GatewayEnv {
+  const desired = computePreservedGatewayEnv(currentEnv, preservedSource);
+  if (Object.keys(desired).length === 0) {
+    fs.rmSync(statePath, { force: true });
+    return desired;
+  }
+
+  fs.mkdirSync(path.dirname(statePath), { recursive: true });
+  fs.writeFileSync(statePath, JSON.stringify(desired, null, 2) + "\n", "utf8");
+  return desired;
 }
 
 export function reconcileGatewayPlistEnv(
