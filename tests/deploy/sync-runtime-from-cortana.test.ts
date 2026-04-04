@@ -46,8 +46,25 @@ function makeFixture() {
   writeJson(path.join(source, "config", "cron", "jobs.json"), {
     jobs: [{ id: "brief", name: "Initial Brief", schedule: { expr: "0 6 * * *" }, enabled: true }],
   });
+  writeJson(path.join(source, "config", "openclaw.json"), {
+    models: {
+      providers: {
+        openai: { apiKey: "__OPENAI_API_KEY__" },
+      },
+    },
+    channels: {
+      telegram: {
+        accounts: {
+          default: { botToken: "__TELEGRAM_BOT_TOKEN__" },
+        },
+      },
+    },
+    gateway: {
+      auth: { token: "__GATEWAY_TOKEN__" },
+    },
+  });
   fs.writeFileSync(path.join(source, "README.md"), "source v1\n", "utf8");
-  git(source, "add", "README.md", "config/cron/jobs.json");
+  git(source, "add", "README.md", "config/cron/jobs.json", "config/openclaw.json");
   git(source, "commit", "-m", "initial");
   git(source, "push", "-u", "origin", "main");
 
