@@ -29,12 +29,19 @@ export type AthleteStateWindowSummary = {
   days_with_protein: number;
   days_with_hydration: number;
   days_with_steps: number;
+  days_with_body_weight: number;
   avg_readiness: number | null;
   avg_sleep_hours: number | null;
   avg_sleep_performance: number | null;
   avg_hrv: number | null;
   avg_rhr: number | null;
   avg_whoop_strain: number | null;
+  avg_body_weight_kg: number | null;
+  avg_active_energy_kcal: number | null;
+  avg_resting_energy_kcal: number | null;
+  avg_walking_running_distance_km: number | null;
+  avg_body_fat_pct: number | null;
+  avg_lean_mass_kg: number | null;
   total_tonal_sessions: number;
   total_tonal_volume: number;
   avg_protein_g: number | null;
@@ -130,12 +137,19 @@ export function buildMonthlyWindowSummaryFromState(
     days_with_protein: rows.filter((row) => row.protein_g != null).length,
     days_with_hydration: rows.filter((row) => row.hydration_liters != null).length,
     days_with_steps: rows.filter((row) => row.step_count != null).length,
+    days_with_body_weight: rows.filter((row) => row.body_weight_kg != null).length,
     avg_readiness: average(rows.map((row) => row.readiness_score)),
     avg_sleep_hours: average(rows.map((row) => row.sleep_hours)),
     avg_sleep_performance: average(rows.map((row) => row.sleep_performance)),
     avg_hrv: average(rows.map((row) => row.hrv)),
     avg_rhr: average(rows.map((row) => row.rhr)),
     avg_whoop_strain: average(rows.map((row) => row.whoop_strain)),
+    avg_body_weight_kg: average(rows.map((row) => row.body_weight_kg)),
+    avg_active_energy_kcal: average(rows.map((row) => row.active_energy_kcal)),
+    avg_resting_energy_kcal: average(rows.map((row) => row.resting_energy_kcal)),
+    avg_walking_running_distance_km: average(rows.map((row) => row.walking_running_distance_km)),
+    avg_body_fat_pct: average(rows.map((row) => row.body_fat_pct)),
+    avg_lean_mass_kg: average(rows.map((row) => row.lean_mass_kg)),
     total_tonal_sessions: rows.reduce((sum, row) => sum + (row.tonal_sessions ?? 0), 0),
     total_tonal_volume: Number(rows.reduce((sum, row) => sum + (row.tonal_volume ?? 0), 0).toFixed(2)),
     avg_protein_g: average(rows.map((row) => row.protein_g)),
@@ -173,6 +187,12 @@ export function stepCoverageReason(current: AthleteStateWindowSummary): string |
   return "Athlete-state rows exist, but no daily step field was persisted from the provider payload";
 }
 
+export function bodyWeightCoverageReason(current: AthleteStateWindowSummary): string | null {
+  if (current.days_with_body_weight > 0) return null;
+  if (current.days_with_data === 0) return "no monthly fitness snapshots were captured";
+  return "Athlete-state rows exist, but no trusted daily body-weight field was persisted from the preferred-source pipeline";
+}
+
 function main(): void {
   const explicitAnchor = process.argv[2] && /^\d{4}-\d{2}-\d{2}$/.test(process.argv[2]) ? process.argv[2] : null;
   const anchorYmd = explicitAnchor ?? localYmd();
@@ -191,6 +211,7 @@ function main(): void {
   const currentTrajectory = trajectory(current, previous);
   const currentTrajectoryReason = trajectoryReason(current, previous);
   const currentStepCoverageReason = stepCoverageReason(current);
+  const currentBodyWeightCoverageReason = bodyWeightCoverageReason(current);
 
   const out = {
     generated_at: new Date().toISOString(),
@@ -212,6 +233,10 @@ function main(): void {
       hydration_liters: delta(current.avg_hydration_liters, previous.avg_hydration_liters),
       steps_total: delta(current.total_steps, previous.total_steps),
       steps_avg_daily: delta(current.avg_daily_steps, previous.avg_daily_steps),
+      body_weight_kg: delta(current.avg_body_weight_kg, previous.avg_body_weight_kg),
+      active_energy_kcal: delta(current.avg_active_energy_kcal, previous.avg_active_energy_kcal),
+      resting_energy_kcal: delta(current.avg_resting_energy_kcal, previous.avg_resting_energy_kcal),
+      walking_running_distance_km: delta(current.avg_walking_running_distance_km, previous.avg_walking_running_distance_km),
     },
     data_quality: {
       days_with_data: current.days_with_data,
@@ -220,6 +245,7 @@ function main(): void {
       sleep_coverage_days: current.days_with_sleep,
       hydration_coverage_days: current.days_with_hydration,
       step_coverage_days: current.days_with_steps,
+      body_weight_coverage_days: current.days_with_body_weight,
       protein_coverage_days: current.days_with_protein,
       recommendation_coverage_days: current.days_with_recommendation,
       tonal_sessions: current.total_tonal_sessions,
@@ -230,10 +256,13 @@ function main(): void {
       has_tonal_signal: current.total_tonal_sessions > 0 || current.total_tonal_volume > 0,
       step_coverage_missing: current.days_with_steps === 0,
       step_coverage_reason: currentStepCoverageReason,
+      body_weight_coverage_missing: current.days_with_body_weight === 0,
+      body_weight_coverage_reason: currentBodyWeightCoverageReason,
       trajectory_reason: currentTrajectoryReason,
     },
     notes: [
       "Monthly overview uses canonical athlete-state rows only (no live Whoop/Tonal fetches).",
+      "Body weight, steps, and energy metrics reflect preferred-source reconciliation when Apple Health rows are available.",
       "Hydration remains null unless provided by meal logs, coach nutrition rows, or future device hydration ingestion.",
     ],
   };

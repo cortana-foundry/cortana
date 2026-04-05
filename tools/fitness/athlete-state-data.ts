@@ -1,5 +1,8 @@
 import type { AthleteStateDailyInput, AthleteStatePhaseMode, MuscleVolumeDailyInput } from "./athlete-state-db.js";
 import type { CoachNutritionRow } from "./coach-db.js";
+import { buildWeeklyBodyWeightTrend, selectPreferredMetricForDate } from "./body-composition-engine.js";
+import { assessGoalModeProgress } from "./goal-mode.js";
+import type { HealthSourceDailyRow } from "./health-source-db.js";
 import { summarizeMealRollup, type MealEntry } from "./meal-log.js";
 import {
   buildReadinessSignal,
@@ -28,6 +31,7 @@ export type AthleteStateBuildInput = {
   coachNutrition?: CoachNutritionRow | null;
   phaseMode?: SpartanPhaseMode | "unknown" | null;
   bodyWeightKg?: number | null;
+  healthSourceRows?: HealthSourceDailyRow[];
   timeZone?: string;
 };
 
@@ -86,6 +90,10 @@ function average(values: Array<number | null | undefined>, digits = 3): number |
   const nums = values.filter((value): value is number => typeof value === "number" && Number.isFinite(value));
   if (nums.length === 0) return null;
   return Number((nums.reduce((sum, value) => sum + value, 0) / nums.length).toFixed(digits));
+}
+
+function selectionConfidence(values: Array<number | null | undefined>): number | null {
+  return average(values, 3);
 }
 
 function boolFlagCount(flags: TonalSetActivity[], predicate: (value: TonalSetActivity) => boolean): number {
@@ -298,7 +306,80 @@ export function buildAthleteStateForDate(input: AthleteStateBuildInput): Athlete
   const phaseMode = normalizePhaseMode(input.phaseMode, input.coachNutrition);
   const nutritionConfidence = deriveNutritionConfidence(mealRollup.today.mealsLogged, input.coachNutrition);
   const proteinTargetG = inferProteinTargetG(phaseMode, input.coachNutrition);
-  const bodyWeightKg = input.bodyWeightKg ?? extractBodyWeightKg(input.whoopPayload);
+  const healthRows = input.healthSourceRows ?? [];
+  const fallbackBodyWeightKg = input.bodyWeightKg ?? extractBodyWeightKg(input.whoopPayload);
+  const bodyWeightSelection = selectPreferredMetricForDate({
+    metricName: "body_weight_kg",
+    metricDate: input.stateDate,
+    healthRows,
+    fallbackValue: fallbackBodyWeightKg,
+    fallbackSource: fallbackBodyWeightKg != null ? "whoop" : null,
+    fallbackConfidence: fallbackBodyWeightKg != null ? 0.58 : null,
+    fallbackUnit: "kg",
+  });
+  const stepSelection = selectPreferredMetricForDate({
+    metricName: "steps",
+    metricDate: input.stateDate,
+    healthRows,
+    fallbackValue: stepSummary.stepCount,
+    fallbackSource: stepSummary.source,
+    fallbackConfidence: stepSummary.stepCount != null ? 0.7 : null,
+    fallbackUnit: "count",
+  });
+  const activeEnergySelection = selectPreferredMetricForDate({
+    metricName: "active_energy_kcal",
+    metricDate: input.stateDate,
+    healthRows,
+  });
+  const restingEnergySelection = selectPreferredMetricForDate({
+    metricName: "resting_energy_kcal",
+    metricDate: input.stateDate,
+    healthRows,
+  });
+  const distanceSelection = selectPreferredMetricForDate({
+    metricName: "walking_running_distance_km",
+    metricDate: input.stateDate,
+    healthRows,
+  });
+  const bodyFatSelection = selectPreferredMetricForDate({
+    metricName: "body_fat_pct",
+    metricDate: input.stateDate,
+    healthRows,
+  });
+  const leanMassSelection = selectPreferredMetricForDate({
+    metricName: "lean_mass_kg",
+    metricDate: input.stateDate,
+    healthRows,
+  });
+  const bodyWeightTrend = buildWeeklyBodyWeightTrend({
+    endDate: input.stateDate,
+    healthRows,
+  });
+  const goalModeAssessment = assessGoalModeProgress({
+    phaseMode,
+    actualWeightDeltaPctWeek: bodyWeightTrend.deltaPct,
+    confidence: bodyWeightTrend.confidence,
+  });
+  const healthSourceConfidence = selectionConfidence([
+    bodyWeightSelection.confidence,
+    stepSelection.usedFallback ? null : stepSelection.confidence,
+    activeEnergySelection.confidence,
+    restingEnergySelection.confidence,
+    distanceSelection.confidence,
+    bodyFatSelection.confidence,
+    leanMassSelection.confidence,
+  ]);
+  const bodyWeightKg = bodyWeightSelection.value;
+  const selectedHealthFlags = new Set([
+    ...bodyWeightSelection.qualityFlags,
+    ...stepSelection.qualityFlags,
+    ...activeEnergySelection.qualityFlags,
+    ...restingEnergySelection.qualityFlags,
+    ...distanceSelection.qualityFlags,
+    ...bodyFatSelection.qualityFlags,
+    ...leanMassSelection.qualityFlags,
+    ...bodyWeightTrend.qualityFlags,
+  ]);
   const qualityFlags: Record<string, unknown> = {
     stale_provider_data:
       (dataFreshnessHours(todayRecovery?.createdAt ?? null) ?? 999) > 18
@@ -309,6 +390,10 @@ export function buildAthleteStateForDate(input: AthleteStateBuildInput): Athlete
     missing_phase_mode: phaseMode === "unknown",
     missing_body_weight: bodyWeightKg == null,
     missing_nutrition_signal: mealRollup.today.mealsLogged === 0 && input.coachNutrition == null,
+    apple_health_rows_present: healthRows.length > 0,
+    body_weight_used_fallback: bodyWeightSelection.usedFallback,
+    low_confidence_body_weight: bodyWeightSelection.value != null && (bodyWeightSelection.confidence ?? 0) < 0.55,
+    health_quality_flags: [...selectedHealthFlags],
   };
 
   const athleteState: AthleteStateDailyInput = {
@@ -323,15 +408,35 @@ export function buildAthleteStateForDate(input: AthleteStateBuildInput): Athlete
     rhr: todayRecovery?.rhr ?? null,
     whoopStrain: todayWhoopWorkoutStrain,
     whoopWorkouts: todayWhoopWorkouts.length,
-    stepCount: stepSummary.stepCount,
-    stepSource: stepSummary.source,
+    stepCount: stepSelection.value,
+    stepSource: stepSelection.source,
     tonalSessions: todayTonalWorkouts.length,
     tonalVolume: roundSum(todayTonalWorkouts.map((workout) => workout.volume)) ?? 0,
     cardioMinutes: cardio.totalMinutes,
     cardioSummary: cardio.summary,
     bodyWeightKg,
+    bodyWeightSource: bodyWeightSelection.source,
+    bodyWeightConfidence: bodyWeightSelection.confidence,
+    activeEnergyKcal: activeEnergySelection.value,
+    restingEnergyKcal: restingEnergySelection.value,
+    walkingRunningDistanceKm: distanceSelection.value,
+    bodyFatPct: bodyFatSelection.value,
+    leanMassKg: leanMassSelection.value,
+    healthSourceConfidence,
+    healthContext: {
+      body_weight: bodyWeightSelection,
+      steps: stepSelection,
+      active_energy: activeEnergySelection,
+      resting_energy: restingEnergySelection,
+      walking_running_distance: distanceSelection,
+      body_fat: bodyFatSelection,
+      lean_mass: leanMassSelection,
+      weekly_body_weight_trend: bodyWeightTrend,
+      goal_mode: goalModeAssessment,
+      available_health_rows: healthRows.length,
+    },
     phaseMode,
-    targetWeightDeltaPctWeek: inferWeightDeltaTarget(phaseMode),
+    targetWeightDeltaPctWeek: goalModeAssessment.targetWeightDeltaPctWeek ?? inferWeightDeltaTarget(phaseMode),
     proteinG: input.coachNutrition?.protein_actual_g ?? mealRollup.today.proteinG,
     proteinTargetG,
     caloriesKcal: input.coachNutrition?.calories_actual_kcal ?? mealRollup.today.calories,
@@ -348,10 +453,15 @@ export function buildAthleteStateForDate(input: AthleteStateBuildInput): Athlete
       tonal_set_rows: muscleVolume.setActivities.length,
       tonal_workouts_today: todayTonalWorkouts.length,
       coach_nutrition_row: input.coachNutrition?.date_local ?? null,
+      body_weight_source: bodyWeightSelection.source,
+      step_source_selected: stepSelection.source,
+      apple_health_rows_considered: healthRows.length,
     },
     raw: {
       readiness_signal: readinessSignal,
       meal_rollup: mealRollup.today,
+      body_weight_trend: bodyWeightTrend,
+      goal_mode_assessment: goalModeAssessment,
     },
   };
 

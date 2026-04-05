@@ -28,6 +28,11 @@ type WindowMetrics = {
   tonal_sessions: number;
   tonal_total_volume: number | null;
   avg_tonal_volume: number | null;
+  body_weight_days_logged: number;
+  avg_body_weight_kg: number | null;
+  avg_active_energy_kcal: number | null;
+  avg_resting_energy_kcal: number | null;
+  avg_walking_running_distance_km: number | null;
   meals_logged: number;
   protein_days_logged: number;
   protein_avg_daily: number | null;
@@ -116,6 +121,11 @@ export function buildWeeklyWindowMetricsFromState(opts: {
     tonal_sessions: rows.reduce((sum, row) => sum + (row.tonal_sessions ?? 0), 0),
     tonal_total_volume: sum(rows.map((row) => row.tonal_volume)),
     avg_tonal_volume: average(rows.map((row) => row.tonal_volume)),
+    body_weight_days_logged: rows.filter((row) => row.body_weight_kg != null).length,
+    avg_body_weight_kg: average(rows.map((row) => row.body_weight_kg)),
+    avg_active_energy_kcal: average(rows.map((row) => row.active_energy_kcal)),
+    avg_resting_energy_kcal: average(rows.map((row) => row.resting_energy_kcal)),
+    avg_walking_running_distance_km: average(rows.map((row) => row.walking_running_distance_km)),
     meals_logged: rows.reduce((sum, row) => sum + ((row.raw?.meal_rollup as { mealsLogged?: number } | undefined)?.mealsLogged ?? 0), 0),
     protein_days_logged: rows.filter((row) => row.protein_g != null).length,
     protein_avg_daily: average(proteinTotals),
@@ -240,6 +250,7 @@ function main(): void {
     sleep_performance: compareMetric(currentMetrics.avg_sleep_performance, previousMetrics.avg_sleep_performance),
     strain_load: compareMetric(currentMetrics.total_strain, previousMetrics.total_strain),
     tonal_volume: compareMetric(currentMetrics.tonal_total_volume, previousMetrics.tonal_total_volume),
+    body_weight_kg: compareMetric(currentMetrics.avg_body_weight_kg, previousMetrics.avg_body_weight_kg),
     protein_avg_daily: compareMetric(currentMetrics.protein_avg_daily, previousMetrics.protein_avg_daily),
   };
 
@@ -356,6 +367,11 @@ function main(): void {
   });
   if (!outcomeWrite.ok) errors.push(`coach_outcome_eval_weekly_upsert_failed:${outcomeWrite.error ?? "unknown"}`);
 
+  const latestHealthContext = currentRows
+    .slice()
+    .reverse()
+    .find((row) => row.health_context && Object.keys(row.health_context).length > 0)?.health_context ?? null;
+
   const out = {
     generated_at: new Date().toISOString(),
     date: today,
@@ -384,6 +400,17 @@ function main(): void {
       weekly_dose_calls: weeklyDoseCalls,
       cut_rate_risk: cutRateRisk,
       cardio_interference_risk: cardioInterferenceRisk,
+    },
+    body_composition: {
+      current_avg_body_weight_kg: currentMetrics.avg_body_weight_kg,
+      previous_avg_body_weight_kg: previousMetrics.avg_body_weight_kg,
+      current_body_weight_days_logged: currentMetrics.body_weight_days_logged,
+      previous_body_weight_days_logged: previousMetrics.body_weight_days_logged,
+      avg_active_energy_kcal: currentMetrics.avg_active_energy_kcal,
+      avg_resting_energy_kcal: currentMetrics.avg_resting_energy_kcal,
+      avg_walking_running_distance_km: currentMetrics.avg_walking_running_distance_km,
+      latest_goal_mode: latestHealthContext?.goal_mode ?? null,
+      latest_weight_trend: latestHealthContext?.weekly_body_weight_trend ?? null,
     },
     trend_signals: trendSignals,
     caffeine_trends: {

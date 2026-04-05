@@ -50,6 +50,17 @@ describe("fitness weekly insights persistence paths", () => {
           cardio_minutes: 20,
           cardio_summary: {},
           body_weight_kg: 84,
+          body_weight_source: "apple_health",
+          body_weight_confidence: 0.92,
+          active_energy_kcal: 650,
+          resting_energy_kcal: 1800,
+          walking_running_distance_km: 7.2,
+          body_fat_pct: 14.1,
+          lean_mass_kg: 63.5,
+          health_source_confidence: 0.88,
+          health_context: {
+            goal_mode: { status: "on_pace" },
+          },
           phase_mode: "lean_gain",
           target_weight_delta_pct_week: 0.15,
           protein_g: 152,
@@ -87,7 +98,16 @@ describe("fitness weekly insights persistence paths", () => {
           tonal_volume: 0,
           cardio_minutes: 0,
           cardio_summary: {},
-          body_weight_kg: 84,
+          body_weight_kg: 84.2,
+          body_weight_source: "apple_health",
+          body_weight_confidence: 0.91,
+          active_energy_kcal: 620,
+          resting_energy_kcal: 1785,
+          walking_running_distance_km: 6.1,
+          body_fat_pct: 14.2,
+          lean_mass_kg: 63.4,
+          health_source_confidence: 0.87,
+          health_context: {},
           phase_mode: "lean_gain",
           target_weight_delta_pct_week: 0.15,
           protein_g: 148,
@@ -115,5 +135,8 @@ describe("fitness weekly insights persistence paths", () => {
     expect(metrics.tonal_sessions).toBe(1);
     expect(metrics.protein_days_logged).toBe(2);
     expect(metrics.protein_days_on_target).toBe(1);
+    expect(metrics.body_weight_days_logged).toBe(2);
+    expect(metrics.avg_body_weight_kg).toBe(84.1);
+    expect(metrics.avg_active_energy_kcal).toBe(635);
   });
 });
