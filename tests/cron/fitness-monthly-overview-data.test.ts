@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  buildMonthlyWindowSummaryFromState,
   completedMonthlyWindows,
   monthlyWindows,
   stepCoverageReason,
@@ -47,6 +48,49 @@ describe("fitness monthly overview windows", () => {
       days_with_data: 14,
     } as any;
 
-    expect(stepCoverageReason(current)).toContain("Whoop/Tonal fitness snapshots exist");
+    expect(stepCoverageReason(current)).toContain("Athlete-state rows exist");
+  });
+
+  it("builds monthly summaries from canonical athlete-state rows", () => {
+    const summary = buildMonthlyWindowSummaryFromState([
+      {
+        state_date: "2026-03-01",
+        readiness_score: 70,
+        sleep_hours: 7.7,
+        sleep_performance: 85,
+        hrv: 102,
+        rhr: 49,
+        whoop_strain: 11,
+        tonal_sessions: 1,
+        tonal_volume: 12000,
+        protein_g: 150,
+        protein_target_g: 150,
+        hydration_liters: 2.5,
+        step_count: 9800,
+        recommendation_mode: "push",
+      },
+      {
+        state_date: "2026-03-02",
+        readiness_score: 62,
+        sleep_hours: 7.1,
+        sleep_performance: 79,
+        hrv: 98,
+        rhr: 50,
+        whoop_strain: 10,
+        tonal_sessions: 0,
+        tonal_volume: 0,
+        protein_g: 142,
+        protein_target_g: 150,
+        hydration_liters: 2.1,
+        step_count: 8600,
+        recommendation_mode: "controlled_train",
+      },
+    ] as any, "2026-03-01", "2026-03-31");
+
+    expect(summary.days_with_data).toBe(2);
+    expect(summary.avg_readiness).toBe(66);
+    expect(summary.total_tonal_sessions).toBe(1);
+    expect(summary.protein_days_on_target).toBe(1);
+    expect(summary.days_with_recommendation).toBe(2);
   });
 });
