@@ -35,7 +35,7 @@ Operational notes for Arbiter.
 
 ## Autonomy Stabilization Intake Context
 - PR #251 (`docs: add autonomy stabilization intake guide`) was merged on 2026-03-11.
-- Authoritative intake doc: `docs/autonomy-stabilization-intake.md`.
+- Authoritative intake doc: `docs/source/runbook/autonomy-stabilization-intake.md`.
 - Standing epic for these issues: `Autonomy Stabilization / Production Tuning`.
 - Use the intake guide when logging trust/timing/correctness failures into the task board, especially missed/late reminders, stale or wrong alerts, duplicate/noisy chatter, failures to act, and wrong/incomplete actions.
 - Required fields for logged issues: title, type, what happened, impact, what Cortana did, what should have happened, severity, suggested owner.

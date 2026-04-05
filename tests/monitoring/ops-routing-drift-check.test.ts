@@ -45,10 +45,10 @@ describe("ops-routing-drift-check", () => {
       {
         id: "stable-docs",
         summary: "Monitor is the user-facing owner lane for inbox/email ops and maintenance alerts.",
-        updateFiles: ["MEMORY.md", "HEARTBEAT.md", "docs/agent-routing.md", "docs/operating-rules.md", "README.md", "config/cron/jobs.json"],
+        updateFiles: ["MEMORY.md", "HEARTBEAT.md", "docs/source/doctrine/agent-routing.md", "docs/source/doctrine/operating-rules.md", "README.md", "config/cron/jobs.json"],
         requiredDocs: [
           {
-            path: "docs/agent-routing.md",
+            path: "docs/source/doctrine/agent-routing.md",
             phrases: ["Monitor is the user-facing owner lane for inbox/email ops and maintenance alerts"],
           },
         ],
@@ -69,7 +69,7 @@ describe("ops-routing-drift-check", () => {
   it("returns NO_REPLY when docs and cron ownership are aligned", async () => {
     seedFiles({
       "/repo/config/ops-hygiene-rules.json": rules,
-      "/repo/docs/agent-routing.md": "Monitor is the user-facing owner lane for inbox/email ops and maintenance alerts.",
+      "/repo/docs/source/doctrine/agent-routing.md": "Monitor is the user-facing owner lane for inbox/email ops and maintenance alerts.",
       "/repo/config/cron/jobs.json": JSON.stringify({
         jobs: [
           {
@@ -92,7 +92,7 @@ describe("ops-routing-drift-check", () => {
   it("flags prompt-owner drift and missing quiet healthy path", async () => {
     seedFiles({
       "/repo/config/ops-hygiene-rules.json": rules,
-      "/repo/docs/agent-routing.md": "Monitor is the user-facing owner lane for inbox/email ops and maintenance alerts.",
+      "/repo/docs/source/doctrine/agent-routing.md": "Monitor is the user-facing owner lane for inbox/email ops and maintenance alerts.",
       "/repo/config/cron/jobs.json": JSON.stringify({
         jobs: [
           {
@@ -128,7 +128,7 @@ describe("ops-routing-drift-check", () => {
   it("flags missing doc-contract phrases and surfaces canonical files to update", async () => {
     seedFiles({
       "/repo/config/ops-hygiene-rules.json": rules,
-      "/repo/docs/agent-routing.md": "Cron jobs go to specialists.",
+      "/repo/docs/source/doctrine/agent-routing.md": "Cron jobs go to specialists.",
       "/repo/config/cron/jobs.json": JSON.stringify({ jobs: [] }),
     });
 
@@ -138,7 +138,7 @@ describe("ops-routing-drift-check", () => {
     expect(payload.findings[0]).toEqual(
       expect.objectContaining({
         type: "doc_contract",
-        filesToUpdate: expect.arrayContaining(["docs/agent-routing.md", "config/cron/jobs.json"]),
+        filesToUpdate: expect.arrayContaining(["docs/source/doctrine/agent-routing.md", "config/cron/jobs.json"]),
       }),
     );
   });

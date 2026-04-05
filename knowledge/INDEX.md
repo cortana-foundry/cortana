@@ -2,6 +2,13 @@
 
 Master index of accumulated knowledge. Updated by Librarian.
 
+Canonical current-truth pages now live under:
+
+- [Systems index](./indexes/systems.md)
+- [Cortana core overview](./domains/cortana-core/overview.md)
+- [Memory system overview](./domains/memory-system/overview.md)
+- [Covenant overview](./domains/covenant/overview.md)
+
 ## Research (Huragok)
 
 *Deep-dive analyses and due diligence reports.*
