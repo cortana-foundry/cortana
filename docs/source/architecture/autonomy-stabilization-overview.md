@@ -166,7 +166,7 @@ Standing epic:
 - `Autonomy Stabilization / Production Tuning`
 
 Shared intake doc:
-- `docs/autonomy-stabilization-intake.md`
+- `docs/source/runbook/autonomy-stabilization-intake.md`
 
 Use that intake doc when logging issues from any agent lane.
 

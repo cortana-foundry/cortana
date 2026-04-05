@@ -27,11 +27,11 @@ The full program is intentionally broken into bounded epics so any LLM can pick 
 
 | Order | Epic | Purpose | Primary Repo | Status | Docs |
 |-------|------|---------|--------------|--------|------|
-| 1 | Core Baseline | Fix provider trust, build canonical athlete state, and make nutrition measurable. | `cortana` + `cortana-external` | Drafted | [PRD](prd-spartan-fitness-core-baseline.md) · [Tech Spec](techspec-spartan-fitness-core-baseline.md) · [Implementation](implementation-spartan-fitness-core-baseline.md) |
-| 2 | Training Intelligence | Convert clean athlete-state data into weekly dose, fatigue, progression, and cut-aware training decisions. | `cortana` | Drafted | [PRD](prd-spartan-training-intelligence.md) · [Tech Spec](techspec-spartan-training-intelligence.md) · [Implementation](implementation-spartan-training-intelligence.md) |
-| 3 | Tonal Programming | Convert recommendations into Tonal-ready plans, templates, and deterministic tomorrow-session outputs. | `cortana` with `cortana-external` support | Drafted | [PRD](prd-spartan-tonal-programming.md) · [Tech Spec](techspec-spartan-tonal-programming.md) · [Implementation](implementation-spartan-tonal-programming.md) |
-| 4 | Coaching Operating Loop | Turn isolated cron messages into a closed-loop coaching system with check-ins, compliance, alerts, and outcome evaluation. | `cortana` | Drafted | [PRD](prd-spartan-coaching-operating-loop.md) · [Tech Spec](techspec-spartan-coaching-operating-loop.md) · [Implementation](implementation-spartan-coaching-operating-loop.md) |
-| 5 | Health Expansion | Add Apple Health as the future source for body weight, step totals, expenditure, and body-composition trend logic. | `cortana-external` + `cortana` | Drafted | [PRD](prd-spartan-health-expansion.md) · [Tech Spec](techspec-spartan-health-expansion.md) · [Implementation](implementation-spartan-health-expansion.md) |
+| 1 | Core Baseline | Fix provider trust, build canonical athlete state, and make nutrition measurable. | `cortana` + `cortana-external` | Drafted | [PRD](../prd/prd-spartan-fitness-core-baseline.md) · [Tech Spec](../techspec/techspec-spartan-fitness-core-baseline.md) · [Implementation](../implementation/implementation-spartan-fitness-core-baseline.md) |
+| 2 | Training Intelligence | Convert clean athlete-state data into weekly dose, fatigue, progression, and cut-aware training decisions. | `cortana` | Drafted | [PRD](../prd/prd-spartan-training-intelligence.md) · [Tech Spec](../techspec/techspec-spartan-training-intelligence.md) · [Implementation](../implementation/implementation-spartan-training-intelligence.md) |
+| 3 | Tonal Programming | Convert recommendations into Tonal-ready plans, templates, and deterministic tomorrow-session outputs. | `cortana` with `cortana-external` support | Drafted | [PRD](../prd/prd-spartan-tonal-programming.md) · [Tech Spec](../techspec/techspec-spartan-tonal-programming.md) · [Implementation](../implementation/implementation-spartan-tonal-programming.md) |
+| 4 | Coaching Operating Loop | Turn isolated cron messages into a closed-loop coaching system with check-ins, compliance, alerts, and outcome evaluation. | `cortana` | Drafted | [PRD](../prd/prd-spartan-coaching-operating-loop.md) · [Tech Spec](../techspec/techspec-spartan-coaching-operating-loop.md) · [Implementation](../implementation/implementation-spartan-coaching-operating-loop.md) |
+| 5 | Health Expansion | Add Apple Health as the future source for body weight, step totals, expenditure, and body-composition trend logic. | `cortana-external` + `cortana` | Drafted | [PRD](../prd/prd-spartan-health-expansion.md) · [Tech Spec](../techspec/techspec-spartan-health-expansion.md) · [Implementation](../implementation/implementation-spartan-health-expansion.md) |
 
 ## Roadmap Traceability
 
@@ -47,7 +47,7 @@ The full program is intentionally broken into bounded epics so any LLM can pick 
 
 Reference roadmap:
 
-- [Ultimate Fitness Trainer Roadmap](fitness-trainer-roadmap-2026-04-04.md)
+- [Ultimate Fitness Trainer Roadmap](./fitness-trainer-roadmap-2026-04-04.md)
 
 ## Dependency Order
 
@@ -104,18 +104,18 @@ Important nuance:
 
 If you want to review this in implementation order:
 
-1. [Core Baseline PRD](prd-spartan-fitness-core-baseline.md)
-2. [Core Baseline Tech Spec](techspec-spartan-fitness-core-baseline.md)
-3. [Core Baseline Implementation](implementation-spartan-fitness-core-baseline.md)
-4. [Training Intelligence PRD](prd-spartan-training-intelligence.md)
-5. [Training Intelligence Tech Spec](techspec-spartan-training-intelligence.md)
-6. [Training Intelligence Implementation](implementation-spartan-training-intelligence.md)
-7. [Tonal Programming PRD](prd-spartan-tonal-programming.md)
-8. [Tonal Programming Tech Spec](techspec-spartan-tonal-programming.md)
-9. [Tonal Programming Implementation](implementation-spartan-tonal-programming.md)
-10. [Coaching Operating Loop PRD](prd-spartan-coaching-operating-loop.md)
-11. [Coaching Operating Loop Tech Spec](techspec-spartan-coaching-operating-loop.md)
-12. [Coaching Operating Loop Implementation](implementation-spartan-coaching-operating-loop.md)
-13. [Health Expansion PRD](prd-spartan-health-expansion.md)
-14. [Health Expansion Tech Spec](techspec-spartan-health-expansion.md)
-15. [Health Expansion Implementation](implementation-spartan-health-expansion.md)
+1. [Core Baseline PRD](../prd/prd-spartan-fitness-core-baseline.md)
+2. [Core Baseline Tech Spec](../techspec/techspec-spartan-fitness-core-baseline.md)
+3. [Core Baseline Implementation](../implementation/implementation-spartan-fitness-core-baseline.md)
+4. [Training Intelligence PRD](../prd/prd-spartan-training-intelligence.md)
+5. [Training Intelligence Tech Spec](../techspec/techspec-spartan-training-intelligence.md)
+6. [Training Intelligence Implementation](../implementation/implementation-spartan-training-intelligence.md)
+7. [Tonal Programming PRD](../prd/prd-spartan-tonal-programming.md)
+8. [Tonal Programming Tech Spec](../techspec/techspec-spartan-tonal-programming.md)
+9. [Tonal Programming Implementation](../implementation/implementation-spartan-tonal-programming.md)
+10. [Coaching Operating Loop PRD](../prd/prd-spartan-coaching-operating-loop.md)
+11. [Coaching Operating Loop Tech Spec](../techspec/techspec-spartan-coaching-operating-loop.md)
+12. [Coaching Operating Loop Implementation](../implementation/implementation-spartan-coaching-operating-loop.md)
+13. [Health Expansion PRD](../prd/prd-spartan-health-expansion.md)
+14. [Health Expansion Tech Spec](../techspec/techspec-spartan-health-expansion.md)
+15. [Health Expansion Implementation](../implementation/implementation-spartan-health-expansion.md)

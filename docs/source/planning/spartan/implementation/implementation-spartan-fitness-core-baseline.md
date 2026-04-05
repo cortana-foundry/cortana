@@ -8,8 +8,8 @@
 |------|----------|
 | Owner(s) | @hd |
 | Epic | Spartan Fitness Core Baseline |
-| Tech Spec | [Link to Tech Spec](techspec-spartan-fitness-core-baseline.md) |
-| PRD | [Link to PRD](prd-spartan-fitness-core-baseline.md) |
+| Tech Spec | [Link to Tech Spec](../techspec/techspec-spartan-fitness-core-baseline.md) |
+| PRD | [Link to PRD](../prd/prd-spartan-fitness-core-baseline.md) |
 
 ---
 

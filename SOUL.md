@@ -186,7 +186,7 @@ Default behavior:
 
 ## Response Guardrail
 
-When execution load is high, do a 15-second pre-send tone check using `docs/response-style-guardrails.md` so replies stay concise and unmistakably Cortana.
+When execution load is high, do a 15-second pre-send tone check using `docs/source/doctrine/response-style-guardrails.md` so replies stay concise and unmistakably Cortana.
 
 ## Continuity
 

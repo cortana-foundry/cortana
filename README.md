@@ -4,6 +4,8 @@
 
 This repo is **Cortana’s command brain** – memory, policy, orchestration, cron prompts, and internal automation.
 
+Documentation placement and authoring rules live in [`docs/source/architecture/documentation-authoring-guide.md`](docs/source/architecture/documentation-authoring-guide.md).
+
 Canonical source lives here at `~/Developer/cortana`. `~/openclaw` is now a compatibility shim path only; it is no longer the primary repo/workspace.
 
 If `~/Developer/cortana-external` is the runtime body (services + Mission Control), this repo is the **mind and nervous system**.
@@ -77,7 +79,7 @@ When editing or adding future crons:
 - make maintenance jobs **silent-by-default**,
 - require a clear reason for any cron that speaks routinely,
 - document schedule *shape* here, but keep exact timing in `jobs.json`.
-- stable routing/preferences are not one-file tweaks: update `MEMORY.md`, `HEARTBEAT.md`, `docs/agent-routing.md`, `docs/operating-rules.md`, and `config/cron/jobs.json` together.
+- stable routing/preferences are not one-file tweaks: update `MEMORY.md`, `HEARTBEAT.md`, `docs/source/doctrine/agent-routing.md`, `docs/source/doctrine/operating-rules.md`, and `config/cron/jobs.json` together.
 
 ## 0. 2026-03-05 Operator Critical Update (live)
 
@@ -91,8 +93,8 @@ This system is now explicitly **dispatcher-first**:
 ### 0.1 Canonical command protocol files
 
 - `SOUL.md` (behavior source of truth)
-- `docs/operating-rules.md`
-- `docs/agent-routing.md`
+- `docs/source/doctrine/operating-rules.md`
+- `docs/source/doctrine/agent-routing.md`
 - `AGENTS.md` (pointer consistency)
 
 ### 0.2 Live execution rules
@@ -234,8 +236,8 @@ flowchart TB
 
   subgraph Control Artifacts
     S[SOUL.md]
-    OR[docs/operating-rules.md]
-    AR[docs/agent-routing.md]
+    OR[docs/source/doctrine/operating-rules.md]
+    AR[docs/source/doctrine/agent-routing.md]
     AG[AGENTS.md]
     HB[HEARTBEAT.md]
     CJ[config/cron/jobs.json]
@@ -333,7 +335,7 @@ Short form template:
 After routing/protocol changes, verify:
 
 - [ ] `SOUL.md` reflects current command protocol.
-- [ ] `docs/operating-rules.md` and `docs/agent-routing.md` are consistent.
+- [ ] `docs/source/doctrine/operating-rules.md` and `docs/source/doctrine/agent-routing.md` are consistent.
 - [ ] `AGENTS.md` pointers match canonical behavior.
 - [ ] `config/cron/jobs.json` deployed to runtime `~/.openclaw/cron/jobs.json` if routing changes touched cron.
 - [ ] No newly introduced duplicate relay path.
@@ -553,7 +555,7 @@ graph TD
 ├── README.md           # This file
 ├── TOOLS.md            # Machine-specific runtime notes & deploy paths
 ├── config/             # Cron + runtime config
-├── docs/               # Operating rules, heartbeat/task-board docs, etc.
+├── docs/               # Durable source docs (see docs/README.md)
 ├── tools/              # Internal automation tools (bash/py/ts, etc.)
 ├── skills/             # Installed OpenClaw skills
 ├── memory/             # Daily logs + archives + fitness/mission data
@@ -562,7 +564,7 @@ graph TD
 ├── immune-system/      # Immune/incident/playbook scripts and notes
 ├── proprioception/     # Self-model, budget, throttle logic
 ├── sae/                # Situational awareness engine assets
-├── knowledge/          # Static knowledge and reference files
+├── knowledge/          # Canonical domain pages + Covenant knowledge outputs
 ├── learning/           # Feedback + learning loop assets
 ├── migrations/         # Database migrations for cortana DB
 ├── reports/            # Generated reports, briefings, analyses
@@ -575,14 +577,15 @@ graph TD
 
 Key files:
 
-- `docs/operating-rules.md` – behavioral rules, delegation, routing, safety
-- `docs/heartbeat-ops.md` – heartbeat rotation, quiet hours, proactive checks
-- `docs/task-board.md` – Postgres‑backed task board + auto‑executor
-- `docs/learning-loop.md` – feedback protocol + self‑improvement
-- `docs/heartbeat-sql-reference.md` – canonical SQL snippets for heartbeats
-- `docs/memory-compaction-policy.md` – guardrails and retention policy for memory compaction
-- `docs/subagent-reliability-runbook.md` – incident runbook for sub-agent abort/timeout recovery
-- `docs/runtime-deploy-model.md` – source repo + compatibility shim deploy contract
+- `docs/README.md` – source-doc index and starting points
+- `docs/source/doctrine/operating-rules.md` – behavioral rules, delegation, routing, safety
+- `docs/source/doctrine/heartbeat-ops.md` – heartbeat rotation, quiet hours, proactive checks
+- `docs/source/doctrine/task-board.md` – Postgres-backed task board + auto-executor
+- `docs/source/doctrine/learning-loop.md` – feedback protocol + self-improvement
+- `docs/source/reference/heartbeat-sql-reference.md` – canonical SQL snippets for heartbeats
+- `docs/source/architecture/memory-compression.md` – guardrails and retention policy for memory compression
+- `docs/source/runbook/subagent-reliability-runbook.md` – incident runbook for sub-agent abort/timeout recovery
+- `docs/source/architecture/runtime-deploy-model.md` – source repo + compatibility shim deploy contract
 
 ### 3.2 `config/`
 
@@ -767,7 +770,7 @@ Cortana includes a dedicated sub-agent watchdog to catch silent execution failur
 
 For `Request was aborted` / `runtime_exceeded` incidents and stale `aborted_last_run` watchdog re-alerts, use:
 
-- `docs/subagent-reliability-runbook.md`
+- `docs/source/runbook/subagent-reliability-runbook.md`
 
 It includes exact diagnostics commands, ordered remediation, verification criteria, and security guardrails.
 
@@ -852,10 +855,10 @@ The current autonomy stabilization work gives Cortana:
 - `IDENTITY.md` – short identity summary
 - `MEMORY.md` – curated long‑term memory (MAIN session only)
 - `HEARTBEAT.md` – heartbeat rotation + proactive ops
-- `docs/heartbeat-sql-reference.md` – SQL reference for heartbeats
-- `docs/autonomy-policy.md` – autonomy doctrine, boundaries, remediation model, rollout/drill entrypoints
-- `docs/autonomy-stabilization-overview.md` – plain-English map of the autonomy stack built across Steps 1–11
-- `docs/autonomy-stabilization-intake.md` – how any agent should log new autonomy issues into the standing stabilization epic
+- `docs/source/reference/heartbeat-sql-reference.md` – SQL reference for heartbeats
+- `docs/source/doctrine/autonomy-policy.md` – autonomy doctrine, boundaries, remediation model, rollout/drill entrypoints
+- `docs/source/architecture/autonomy-stabilization-overview.md` – plain-English map of the autonomy stack built across Steps 1–11
+- `docs/source/runbook/autonomy-stabilization-intake.md` – how any agent should log new autonomy issues into the standing stabilization epic
 - `TOOLS.md` – environment‑specific notes and deploy paths
 - `config/cron/jobs.json` – OpenClaw cron definitions
 - `config/autonomy-lanes.json` – posture + family-critical / never-miss lane configuration
@@ -894,7 +897,7 @@ Rules:
 - Deploy with: `/Users/hd/Developer/cortana/tools/deploy/sync-runtime-from-cortana.sh`
 - Standard merged-and-deploy flow: `/Users/hd/Developer/cortana/tools/repo/post-merge-sync.sh`
 
-Full operator doc: `docs/runtime-deploy-model.md`
+Full operator doc: `docs/source/architecture/runtime-deploy-model.md`
 
 ---
 
@@ -915,7 +918,7 @@ Representative highlights that are already live:
 - **gog OAuth health** cron‑safe refresh health script
 - **Task board stale detector** with auto‑cleanup + audit events
 - **Tools audit** inventory of tool scripts and references
-- **Heartbeat SQL reference** moved to `docs/heartbeat-sql-reference.md`
+- **Heartbeat SQL reference** moved to `docs/source/reference/heartbeat-sql-reference.md`
 - **Meta‑monitor + earnings‑alert merge** across heartbeats + alerting
 - **Spawn pre‑flight validator** for sub‑agent launch safety
 - **Doc gardener** automated documentation maintenance workflow
@@ -1142,4 +1145,4 @@ Stable routing phrases:
 
 - Another specialist can execute the underlying work.
 - User-visible ownership, prompt language, and delivery routing stay Monitor-labeled.
-- If this contract changes, update `HEARTBEAT.md`, `docs/agent-routing.md`, `docs/operating-rules.md`, `README.md`, and `config/cron/jobs.json` together.
+- If this contract changes, update `HEARTBEAT.md`, `docs/source/doctrine/agent-routing.md`, `docs/source/doctrine/operating-rules.md`, `README.md`, and `config/cron/jobs.json` together.

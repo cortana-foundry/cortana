@@ -192,9 +192,9 @@ Current system observations that justify this epic:
 
 Relevant prior docs:
 
-- [Ultimate Fitness Trainer Roadmap](fitness-trainer-roadmap-2026-04-04.md)
-- [Core Baseline PRD](prd-spartan-fitness-core-baseline.md)
-- [Program Index](spartan-fitness-program-index.md)
+- [Ultimate Fitness Trainer Roadmap](../roadmap/fitness-trainer-roadmap-2026-04-04.md)
+- [Core Baseline PRD](./prd-spartan-fitness-core-baseline.md)
+- [Program Index](../roadmap/spartan-fitness-program-index.md)
 
 ### Open Questions
 

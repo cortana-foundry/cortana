@@ -28,7 +28,7 @@
         },
         {
           "name": "subagent reliability runbook",
-          "path": "docs/subagent-reliability-runbook.md"
+          "path": "docs/source/runbook/subagent-reliability-runbook.md"
         }
       ]
     },

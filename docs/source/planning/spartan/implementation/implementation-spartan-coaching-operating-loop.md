@@ -8,8 +8,8 @@
 |------|----------|
 | Owner(s) | @hd |
 | Epic | Spartan Coaching Operating Loop |
-| Tech Spec | [Link to Tech Spec](techspec-spartan-coaching-operating-loop.md) |
-| PRD | [Link to PRD](prd-spartan-coaching-operating-loop.md) |
+| Tech Spec | [Link to Tech Spec](../techspec/techspec-spartan-coaching-operating-loop.md) |
+| PRD | [Link to PRD](../prd/prd-spartan-coaching-operating-loop.md) |
 
 ---
 

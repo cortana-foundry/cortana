@@ -72,7 +72,7 @@ npx tsx /Users/hd/Developer/cortana/tools/monitoring/ops-routing-drift-check.ts
 This enforces the stable owner-lane contract:
 - inbox/email ops + maintenance alerts route through **Monitor**
 - healthy watcher paths stay quiet with `NO_REPLY`
-- stable routing/preferences updates belong in `MEMORY.md`, `HEARTBEAT.md`, `docs/agent-routing.md`, `docs/operating-rules.md`, `README.md`, and `config/cron/jobs.json` together
+- stable routing/preferences updates belong in `MEMORY.md`, `HEARTBEAT.md`, `docs/source/doctrine/agent-routing.md`, `docs/source/doctrine/operating-rules.md`, `README.md`, and `config/cron/jobs.json` together
 
 ## PR completion protocol (standard)
 

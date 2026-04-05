@@ -35,7 +35,7 @@ Quiet maintenance watchers should return exactly `NO_REPLY` on healthy paths.
 
 - Another specialist can still execute the underlying work.
 - The user-facing delivery account, prompt ownership language, and cron routing should still point to Monitor.
-- If this contract changes, update `MEMORY.md`, `HEARTBEAT.md`, `docs/operating-rules.md`, `README.md`, and `config/cron/jobs.json` in the same workflow.
+- If this contract changes, update `MEMORY.md`, `HEARTBEAT.md`, `docs/source/doctrine/operating-rules.md`, `README.md`, and `config/cron/jobs.json` in the same workflow.
 
 ## Cortana Protocol (Routing)
 
@@ -48,12 +48,12 @@ Quiet maintenance watchers should return exactly `NO_REPLY` on healthy paths.
 - Status claims must be check-backed (CI/cron/runtime verification before declaring green).
 - If wrong, correct quickly and post the verified state.
 
-For Researcher bootstrap + usage details, see `docs/researcher-bot-bootstrap.md`.
+For Researcher bootstrap + usage details, see `docs/source/architecture/researcher-bot-bootstrap.md`.
 
 ## Monitor/Covenant Telegram troubleshooting
 
 If Monitor cannot see Covenant group messages, use:
-- `docs/monitor-covenant-telegram-troubleshooting.md`
+- `docs/source/runbook/monitor-covenant-telegram-troubleshooting.md`
 
 This covers routing keys, account bindings, group mention policy, and Telegram privacy/admin checks.
 

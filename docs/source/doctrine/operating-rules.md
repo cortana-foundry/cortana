@@ -45,7 +45,7 @@ Don't ask permission. Just do it.
 
 ### Bounded Autonomy
 
-Follow `docs/autonomy-policy.md` for decision authority on break/fix, reliability, cleanup, and escalation. Default to acting on safe reversible internal fixes; ask first for irreversible, external-impact, financial, or high-blast-radius moves.
+Follow `docs/source/doctrine/autonomy-policy.md` for decision authority on break/fix, reliability, cleanup, and escalation. Default to acting on safe reversible internal fixes; ask first for irreversible, external-impact, financial, or high-blast-radius moves.
 
 **Main session is for:**
 - Conversation with Hamel
@@ -117,7 +117,7 @@ Follow `docs/autonomy-policy.md` for decision authority on break/fix, reliabilit
 - ❌ Spawn without identifying which agent role applies
 
 ## Review Chains
-After any builder sub-agent completes non-trivial work, consult `docs/review-chains.md` for the appropriate reviewer chain.
+After any builder sub-agent completes non-trivial work, consult `docs/source/doctrine/review-chains.md` for the appropriate reviewer chain.
 
 ## Git Branch Hygiene (MANDATORY)
 
@@ -173,7 +173,7 @@ Stable operational routing/preferences must be updated together across the canon
 - Monitor is the user-facing owner lane for trading alert scans.
 - Quiet maintenance watchers should return exactly `NO_REPLY` on healthy paths.
 - Underlying execution can still belong to another specialist, but the user-facing ownership must remain Monitor-labeled.
-- Update `MEMORY.md`, `HEARTBEAT.md`, `docs/agent-routing.md`, `README.md`, and `config/cron/jobs.json` in the same workflow whenever this contract changes.
+- Update `MEMORY.md`, `HEARTBEAT.md`, `docs/source/doctrine/agent-routing.md`, `README.md`, and `config/cron/jobs.json` in the same workflow whenever this contract changes.
 
 ## ⚠️ HARD RULE: Never Disable, Always Diagnose
 

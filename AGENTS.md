@@ -26,18 +26,18 @@ Specialist agents must not introduce themselves as Cortana unless explicitly ins
 ## 2. Where Rules Live
 
 - **Command-brain behavior source of truth → `SOUL.md`**
-- Operating rules, delegation, routing, safety → `docs/operating-rules.md`
-- **Agent routing & channel architecture → `docs/agent-routing.md`**
-- Heartbeat logic, quiet hours, proactive checks → `docs/heartbeat-ops.md`
-- Bounded autonomy / decision authority → `docs/autonomy-policy.md`
-- Task board + autonomous queue → `docs/task-board.md`
-- Learning loop, feedback protocol → `docs/learning-loop.md`
+- Operating rules, delegation, routing, safety → `docs/source/doctrine/operating-rules.md`
+- **Agent routing & channel architecture → `docs/source/doctrine/agent-routing.md`**
+- Heartbeat logic, quiet hours, proactive checks → `docs/source/doctrine/heartbeat-ops.md`
+- Bounded autonomy / decision authority → `docs/source/doctrine/autonomy-policy.md`
+- Task board + autonomous queue → `docs/source/doctrine/task-board.md`
+- Learning loop, feedback protocol → `docs/source/doctrine/learning-loop.md`
 
 ## 3. Hard Constraints (Pointers Only)
 
-- **Main session = conversation + coordination.** Execution routes to specialists; Cortana does not self-author PRs by default. Details in `docs/operating-rules.md`.
-- **Inter-agent lanes are TASK-only.** No FYI/status chatter; no duplicate relays when specialists already delivered. See `docs/agent-routing.md`.
-- **Files are memory.** Use daily notes + `MEMORY.md` for persistence; see `docs/operating-rules.md` + `docs/heartbeat-ops.md` for full protocol.
+- **Main session = conversation + coordination.** Execution routes to specialists; Cortana does not self-author PRs by default. Details in `docs/source/doctrine/operating-rules.md`.
+- **Inter-agent lanes are TASK-only.** No FYI/status chatter; no duplicate relays when specialists already delivered. See `docs/source/doctrine/agent-routing.md`.
+- **Files are memory.** Use daily notes + `MEMORY.md` for persistence; see `docs/source/doctrine/operating-rules.md` + `docs/source/doctrine/heartbeat-ops.md` for full protocol.
 
 ## 4. Identity Namespace Scaffolds (Slice 1)
 
@@ -52,9 +52,9 @@ These are doctrine/memory placeholders only. Runtime routing/wiring is **not** s
 When adding durable behavior:
 - Voice/tone → `SOUL.md`
 - Human context/preferences → `USER.md` or `MEMORY.md`
-- Behavioral rules/routing → `docs/operating-rules.md`
-- Heartbeats/proactive behavior → `docs/heartbeat-ops.md`
-- Task-board behavior → `docs/task-board.md`
-- Learning/feedback → `docs/learning-loop.md`
+- Behavioral rules/routing → `docs/source/doctrine/operating-rules.md`
+- Heartbeats/proactive behavior → `docs/source/doctrine/heartbeat-ops.md`
+- Task-board behavior → `docs/source/doctrine/task-board.md`
+- Learning/feedback → `docs/source/doctrine/learning-loop.md`
 
 This file stays a slim index, not a dumping ground.

@@ -8,8 +8,8 @@
 |------|----------|
 | Owner(s) | @hd |
 | Epic | Spartan Tonal Programming |
-| Tech Spec | [Link to Tech Spec](techspec-spartan-tonal-programming.md) |
-| PRD | [Link to PRD](prd-spartan-tonal-programming.md) |
+| Tech Spec | [Link to Tech Spec](../techspec/techspec-spartan-tonal-programming.md) |
+| PRD | [Link to PRD](../prd/prd-spartan-tonal-programming.md) |
 
 ---
 

@@ -192,9 +192,9 @@ Current-state evidence:
 
 Related docs:
 
-- [Training Intelligence PRD](prd-spartan-training-intelligence.md)
-- [Ultimate Fitness Trainer Roadmap](fitness-trainer-roadmap-2026-04-04.md)
-- [Program Index](spartan-fitness-program-index.md)
+- [Training Intelligence PRD](./prd-spartan-training-intelligence.md)
+- [Ultimate Fitness Trainer Roadmap](../roadmap/fitness-trainer-roadmap-2026-04-04.md)
+- [Program Index](../roadmap/spartan-fitness-program-index.md)
 
 ### Open Questions
 

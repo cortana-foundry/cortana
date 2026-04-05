@@ -23,8 +23,8 @@
       "summary": "Monitor is the user-facing owner lane for inbox/email ops and operational maintenance alerts.",
       "updateFiles": [
         "HEARTBEAT.md",
-        "docs/agent-routing.md",
-        "docs/operating-rules.md",
+        "docs/source/doctrine/agent-routing.md",
+        "docs/source/doctrine/operating-rules.md",
         "README.md",
         "config/cron/jobs.json"
       ],
@@ -38,13 +38,13 @@
           ]
         },
         {
-          "path": "docs/agent-routing.md",
+          "path": "docs/source/doctrine/agent-routing.md",
           "phrases": [
             "Monitor is the user-facing owner lane for inbox/email ops and operational maintenance alerts."
           ]
         },
         {
-          "path": "docs/operating-rules.md",
+          "path": "docs/source/doctrine/operating-rules.md",
           "phrases": [
             "Stable operational routing/preferences must be updated together",
             "Monitor is the user-facing owner lane for inbox/email ops and operational maintenance alerts."
@@ -65,8 +65,8 @@
       "updateFiles": [
         "MEMORY.md",
         "HEARTBEAT.md",
-        "docs/agent-routing.md",
-        "docs/operating-rules.md",
+        "docs/source/doctrine/agent-routing.md",
+        "docs/source/doctrine/operating-rules.md",
         "README.md",
         "config/cron/jobs.json"
       ],
@@ -74,7 +74,7 @@
         {
           "path": "MEMORY.md",
           "phrases": [
-            "Stable operational routing/preferences belong in HEARTBEAT.md, docs/agent-routing.md, docs/operating-rules.md, README.md, and config/cron/jobs.json together."
+            "Stable operational routing/preferences belong in HEARTBEAT.md, docs/source/doctrine/agent-routing.md, docs/source/doctrine/operating-rules.md, README.md, and config/cron/jobs.json together."
           ]
         }
       ]

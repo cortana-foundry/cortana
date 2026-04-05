@@ -8,8 +8,8 @@
 |------|----------|
 | Owner(s) | @hd |
 | Epic | Spartan Health Expansion |
-| Tech Spec | [Link to Tech Spec](techspec-spartan-health-expansion.md) |
-| PRD | [Link to PRD](prd-spartan-health-expansion.md) |
+| Tech Spec | [Link to Tech Spec](../techspec/techspec-spartan-health-expansion.md) |
+| PRD | [Link to PRD](../prd/prd-spartan-health-expansion.md) |
 
 ---
 

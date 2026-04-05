@@ -8,8 +8,8 @@
 |------|----------|
 | Owner(s) | @hd |
 | Epic | Spartan Training Intelligence |
-| Tech Spec | [Link to Tech Spec](techspec-spartan-training-intelligence.md) |
-| PRD | [Link to PRD](prd-spartan-training-intelligence.md) |
+| Tech Spec | [Link to Tech Spec](../techspec/techspec-spartan-training-intelligence.md) |
+| PRD | [Link to PRD](../prd/prd-spartan-training-intelligence.md) |
 
 ---
 
