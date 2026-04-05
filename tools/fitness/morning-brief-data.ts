@@ -3,6 +3,7 @@
 import { spawnSync } from "node:child_process";
 import { chooseSurfacedInsightIds, fetchPendingHealthInsights, markInsightsSql } from "./insights-db.js";
 import { upsertFitnessDailySnapshot } from "./facts-db.js";
+import { loadAppleHealthWindow } from "./health-source-service.js";
 import { collectRecentMealEntries, summarizeMealRollup } from "./meal-log.js";
 import { fetchCoachCaffeineDaySummary, fetchCoachNutritionRow, upsertCoachDecision } from "./coach-db.js";
 import { buildAthleteStateForDate } from "./athlete-state-data.js";
@@ -194,6 +195,12 @@ function main(): void {
   const isStale = (recoveryFreshnessHours ?? 99) > 18 || (sleepFreshnessHours ?? 99) > 18;
   const caffeineYesterday = fetchCoachCaffeineDaySummary(yesterday);
   const mealEntries = collectRecentMealEntries({ days: 14, agentId: "spartan" });
+  const appleHealth = loadAppleHealthWindow({
+    endDate: today,
+    lookbackDays: 13,
+  });
+  if (appleHealth.error) errors.push(`apple_health:${appleHealth.error}`);
+  if (appleHealth.serviceStatus === "unhealthy") errors.push("apple_health_unhealthy");
   const mealRollup = summarizeMealRollup(mealEntries, today);
   const coachNutrition = fetchCoachNutritionRow(today);
   const proteinDaysLoggedPrior = previousProteinDaysLogged(mealEntries, today);
@@ -225,6 +232,7 @@ function main(): void {
     tonalPayload: tonal,
     mealEntries,
     coachNutrition,
+    healthSourceRows: appleHealth.healthRows,
   });
   const recommendation = buildDailyRecommendation({
     readinessBand: athleteStateBuild.athleteState.readinessBand ?? "unknown",
@@ -399,6 +407,7 @@ function main(): void {
       is_stale: isStale,
       recovery_hours: recoveryFreshnessHours,
       sleep_hours: sleepFreshnessHours,
+      apple_health_status: appleHealth.serviceStatus,
     },
     pending_health_insights: pendingInsights,
     surfaced_insight_ids: surfacedInsightIds,
@@ -432,6 +441,15 @@ function main(): void {
       has_sleep_signal: latestSleep?.sleepPerformance != null,
       has_tonal_today: tonalWorkouts.length > 0,
       has_meal_logs: mealRollup.today.mealsLogged > 0,
+      has_apple_health: appleHealth.healthRows.length > 0,
+    },
+    apple_health: {
+      status: appleHealth.serviceStatus,
+      rows_loaded: appleHealth.healthRows.length,
+      rows_ingested: appleHealth.ingestedRowCount,
+      ignored_metrics: appleHealth.ignoredMetricCount,
+      write_status: appleHealth.writeResult?.ok === false ? "error" : "ok",
+      write_error: appleHealth.writeResult?.ok === false ? appleHealth.writeResult.error ?? "unknown" : null,
     },
     tonal_health: tonalHealth,
   };
