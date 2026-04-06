@@ -3,7 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { buildMorningTrainingRecommendation, readinessEmoji, whoopRecoveryBandFromScore } from "./coaching-rules.js";
 import { buildNutritionAssumption, type NutritionAssumption } from "./evening-recap-data.js";
-import type { ReliabilityGuardrailStatus } from "./reliability-guardrail.js";
+import { isMorningFreshnessWarn, type ReliabilityGuardrailStatus } from "./reliability-guardrail.js";
 import { buildWeeklyProteinAssumption, type WeeklyProteinAssumption } from "./weekly-insights-data.js";
 import type { ReadinessBand } from "./signal-utils.js";
 
@@ -14,6 +14,7 @@ type HydrationStatus = "unknown" | "low" | "moderate" | "on_track";
 export type TodayMissionInput = {
   dateLocal: string;
   readinessScore: number | null;
+  readinessBandOverride?: ReadinessBand | null;
   sleepPerformance: number | null;
   hrvLatest?: number | null;
   rhrLatest?: number | null;
@@ -160,9 +161,18 @@ function buildConfidence(opts: {
   return "medium";
 }
 
+function buildSummaryQualifier(opts: {
+  confidence: TodayMissionArtifact["confidence"];
+  guardrailStatus?: ReliabilityGuardrailStatus;
+}): string {
+  if (opts.guardrailStatus === "block") return "guardrail block";
+  if (opts.guardrailStatus === "warn") return "guardrail warn";
+  return `${opts.confidence} confidence`;
+}
+
 export function buildTodayMissionArtifact(input: TodayMissionInput): TodayMissionArtifact {
-  const readinessBand = whoopRecoveryBandFromScore(input.readinessScore);
-  const stale = (input.recoveryFreshnessHours ?? 99) > 18 || (input.sleepFreshnessHours ?? 99) > 18;
+  const readinessBand = input.readinessBandOverride ?? whoopRecoveryBandFromScore(input.readinessScore);
+  const stale = isMorningFreshnessWarn(input.recoveryFreshnessHours) || isMorningFreshnessWarn(input.sleepFreshnessHours);
   const recommendation = input.trainingOverride ?? buildMorningTrainingRecommendation({
     readinessBand,
     sleepPerformance: input.sleepPerformance,
@@ -211,8 +221,17 @@ export function buildTodayMissionArtifact(input: TodayMissionInput): TodayMissio
   const weeklySummary = weeklyFueling.status === "observed_from_logs"
     ? "weekly fueling is being observed"
     : "weekly fueling still needs consistent logs";
-
-  const summary = `${readinessEmoji(readinessBand)} ${readinessBand.toUpperCase()} | ${recommendation.mode} | ${weeklySummary}`;
+  const confidence = buildConfidence({
+    stale,
+    readinessBand,
+    nutrition,
+    weeklyFueling,
+    guardrailStatus: input.guardrailStatus,
+  });
+  const summary = `${readinessEmoji(readinessBand)} ${readinessBand.toUpperCase()} | ${recommendation.mode} | ${buildSummaryQualifier({
+    confidence,
+    guardrailStatus: input.guardrailStatus,
+  })} | ${weeklySummary}`;
 
   return {
     schema: "spartan.today_mission.v1",
@@ -255,13 +274,7 @@ export function buildTodayMissionArtifact(input: TodayMissionInput): TodayMissio
     priorities,
     non_negotiables: nonNegotiables,
     top_risk: topRiskWithGuardrail,
-    confidence: buildConfidence({
-      stale,
-      readinessBand,
-      nutrition,
-      weeklyFueling,
-      guardrailStatus: input.guardrailStatus,
-    }),
+    confidence,
     summary,
   };
 }

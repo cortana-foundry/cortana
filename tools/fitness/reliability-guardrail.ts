@@ -15,8 +15,7 @@ export type ReliabilityGuardrailReasonCode =
   | "readiness_blind_spot"
   | "nutrition_incomplete"
   | "apple_health_degraded"
-  | "apple_health_unhealthy"
-  | "apple_health_unconfigured";
+  | "apple_health_unhealthy";
 
 export type ReliabilityGuardrailReason = {
   code: ReliabilityGuardrailReasonCode;
@@ -47,8 +46,8 @@ export type MorningReliabilityGuardrail = {
   summary: string;
 };
 
-const WARN_FRESHNESS_HOURS = 18;
-const BLOCK_FRESHNESS_HOURS = 30;
+export const MORNING_FRESHNESS_WARN_HOURS = 18;
+export const MORNING_FRESHNESS_BLOCK_HOURS = 30;
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
@@ -93,6 +92,14 @@ export function buildReliabilityGuardrailErrorCodes(guardrail: MorningReliabilit
   return codes;
 }
 
+export function isMorningFreshnessWarn(hours: number | null | undefined): boolean {
+  return hours != null && hours > MORNING_FRESHNESS_WARN_HOURS;
+}
+
+export function isMorningFreshnessBlock(hours: number | null | undefined): boolean {
+  return hours != null && hours > MORNING_FRESHNESS_BLOCK_HOURS;
+}
+
 export function evaluateMorningReliabilityGuardrail(
   input: MorningReliabilityGuardrailInput,
 ): MorningReliabilityGuardrail {
@@ -105,14 +112,14 @@ export function evaluateMorningReliabilityGuardrail(
       impact: "mode",
       message: "WHOOP recovery is missing, so readiness cannot be trusted.",
     });
-  } else if ((input.recoveryFreshnessHours ?? 0) > BLOCK_FRESHNESS_HOURS) {
+  } else if (isMorningFreshnessBlock(input.recoveryFreshnessHours)) {
     reasons.push({
       code: "whoop_recovery_stale",
       severity: "block",
       impact: "mode",
       message: "WHOOP recovery is too stale for an aggressive training call.",
     });
-  } else if ((input.recoveryFreshnessHours ?? 0) > WARN_FRESHNESS_HOURS) {
+  } else if (isMorningFreshnessWarn(input.recoveryFreshnessHours)) {
     reasons.push({
       code: "whoop_recovery_stale",
       severity: "warn",
@@ -128,14 +135,14 @@ export function evaluateMorningReliabilityGuardrail(
       impact: "mode",
       message: "WHOOP sleep is missing, so the morning recovery picture is incomplete.",
     });
-  } else if ((input.sleepFreshnessHours ?? 0) > BLOCK_FRESHNESS_HOURS) {
+  } else if (isMorningFreshnessBlock(input.sleepFreshnessHours)) {
     reasons.push({
       code: "whoop_sleep_stale",
       severity: "block",
       impact: "mode",
       message: "WHOOP sleep is too stale for a confident training push.",
     });
-  } else if ((input.sleepFreshnessHours ?? 0) > WARN_FRESHNESS_HOURS) {
+  } else if (isMorningFreshnessWarn(input.sleepFreshnessHours)) {
     reasons.push({
       code: "whoop_sleep_stale",
       severity: "warn",
@@ -188,13 +195,6 @@ export function evaluateMorningReliabilityGuardrail(
       severity: "warn",
       impact: "confidence",
       message: "Apple Health is unhealthy, so body-composition metrics are not trustworthy today.",
-    });
-  } else if (input.appleHealthStatus === "unconfigured") {
-    reasons.push({
-      code: "apple_health_unconfigured",
-      severity: "warn",
-      impact: "confidence",
-      message: "Apple Health is not configured, so body-composition guidance remains lower confidence.",
     });
   }
 
