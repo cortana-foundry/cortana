@@ -1,6 +1,8 @@
 # Technical Specification - Spartan Coaching Operating Loop
 
-**Document Status:** Draft
+**Document Status:** Implemented
+
+Shipped on `main`; retained as the technical reference for the current system.
 
 ## Team
 
