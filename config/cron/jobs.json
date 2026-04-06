@@ -828,6 +828,28 @@
       }
     },
     {
+      "id": "main-bootstrap-refresh-15m",
+      "agentId": "cron-maintenance",
+      "name": "🧠 Main Bootstrap Refresh (15m)",
+      "enabled": true,
+      "schedule": {
+        "kind": "cron",
+        "expr": "*/15 * * * *",
+        "tz": "America/New_York"
+      },
+      "sessionTarget": "isolated",
+      "wakeMode": "now",
+      "payload": {
+        "kind": "agentTurn",
+        "timeoutSeconds": 60,
+        "message": "OUTPUT LIMIT: Keep this to one short line.\n\nThis is a quiet maintenance refresh for main-session live context.\n\nExecution contract:\n- First action must be one `exec` tool call.\n- Do not read files, search the repo, inspect skills, or use any other tool before that exec call.\n- Use this exact command and settings, non-interactively:\n  command: npx tsx /Users/hd/Developer/cortana/tools/context/refresh-main-bootstrap.ts\n  workdir: /Users/hd/.openclaw/workspaces/cron-maintenance\n  host: gateway\n  security: full\n  ask: off\n  timeout: 120\n  yieldMs: 20000\n\nRules:\n- The script writes /Users/hd/Developer/cortana/BOOTSTRAP.md.\n- Do not use the message tool.\n- If exec exits 0, return exactly: bootstrap refreshed\n- If exec fails, return stderr only."
+      },
+      "delivery": {
+        "mode": "none",
+        "accountId": "monitor"
+      }
+    },
+    {
       "id": "subagent-reliability-reaper-15m",
       "agentId": "cron-maintenance",
       "name": "🧯 Subagent Reliability Reaper (15m)",

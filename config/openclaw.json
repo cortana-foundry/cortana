@@ -64,7 +64,7 @@
       },
       "workspace": "/Users/hd/Developer/cortana",
       "bootstrapMaxChars": 12000,
-      "bootstrapTotalMaxChars": 22000,
+      "bootstrapTotalMaxChars": 23000,
       "memorySearch": {
         "enabled": true,
         "sources": [
