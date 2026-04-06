@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { isMorningFreshnessWarn } from "./reliability-guardrail.js";
 import type { ReadinessBand } from "./signal-utils.js";
 
 export type AlertSeverity = "info" | "warning" | "high";
@@ -112,7 +113,16 @@ function maxSeverity(a: AlertSeverity, b: AlertSeverity): AlertSeverity {
 }
 
 function shouldFlagFreshness(hours: number | null | undefined): boolean {
-  return hours != null && hours > 18;
+  return isMorningFreshnessWarn(hours);
+}
+
+function hasFreshnessGuardrailReason(codes: string[]): boolean {
+  return codes.some((code) =>
+    code === "whoop_recovery_missing"
+    || code === "whoop_sleep_missing"
+    || code === "whoop_recovery_stale"
+    || code === "whoop_sleep_stale",
+  );
 }
 
 function recoveryRiskSeverity(readinessBand: ReadinessBand | undefined, riskFlags: string[]): AlertSeverity | null {
@@ -165,7 +175,11 @@ export function evaluateAlertPolicy(input: AlertPolicyInput): AlertDecision[] {
   const freshnessRecovery = input.dataFreshnessHours?.recovery ?? null;
   const freshnessSleep = input.dataFreshnessHours?.sleep ?? null;
 
-  if (shouldFlagFreshness(freshnessRecovery) || shouldFlagFreshness(freshnessSleep) || guardrailStatus === "warn" || guardrailStatus === "block") {
+  if (
+    shouldFlagFreshness(freshnessRecovery)
+    || shouldFlagFreshness(freshnessSleep)
+    || ((guardrailStatus === "warn" || guardrailStatus === "block") && hasFreshnessGuardrailReason(guardrailReasonCodes))
+  ) {
     const severity =
       guardrailStatus === "block" || (shouldFlagFreshness(freshnessRecovery) && shouldFlagFreshness(freshnessSleep))
         ? "high"

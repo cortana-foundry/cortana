@@ -92,4 +92,23 @@ describe("fitness alert policy", () => {
       guardrail_reason_codes: ["whoop_recovery_missing", "readiness_blind_spot"],
     });
   });
+
+  it("does not mislabel non-freshness guardrail warnings as freshness alerts", () => {
+    const alerts = evaluateAlertPolicy({
+      dateLocal: "2026-04-06",
+      readinessBand: "green",
+      guardrailStatus: "warn",
+      guardrailReasonCodes: ["tonal_unhealthy"],
+      dataFreshnessHours: {
+        recovery: 4,
+        sleep: 5,
+      },
+      totalStrainToday: 8,
+      tonalSessionsToday: 0,
+      proteinActualG: 120,
+      proteinTargetG: 130,
+    });
+
+    expect(alerts.find((alert) => alert.alert_type === "freshness")).toBeUndefined();
+  });
 });

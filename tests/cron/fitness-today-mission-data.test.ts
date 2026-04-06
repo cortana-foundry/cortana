@@ -37,6 +37,7 @@ describe("fitness today mission artifact", () => {
     expect(mission.priorities[0]).toContain("controlled session");
     expect(mission.non_negotiables[0]).toContain("Protein target");
     expect(mission.confidence).toBe("high");
+    expect(mission.summary).toContain("high confidence");
   });
 
   it("falls back to conservative guidance when recovery data is stale", () => {
@@ -64,6 +65,7 @@ describe("fitness today mission artifact", () => {
     expect(mission.top_risk).toContain("stale recovery data");
     expect(mission.confidence).toBe("low");
     expect(mission.sleep_target.goal_hours).toBe(8.25);
+    expect(mission.summary).toContain("low confidence");
   });
 
   it("returns stable sandbox and repo mission paths", () => {
@@ -105,5 +107,6 @@ describe("fitness today mission artifact", () => {
     expect(mission.priorities[0]).toContain("controlled session");
     expect(mission.top_risk).toBe("WHOOP recovery is aging out and should be treated conservatively.");
     expect(mission.confidence).toBe("medium");
+    expect(mission.summary).toContain("guardrail warn");
   });
 });

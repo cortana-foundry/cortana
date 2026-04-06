@@ -1,6 +1,8 @@
 # Product Requirements Document (PRD) - Spartan Coaching Operating Loop
 
-**Document Status:** Draft
+**Document Status:** Implemented
+
+Shipped on `main`; retained as the design reference for the current system.
 
 ## Team
 

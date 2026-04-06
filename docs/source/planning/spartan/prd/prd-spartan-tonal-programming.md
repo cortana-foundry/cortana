@@ -1,6 +1,8 @@
 # Product Requirements Document (PRD) - Spartan Tonal Programming
 
-**Document Status:** Draft
+**Document Status:** Implemented
+
+Shipped on `main`; retained as the design reference for the current system.
 
 ## Team
 

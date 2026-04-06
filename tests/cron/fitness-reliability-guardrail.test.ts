@@ -69,7 +69,7 @@ describe("fitness reliability guardrail", () => {
     );
   });
 
-  it("keeps Apple Health concerns as confidence-only guidance", () => {
+  it("does not penalize training confidence when Apple Health is merely unconfigured", () => {
     const result = evaluateMorningReliabilityGuardrail({
       hasRecovery: true,
       hasSleep: true,
@@ -85,12 +85,7 @@ describe("fitness reliability guardrail", () => {
 
     expect(result.status).toBe("ok");
     expect(result.modeCap).toBe("push");
-    expect(result.confidenceCap).toBe(0.86);
-    expect(result.reasons).toEqual([
-      expect.objectContaining({
-        code: "apple_health_unconfigured",
-        impact: "confidence",
-      }),
-    ]);
+    expect(result.confidenceCap).toBeNull();
+    expect(result.reasons).toEqual([]);
   });
 });

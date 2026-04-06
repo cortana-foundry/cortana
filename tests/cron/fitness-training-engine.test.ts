@@ -90,6 +90,46 @@ describe("fitness training engine", () => {
     }).mode).toBe("push");
   });
 
+  it("does not suppress a green push day only because same-day protein is not logged yet", () => {
+    const recommendation = buildDailyRecommendation({
+      readinessBand: "green",
+      readinessConfidence: 0.9,
+      sleepPerformance: 91,
+      whoopStrain: 7,
+      proteinTargetG: 130,
+      proteinG: null,
+      nutritionConfidence: "low",
+      weeklyFatigueScore: 8,
+      weeklyInterferenceRiskScore: 10,
+      underdosedMusclesCount: 1,
+      overdosedMusclesCount: 0,
+    });
+
+    expect(recommendation.mode).toBe("push");
+    expect(recommendation.confidence).toBeLessThan(0.9);
+  });
+
+  it("caps push days when the cut target is already too aggressive", () => {
+    const recommendation = buildDailyRecommendation({
+      readinessBand: "green",
+      readinessConfidence: 0.92,
+      sleepPerformance: 91,
+      whoopStrain: 7,
+      proteinTargetG: 160,
+      proteinG: 160,
+      nutritionConfidence: "high",
+      phaseMode: "aggressive_cut",
+      targetWeightDeltaPctWeek: -0.9,
+      weeklyFatigueScore: 8,
+      weeklyInterferenceRiskScore: 10,
+      underdosedMusclesCount: 1,
+      overdosedMusclesCount: 0,
+    });
+
+    expect(recommendation.mode).toBe("controlled_train");
+    expect(recommendation.limitingFactor).toBe("cut_rate_risk");
+  });
+
   it("clamps push recommendations when the reliability guardrail is degraded", () => {
     const recommendation = buildDailyRecommendation({
       readinessBand: "green",

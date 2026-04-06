@@ -20,6 +20,7 @@ import { buildAndPersistTomorrowTonalPlan } from "./tonal-plan-artifact.js";
 import {
   buildReliabilityGuardrailErrorCodes,
   evaluateMorningReliabilityGuardrail,
+  isMorningFreshnessWarn,
 } from "./reliability-guardrail.js";
 import {
   buildReadinessSignal,
@@ -231,7 +232,7 @@ function main(): void {
   const readinessBand = whoopRecoveryBandFromScore(latestRecovery?.recoveryScore ?? null);
   const recoveryFreshnessHours = dataFreshnessHours(latestRecovery?.createdAt ?? null);
   const sleepFreshnessHours = dataFreshnessHours(latestSleep?.createdAt ?? null);
-  const isStale = (recoveryFreshnessHours ?? 99) > 18 || (sleepFreshnessHours ?? 99) > 18;
+  const isStale = isMorningFreshnessWarn(recoveryFreshnessHours) || isMorningFreshnessWarn(sleepFreshnessHours);
   const caffeineYesterday = fetchCoachCaffeineDaySummary(yesterday);
   const mealEntries = collectRecentMealEntries({ days: 14, agentId: "spartan" });
   const appleHealth = loadAppleHealthWindow({
@@ -309,6 +310,7 @@ function main(): void {
   const todayMission = buildTodayMissionArtifact({
     dateLocal: today,
     readinessScore: latestRecovery?.recoveryScore ?? null,
+    readinessBandOverride: athleteStateBuild.athleteState.readinessBand ?? readinessBand,
     sleepPerformance: latestSleep?.sleepPerformance ?? null,
     hrvLatest: readinessSupport.hrv_latest,
     rhrLatest: readinessSupport.rhr_latest,
@@ -360,8 +362,8 @@ function main(): void {
 
   if (recoveries.length === 0) errors.push("whoop_recovery_missing");
   if (sleeps.length === 0) errors.push("whoop_sleep_missing");
-  if (recoveryFreshnessHours != null && recoveryFreshnessHours > 18) errors.push("whoop_recovery_stale");
-  if (sleepFreshnessHours != null && sleepFreshnessHours > 18) errors.push("whoop_sleep_stale");
+  if (isMorningFreshnessWarn(recoveryFreshnessHours)) errors.push("whoop_recovery_stale");
+  if (isMorningFreshnessWarn(sleepFreshnessHours)) errors.push("whoop_sleep_stale");
   errors.push(...buildReliabilityGuardrailErrorCodes(reliabilityGuardrail).map((code) => `reliability_guardrail:${code}`));
 
   const athleteStateWrite = upsertAthleteStateDaily({

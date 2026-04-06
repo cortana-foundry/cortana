@@ -142,6 +142,12 @@ function hasQualityFlag(flags: Record<string, unknown> | null | undefined, key: 
   return Boolean(flags && key in flags && flags[key] !== false && flags[key] != null);
 }
 
+function isCutRateRisk(context: DailyRecommendationContext, config: TrainingEngineConfig): boolean {
+  const phaseMode = context.phaseMode ?? "unknown";
+  if (phaseMode !== "aggressive_cut" && phaseMode !== "gentle_cut") return false;
+  return (context.targetWeightDeltaPctWeek ?? 0) <= config.cutRateRiskFloorPct;
+}
+
 function inferCardioModeFromSportName(sport: string): CardioMode {
   const normalized = sport.trim().toLowerCase();
   if (!normalized) return "other";
@@ -307,11 +313,20 @@ export function buildDailyRecommendation(
     }, context.guardrail);
   }
 
+  if (isCutRateRisk(context, config)) {
+    return applyReliabilityGuardrail({
+      mode: "controlled_train",
+      confidence,
+      limitingFactor: "cut_rate_risk",
+      topRisk: "The current cut target is aggressive enough that extra push volume is more likely to cost muscle than add it.",
+      rationale: "Training quality still matters, but the current rate target argues for controlled execution instead of an all-in progression day.",
+    }, context.guardrail);
+  }
+
   if (
     context.readinessBand === "yellow"
     || (context.sleepPerformance ?? 100) < config.sleepPerformancePushFloor
     || (context.whoopStrain ?? 0) >= config.highStrainThreshold
-    || proteinGap == null
     || proteinGap > 0
   ) {
     return applyReliabilityGuardrail({

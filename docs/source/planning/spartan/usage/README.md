@@ -20,6 +20,13 @@ Spartan is most useful when these are true:
 
 Apple Health is optional for now. If the export file is not configured, Spartan should show `appleHealth.status = "unconfigured"` rather than failing.
 
+## Current Tuned Operating Posture
+
+- a clearly green day can still produce `push` even when same-day protein has not been logged yet; missing nutrition evidence lowers confidence instead of automatically suppressing the day
+- stale or missing WHOOP inputs still clamp the day conservatively through the morning reliability guardrail
+- Apple Health being `unconfigured` should not drag training confidence down by itself; it mainly limits body-composition context
+- `today_mission.summary` is the shortest reliable daily decision line and should be the first thing you scan
+
 ## HealthBridge On iPhone
 
 HealthBridge is the supported native iPhone producer for Apple Health data. It exports the canonical daily payload and posts it to the local importer.
@@ -74,6 +81,8 @@ Use it to confirm:
 
 - `errors` is empty
 - `today_training_recommendation.mode` looks plausible for current readiness
+- `today_training_recommendation.confidence` matches the amount of real signal available
+- `reliability_guardrail.status` is `ok` unless stale or missing core inputs justify a clamp
 - `tomorrow_tonal_plan` exists and has a stable `id`
 - `apple_health.status` is either `healthy` or `unconfigured`, not `unhealthy`
 

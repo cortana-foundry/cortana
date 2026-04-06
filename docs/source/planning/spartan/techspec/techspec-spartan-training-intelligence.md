@@ -1,6 +1,8 @@
 # Technical Specification - Spartan Training Intelligence
 
-**Document Status:** Draft
+**Document Status:** Implemented
+
+Shipped on `main`; retained as the technical reference for the current system.
 
 ## Team
 
