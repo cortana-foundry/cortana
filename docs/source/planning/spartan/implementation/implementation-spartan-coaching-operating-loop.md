@@ -197,6 +197,25 @@ Runtime integration should happen after today mission, alerting, and evaluation 
 
 ---
 
+## Post-Implementation Hardening - Morning Reliability Guardrail
+
+**cortana: add a deterministic morning safety layer so Spartan fails conservative instead of pretending confidence**
+
+#### Jira
+
+- [x] Sub-task 1: Create `/Users/hd/Developer/cortana/tools/fitness/reliability-guardrail.ts` as the shared morning guardrail evaluator for core freshness, provider availability, and confidence caps.
+- [x] Sub-task 2: Update `/Users/hd/Developer/cortana/tools/fitness/morning-brief-data.ts` and `/Users/hd/Developer/cortana/tools/fitness/today-mission-data.ts` so the morning artifact and today mission carry explicit guardrail state.
+- [x] Sub-task 3: Update `/Users/hd/Developer/cortana/tools/fitness/training-engine.ts` so degraded inputs clamp aggressive recommendations before output.
+- [x] Sub-task 4: Update alert consumption in `/Users/hd/Developer/cortana/tools/fitness/alert-policy.ts` and `/Users/hd/Developer/cortana/tools/fitness/fitness-alerts-data.ts`, then cover the new behavior in focused cron tests.
+
+#### Testing
+
+- Fresh, complete inputs preserve normal recommendation behavior.
+- Stale or missing WHOOP/Tonal inputs downgrade the morning recommendation deterministically.
+- Morning artifact output includes guardrail status, reasons, and confidence behavior without breaking existing JSON consumers.
+
+---
+
 ## Realistic Delivery Notes
 
 This epic is operationally sensitive because it changes how Spartan behaves day to day. The safest approach is to keep all decisions structured and logged, preserve concise message contracts, and harden alert dedupe before adding any new proactive surface.
