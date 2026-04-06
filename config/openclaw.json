@@ -463,7 +463,7 @@
       "openai": {
         "enabled": true,
         "config": {
-          "personality": "friendly"
+          "personality": "off"
         }
       },
       "brave": {
