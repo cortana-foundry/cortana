@@ -258,7 +258,37 @@ async function sessionsSend(task: SpecialistTask): Promise<SpecialistResult> {
 
 async function fetchWeather(): Promise<string> {
   try {
-    return await runCommand("curl", ["-s", "wttr.in/Warren+NJ?format=3"], 20_000);
+    const raw = await runCommand("curl", ["-s", "https://wttr.in/Warren+NJ?format=j1"], 20_000);
+    const parsed = safeJsonParse(raw) as
+      | {
+          current_condition?: Array<{
+            temp_F?: string;
+            FeelsLikeF?: string;
+            weatherDesc?: Array<{ value?: string }>;
+            windspeedMiles?: string;
+          }>;
+          weather?: Array<{
+            maxtempF?: string;
+            mintempF?: string;
+            hourly?: Array<{ chanceofrain?: string }>;
+          }>;
+        }
+      | null;
+
+    const current = parsed?.current_condition?.[0];
+    const today = parsed?.weather?.[0];
+    const condition = (current?.weatherDesc?.[0]?.value ?? "Weather").trim();
+    const temp = current?.temp_F ?? "?";
+    const feels = current?.FeelsLikeF ?? "?";
+    const high = today?.maxtempF ?? "?";
+    const low = today?.mintempF ?? "?";
+    const rain = today?.hourly?.reduce((max, hour) => {
+      const chance = Number(hour?.chanceofrain ?? 0);
+      return Number.isFinite(chance) ? Math.max(max, chance) : max;
+    }, 0) ?? 0;
+    const wind = current?.windspeedMiles ?? "?";
+
+    return `${condition}, ${temp}F (feels ${feels}F), high ${high}/low ${low}, rain ${rain}%, wind ${wind} mph`;
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
     return `Weather unavailable (${msg})`;
