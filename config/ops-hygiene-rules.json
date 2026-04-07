@@ -90,8 +90,8 @@
         "gmail",
         "inbox",
         "email triage",
-        "calendar reminders",
-        "apple reminders"
+        "calendar reminders \u2192 telegram",
+        "apple reminders alerts \u2192 telegram"
       ],
       "requireExplicitOwner": true,
       "requireQuietHealthy": true
