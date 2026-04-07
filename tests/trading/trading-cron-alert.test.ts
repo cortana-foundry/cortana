@@ -234,8 +234,8 @@ Dip Buyer: scanned 120 | evaluated 7 | threshold-passed 7 | emitted BUY 0 / WATC
       failClosedScans: [],
     });
 
-    expect(alert).toContain("CANSLIM status: analysis failed");
-    expect(alert).toContain("Dip Buyer status: market gate blocked");
+    expect(alert).toContain("CANSLIM temporarily unavailable this cycle");
+    expect(alert).toContain("Dip Buyer blocked by market conditions");
   });
 
   it("labels healthy empty typed snapshot sections as healthy no candidates", () => {
@@ -274,8 +274,54 @@ Dip Buyer: scanned 120 | evaluated 7 | threshold-passed 7 | emitted BUY 0 / WATC
       failClosedScans: [],
     });
 
-    expect(alert).toContain("CANSLIM status: healthy no candidates");
-    expect(alert).toContain("Dip Buyer status: healthy no candidates");
+    expect(alert).toContain("CANSLIM found no qualified setups");
+    expect(alert).toContain("Dip Buyer found no qualified setups");
+  });
+
+  it("humanizes degraded no-trade operator language in snapshot alerts", () => {
+    const alert = buildCronAlertFromPipelineSnapshot({
+      decision: "NO_TRADE",
+      confidence: 0.9,
+      risk: "LOW",
+      correctionMode: false,
+      regimeGates: "Regime/Gates: correction=NO | n/a | degraded | outcome_class=healthy_no_candidates | degraded=degraded_risky",
+      summary: { buy: 0, watch: 0, noBuy: 96 },
+      strategies: {
+        canslim: {
+          outcomeClass: "healthy_no_candidates",
+          scanned: 120,
+          evaluated: 0,
+          thresholdPassed: 0,
+          buy: 0,
+          watch: 0,
+          noBuy: 48,
+          signals: [],
+        },
+        dipBuyer: {
+          outcomeClass: "analysis_failed",
+          scanned: 120,
+          evaluated: 0,
+          thresholdPassed: 0,
+          buy: 0,
+          watch: 0,
+          noBuy: 48,
+          signals: [],
+        },
+      },
+      guardrailCount: 0,
+      relatedDetections: 0,
+      calibration: { status: "stale", settledCandidates: 0, reason: "no_settled_records" },
+      failClosedScans: [],
+    });
+
+    expect(alert).toContain("🟢 Regime: ACTIVE — stand aside until fresh market data returns");
+    expect(alert).toContain("🧪 Calibration: Unavailable | no settled records yet");
+    expect(alert).toContain("Dip Buyer temporarily unavailable this cycle");
+    expect(alert).toContain("CANSLIM found no qualified setups");
+    expect(alert).not.toContain("degraded_risky");
+    expect(alert).not.toContain("analysis failed");
+    expect(alert).not.toContain("healthy_no_candidates");
+    expect(alert).not.toContain("no_settled_records");
   });
 
   it("prefers the final ticker state when the pipeline emits conflicting duplicates", () => {

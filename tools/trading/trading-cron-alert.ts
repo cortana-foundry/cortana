@@ -106,19 +106,50 @@ function formatStrategyOutcomeLine(
   const humanized = (() => {
     switch (outcomeClass) {
       case "analysis_failed":
-        return "analysis failed";
+        return `${label} temporarily unavailable this cycle`;
       case "market_gate_blocked":
-        return "market gate blocked";
+        return `${label} blocked by market conditions`;
       case "healthy_no_candidates":
-        return "healthy no candidates";
+        return `${label} found no qualified setups`;
       case "healthy_candidates_found":
-        return "healthy candidates found";
+        return `${label} found qualified setups`;
       default:
-        return outcomeClass.replace(/_/g, " ");
+        return `${label} status: ${outcomeClass.replace(/_/g, " ")}`;
     }
   })();
 
-  return `${label} status: ${humanized}`;
+  return humanized;
+}
+
+function humanizeCalibrationSummary(raw: string): string | undefined {
+  const normalized = raw.trim();
+  if (!normalized) return undefined;
+  const lower = normalized.toLowerCase();
+  if (lower.startsWith("fresh")) return normalized.replace(/^fresh\b/i, "FRESH");
+  if (lower.includes("no_settled_records")) return "Unavailable | no settled records yet";
+  if (lower.startsWith("stale")) return normalized.replace(/^stale\b/i, "Unavailable");
+  return normalized;
+}
+
+function humanizeRegimeForAlert(raw: string, inCorrection: boolean): string {
+  const normalizedRaw = raw.replace(/^Regime\/Gates:\s*/i, "").trim();
+  if (inCorrection) return "CORRECTION — no new positions";
+
+  const lower = normalizedRaw.toLowerCase();
+  if (lower.includes("degraded=degraded_risky") || lower.includes("outcome_class=healthy_no_candidates")) {
+    return "ACTIVE — stand aside until fresh market data returns";
+  }
+  if (lower.includes("degraded=degraded_safe") || lower.includes("| degraded |")) {
+    return "ACTIVE — market data degraded, use extra caution";
+  }
+
+  const cleaned = normalizedRaw
+    .replace(/\|\s*n\/a\b/gi, "")
+    .replace(/\|\s*outcome_class=[^|]+/gi, "")
+    .replace(/\|\s*degraded=[^|]+/gi, "")
+    .replace(/\s+\|\s+/g, " | ")
+    .trim();
+  return cleaned || "ACTIVE";
 }
 
 export type ParsedSignal = { ticker: string; score: number; action: "BUY" | "WATCH" | "NO_BUY"; section: string };
@@ -276,7 +307,7 @@ export function buildCronAlertFromPipelineReport(report: string): string {
     "⚡ P1 High | Action Now",
     "",
     `🎯 Decision: ${decision} | Confidence: ${confidence} | Risk: ${risk}`,
-    inCorrection ? `🔴 Regime: CORRECTION — no new positions` : `🟢 Regime: ${regimeRaw}`,
+    inCorrection ? `🔴 Regime: ${humanizeRegimeForAlert(regimeRaw, inCorrection)}` : `🟢 Regime: ${humanizeRegimeForAlert(regimeRaw, inCorrection)}`,
     "",
     "┌ Summary ─────────────────────┐",
     `│ BUY ${summaryCounts.buy} │ WATCH ${summaryCounts.watch} │ NO_BUY ${summaryCounts.noBuy} │`,
@@ -288,7 +319,7 @@ export function buildCronAlertFromPipelineReport(report: string): string {
     focusSignal
       ? `🔥 Focus: ${focusSignal.ticker} — ${focusSignal.action}${focusSources.length ? ` (${focusSources.join(" + ")})` : ""}`
       : "🔥 Focus: unavailable",
-    calibration ? `🧪 Calibration: ${calibration.replace(/^fresh\b/i, "FRESH").replace(/^stale\b/i, "STALE")}` : undefined,
+    calibration ? `🧪 Calibration: ${humanizeCalibrationSummary(calibration)}` : undefined,
     "",
     dipWatchlist.title,
     dipWatchlist.body,
@@ -385,7 +416,9 @@ export function buildCronAlertFromPipelineSnapshot(snapshot: PipelineSnapshot): 
     "⚡ P1 High | Action Now",
     "",
     `🎯 Decision: ${snapshot.decision} | Confidence: ${snapshot.confidence.toFixed(2)} | Risk: ${snapshot.risk}`,
-    snapshot.correctionMode ? `🔴 Regime: CORRECTION — no new positions` : `🟢 Regime: ${snapshot.regimeGates}`,
+    snapshot.correctionMode
+      ? `🔴 Regime: ${humanizeRegimeForAlert(snapshot.regimeGates, snapshot.correctionMode)}`
+      : `🟢 Regime: ${humanizeRegimeForAlert(snapshot.regimeGates, snapshot.correctionMode)}`,
     "",
     "┌ Summary ─────────────────────┐",
     `│ BUY ${summaryCounts.buy} │ WATCH ${summaryCounts.watch} │ NO_BUY ${summaryCounts.noBuy} │`,
@@ -397,7 +430,7 @@ export function buildCronAlertFromPipelineSnapshot(snapshot: PipelineSnapshot): 
     focusSignal
       ? `🔥 Focus: ${focusSignal.ticker} — ${focusSignal.action}${focusSources.length ? ` (${focusSources.join(" + ")})` : ""}`
       : "🔥 Focus: unavailable",
-    calibration ? `🧪 Calibration: ${calibration.replace(/^fresh\b/i, "FRESH").replace(/^stale\b/i, "STALE")}` : undefined,
+    calibration ? `🧪 Calibration: ${humanizeCalibrationSummary(calibration)}` : undefined,
     "",
     dipWatchlist.title,
     dipWatchlist.body,
