@@ -18,6 +18,9 @@ cortical-loop/logs/
 cortical-loop/state/
 tmp/
 tmp/research/
+tmp-backtest-compute-*/
+tmp-notify-*/
+tmp-trading-run-state-*/
 __pycache__/
 
 # Runtime local state (do not track)
