@@ -67,4 +67,17 @@ describe("trading ops guard", () => {
     expect(spawnSyncMock).toHaveBeenCalledTimes(1);
     expect(spawnSyncMock.mock.calls[0][1]).toContain("mission_control:smoke_failed");
   });
+
+  it("suppresses Telegram alerts when guard alerts are disabled", () => {
+    reportTradingRunSyncIncident({
+      runId: "20260407-184121",
+      stage: "notify_deferred",
+      mode: "skipped",
+      reason: "MISSION_CONTROL_DATABASE_URL is not configured",
+      env: { ...process.env, TRADING_OPS_GUARD_DISABLE_ALERTS: "1" },
+    });
+
+    expect(runPsqlMock).toHaveBeenCalledTimes(1);
+    expect(spawnSyncMock).not.toHaveBeenCalled();
+  });
 });

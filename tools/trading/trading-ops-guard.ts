@@ -120,6 +120,8 @@ function sendIncidentAlert(input: {
   severity: "critical" | "high";
   env: NodeJS.ProcessEnv;
 }): void {
+  if (alertsDisabled(input.env)) return;
+
   spawnSync(
     TELEGRAM_GUARD,
     [
@@ -141,6 +143,11 @@ function sendIncidentAlert(input: {
       stdio: "ignore",
     },
   );
+}
+
+function alertsDisabled(env: NodeJS.ProcessEnv): boolean {
+  const raw = String(env.TRADING_OPS_GUARD_DISABLE_ALERTS ?? "").trim().toLowerCase();
+  return raw === "1" || raw === "true" || raw === "yes";
 }
 
 function sqlEscape(value: string): string {
