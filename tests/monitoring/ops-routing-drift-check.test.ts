@@ -142,4 +142,64 @@ describe("ops-routing-drift-check", () => {
       }),
     );
   });
+
+  it("does not flag Morning Brief just because it references Apple Reminders as content input", async () => {
+    const morningBriefRules = JSON.stringify({
+      version: 1,
+      stablePreferenceRules: [
+        {
+          id: "stable-docs",
+          summary: "Monitor is the user-facing owner lane for inbox/email ops and maintenance alerts.",
+          updateFiles: ["HEARTBEAT.md", "docs/source/doctrine/agent-routing.md", "docs/source/doctrine/operating-rules.md", "README.md", "config/cron/jobs.json"],
+          requiredDocs: [
+            {
+              path: "docs/source/doctrine/agent-routing.md",
+              phrases: ["Monitor is the user-facing owner lane for inbox/email ops and maintenance alerts."],
+            },
+          ],
+        },
+      ],
+      routingRules: [
+        {
+          id: "monitor-owns-inbox-ops",
+          scopeLabel: "inbox/email ops",
+          expectedOwner: "monitor",
+          jobKeywords: [
+            "newsletter",
+            "gmail",
+            "inbox",
+            "email triage",
+            "calendar reminders → telegram",
+            "apple reminders alerts → telegram",
+          ],
+          requireExplicitOwner: true,
+          requireQuietHealthy: true,
+        },
+      ],
+    });
+
+    seedFiles({
+      "/repo/config/ops-hygiene-rules.json": morningBriefRules,
+      "/repo/docs/source/doctrine/agent-routing.md": "Monitor is the user-facing owner lane for inbox/email ops and maintenance alerts.",
+      "/repo/config/cron/jobs.json": JSON.stringify({
+        jobs: [
+          {
+            id: "morning-brief",
+            name: "☀️ Morning brief (Hamel)",
+            agentId: "cron-comms",
+            delivery: { mode: "none" },
+            payload: {
+              message:
+                "Routing owner: Cron-comms owns the morning brief delivery lane. Policy: Morning Brief must be built from real data, including open Apple Reminders in the Cortana list. If exec exits 0: return exactly `Morning brief sent.`",
+            },
+          },
+        ],
+      }),
+    });
+
+    const output = await runScript(["--json", "--repo-root", "/repo"]);
+    const payload = JSON.parse(output);
+    expect(payload.status).toBe("healthy");
+    expect(payload.findings).toEqual([]);
+  });
 });
