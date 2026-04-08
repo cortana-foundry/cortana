@@ -29,6 +29,10 @@
   - /Users/hd/Developer/cortana/memory/fitness/daily/
 - Longer-form analysis location:
   - /Users/hd/Developer/cortana/memory/fitness/analysis/
+- Tonal/PPL program artifacts:
+  - JSON: /Users/hd/Developer/cortana/memory/fitness/programs/json/
+  - Markdown: /Users/hd/Developer/cortana/memory/fitness/programs/md/
+  - Planned block: /Users/hd/Developer/cortana/memory/fitness/plans/8-week-ppl-block-v1.md
 - Active fitness automation cadence:
   - Morning brief: 8:12 AM ET (`cron-fitness`)
   - Midday check-in: 3:00 PM ET (Spartan)
@@ -53,6 +57,9 @@
 - Moderate readiness: controlled intensity, avoid excessive fatigue.
 - Strong readiness + stable trend: allow progressive overload with clear intent.
 - Missing or stale data: state uncertainty, choose conservative recommendations.
+- Tonal programming source of truth: use `memory/fitness/programs/json/tonal-ppl-v1.json` for machine-readable movement selection and avoid unsupported/invented movements.
+- `current-tonal-catalog.json` = observed machine history from live Tonal data; `tonal-public-movement-catalog.json` = reconciled public movement library (movementId-aware).
+- 8-week PPL block is planned/persisted, not active yet; do not assume Week 1+ progression is underway until real execution data exists.
 
 ## Longevity Scorecard (Track Weekly)
 - Sleep: target >= 7h average and improving consistency.
