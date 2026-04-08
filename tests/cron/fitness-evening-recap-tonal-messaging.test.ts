@@ -17,11 +17,12 @@ describe("Fitness Evening Recap Tonal tomorrow messaging", () => {
     expect(message).toContain("/Users/hd/Developer/cortana/tools/fitness/evening-recap-data.ts");
     expect(message).toContain("today_training_output");
     expect(message).toContain("cycle-first");
-    expect(message).toContain("start with `Load:`");
+    expect(message).toContain("Open with the day’s load verdict in natural language");
     expect(message).toContain("today_nutrition");
     expect(message).toContain("nutrition_assumption");
     expect(message).toContain("tonight_sleep_target");
-    expect(message).toContain("Longevity impact:");
+    expect(message).toContain("Sound like a real coach following up after the day");
+    expect(message).toContain("do not literally write `Longevity impact:`");
     expect(message).toContain("one concrete action");
     expect(message).toContain("Do not call evening load signal \"readiness\"");
     expect(message).toContain("age-100 objective");
