@@ -52,8 +52,9 @@ describe("fitness cron contract", () => {
     expect(morningMessage).toContain("today_mission.summary");
     expect(morningMessage).toContain("Sound like a real coach texting one athlete");
     expect(morningMessage).toContain("Conversational, not robotic");
-    expect(morningMessage).toContain("do not literally write `Longevity impact:`");
-    expect(morningMessage).toContain("age-100 objective");
+    expect(morningMessage).toContain("1-2 facts that changed the call");
+    expect(morningMessage).toContain("Write like a smart trainer who knows the athlete");
+    expect(morningMessage).toContain("Keep the age-100 objective in mind");
     expect(morningMessage).toContain("tonal_sessions_today");
     expect(morningMessage).toContain("tonal_total_volume_today");
     expect(morningMessage).toContain("insight_mark_sql");
@@ -65,10 +66,10 @@ describe("fitness cron contract", () => {
     expect(eveningMessage).toContain("nutrition_assumption");
     expect(eveningMessage).toContain("tonight_sleep_target");
     expect(eveningMessage).toContain("Sound like a real coach following up after the day");
-    expect(eveningMessage).toContain("Open with the day’s load verdict in natural language");
+    expect(eveningMessage).toContain("Write like a text follow-up, not a summary report");
+    expect(eveningMessage).toContain("Use the 1-2 facts that matter most tonight");
     expect(eveningMessage).toContain("Do not call evening load signal \"readiness\"");
-    expect(eveningMessage).toContain("do not literally write `Longevity impact:`");
-    expect(eveningMessage).toContain("age-100 objective");
+    expect(eveningMessage).toContain("Keep the age-100 objective in mind");
     expect(eveningMessage).toContain("do not stop at \"unknown\"");
     expect(eveningMessage).toContain("Do not rehash morning readiness");
 
@@ -78,14 +79,14 @@ describe("fitness cron contract", () => {
     expect(weeklyMessage).toContain("strength_context.tonal");
     expect(weeklyMessage).toContain("current_sessions");
     expect(weeklyMessage).toContain("current_total_volume");
-    expect(weeklyMessage).toContain("age-100 objective");
+    expect(weeklyMessage).toContain("Write like one weekly check-in text");
     expect(weeklyMessage).toContain("112-140g/day");
     expect(weeklyMessage).toContain("protein_adherence_assumption");
     expect(weeklyMessage).toContain("coaching_outcome_evaluation.summary");
     expect(weeklyMessage).toContain("Sound like a real coach wrapping the week");
     expect(weeklyMessage).toContain("do not output only \"unknown\"");
     expect(weeklyMessage).toContain("state uncertainty rather than claiming zero strength output");
-    expect(weeklyMessage).toContain("next 24h");
+    expect(weeklyMessage).toContain("next 24 hours");
     expect(weeklyMessage).toContain("weekly_file_path");
     expect(weeklyMessage).toContain("weekly_repo_file_path");
     expect(weeklyMessage).toContain("do not fail the cron");
@@ -104,15 +105,22 @@ describe("fitness cron contract", () => {
       expect(job?.payload?.model).toBe("openai-codex/gpt-5.3-codex");
       expect(String(job?.payload?.message ?? "")).toContain("tools/fitness/fitness-alerts-data.ts");
       expect(String(job?.payload?.message ?? "")).toContain("mark_delivered_command");
-      expect(String(job?.payload?.message ?? "")).toContain("sounds human and direct, not robotic");
+      expect(String(job?.payload?.message ?? "")).toContain("2 short sentences");
+      expect(String(job?.payload?.message ?? "")).toContain("Lead with what Hamel should do now");
+      expect(String(job?.payload?.message ?? "")).toContain("Do not use labels, bullets, report tone");
     }
 
     expect(freshness?.schedule?.expr).toBe("20 6,12,18 * * *");
     expect(recoveryRisk?.schedule?.expr).toBe("5 9 * * *");
     expect(overreach?.schedule?.expr).toBe("15 19 * * *");
     expect(String(freshness?.payload?.message ?? "")).toContain("--types=freshness");
+    expect(String(freshness?.payload?.message ?? "")).toContain("keep today easy");
+    expect(String(freshness?.payload?.message ?? "")).toContain("Zone 2 until data refreshes");
     expect(String(recoveryRisk?.payload?.message ?? "")).toContain("--types=recovery_risk");
+    expect(String(recoveryRisk?.payload?.message ?? "")).toContain("if hard, pull back; if moderate, keep it controlled; if easy or recovery, stay there");
     expect(String(overreach?.payload?.message ?? "")).toContain("--types=overreach,protein_miss,pain,schedule_conflict");
+    expect(String(overreach?.payload?.message ?? "")).toContain("Choose the single dominant issue");
+    expect(String(overreach?.payload?.message ?? "")).toContain("protein-first meal or shake tonight");
   });
 
   it("defines monthly fitness overview cron with DB artifact contract", () => {
@@ -133,7 +141,8 @@ describe("fitness cron contract", () => {
     expect(message).toContain("data_quality.sleep_coverage_days");
     expect(message).toContain("data_quality.tonal_volume");
     expect(message).toContain("Sound like a real coach reviewing the month");
+    expect(message).toContain("Write like a clear monthly check-in");
     expect(message).toContain("do not imply the whole month lacks data");
-    expect(message).toContain("age-100 objective");
+    expect(message).toContain("Keep the age-100 objective in mind");
   });
 });
