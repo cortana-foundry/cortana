@@ -1,0 +1,526 @@
+{
+  "schema": "spartan.tonal_ppl_v1",
+  "generatedAt": "2026-04-08T16:38:10.013Z",
+  "source": {
+    "publicCatalogPath": "/Users/hd/Developer/cortana/memory/fitness/programs/json/tonal-public-movement-catalog.json",
+    "observedCatalogPath": "/Users/hd/Developer/cortana/memory/fitness/programs/json/current-tonal-catalog.json"
+  },
+  "summary": {
+    "workoutsSeen": 83,
+    "mappedMovementsSeen": 19,
+    "latestWorkoutAt": "2026-04-07T10:37:55.805493Z",
+    "publicMovementCount": 257,
+    "metricReadyPublicMovementCount": 51,
+    "observedPublicMovementCount": 51
+  },
+  "notes": [
+    "This is a v1 hypertrophy-oriented PPL built only from Tonal-supported movements that are locally mapped and validated by the public library, your own machine history, or both.",
+    "Use your recent average load as a reference point, not a hard prescription. Let the target rep range and 1-2 RIR drive the final load on the day.",
+    "If recovery is yellow or red, trim one accessory slot before you trim the main lift.",
+    "Weekly hard-set volume matters more than whether the split is labeled PPL or full body. If schedule allows, run this as a rolling split so muscles are exposed roughly twice every 7-10 days instead of only once per week.",
+    "Keep compounds mostly 1-2 RIR and accessories 0-2 RIR. You do not need routine failure work on presses, rows, split squats, or RDLs to grow.",
+    "Rest 2-3 minutes on the main compound lifts and 60-120 seconds on fly, raise, curl, triceps, and trunk accessories so the quality of the hard sets stays high.",
+    "Because you also run, keep hard running and the legs day separated by about 24 hours when possible, or reduce one accessory slot on the lower day if the run load was already high."
+  ],
+  "days": {
+    "push": {
+      "theme": "chest + shoulders + triceps with movements you already handle well on Tonal",
+      "whyThisFits": "Push day leans on your most repeated press and fly patterns, then finishes with shoulder and triceps work you have already logged successfully.",
+      "movements": [
+        {
+          "slot": "main_press",
+          "title": "Bench Press",
+          "movementId": "8edc0211-4594-4e5e-8e1b-b05dfc1d67c7",
+          "canonicalKey": "bench press",
+          "muscleGroup": "chest",
+          "pattern": "press",
+          "validationSources": [
+            "public_library",
+            "observed_history"
+          ],
+          "publicUrls": [
+            "https://tonal.com/blogs/movements?page=10",
+            "https://tonal.com/blogs/movements?page=11",
+            "https://tonal.com/blogs/movements?page=9",
+            "https://tonal.com/blogs/movements?page=6",
+            "https://tonal.com/blogs/movements?page=7"
+          ],
+          "recentHistory": {
+            "setCount": 44,
+            "workoutCount": 2,
+            "avgLoad": 37.5,
+            "avgReps": 9.4,
+            "avgVolume": 709.7
+          },
+          "programming": {
+            "sets": "4",
+            "reps": "6-10",
+            "rir": "1-2",
+            "note": "Run this as the main progression lift for the day."
+          },
+          "alternates": [],
+          "selectionReason": "Validated by public Tonal movement library, your workout history, 44 tracked sets, ~37.5 lb recent average load."
+        },
+        {
+          "slot": "vertical_press",
+          "title": "Standing Barbell Overhead Press",
+          "movementId": "eabcfa09-599a-4efd-8997-de107832de01",
+          "canonicalKey": "standing barbell overhead press",
+          "muscleGroup": "shoulders",
+          "pattern": "press",
+          "validationSources": [
+            "public_library",
+            "observed_history"
+          ],
+          "publicUrls": [
+            "https://tonal.com/blogs/movements?page=5",
+            "https://tonal.com/blogs/movements?page=6",
+            "https://tonal.com/blogs/movements?page=8"
+          ],
+          "recentHistory": {
+            "setCount": 35,
+            "workoutCount": 2,
+            "avgLoad": 17.5,
+            "avgReps": 12,
+            "avgVolume": 403.2
+          },
+          "programming": {
+            "sets": "3",
+            "reps": "6-10",
+            "rir": "1-2",
+            "note": "Second compound. Keep reps clean and stop before grinders."
+          },
+          "alternates": [
+            "Barbell Seated Overhead Press"
+          ],
+          "selectionReason": "Validated by public Tonal movement library, your workout history, 35 tracked sets, ~17.5 lb recent average load."
+        },
+        {
+          "slot": "chest_accessory",
+          "title": "Decline Chest Fly",
+          "movementId": "f4d78bdf-f70c-4f3c-bccb-78e9ff80f9fb",
+          "canonicalKey": "decline chest fly",
+          "muscleGroup": "chest",
+          "pattern": "fly",
+          "validationSources": [
+            "public_library",
+            "observed_history"
+          ],
+          "publicUrls": [
+            "https://tonal.com/blogs/movements?page=6",
+            "https://tonal.com/blogs/movements?page=7"
+          ],
+          "recentHistory": {
+            "setCount": 44,
+            "workoutCount": 2,
+            "avgLoad": 19.6,
+            "avgReps": 12.9,
+            "avgVolume": 507.3
+          },
+          "programming": {
+            "sets": "3",
+            "reps": "10-15",
+            "rir": "1-2",
+            "note": "Controlled stretch and squeeze. No sloppy fatigue chasing."
+          },
+          "alternates": [
+            "Incline Chest Fly",
+            "Middle Chest Fly"
+          ],
+          "selectionReason": "Validated by public Tonal movement library, your workout history, 44 tracked sets, ~19.6 lb recent average load."
+        },
+        {
+          "slot": "delt_accessory",
+          "title": "Barbell Front Raise",
+          "movementId": "5c740fbf-6d28-4fba-912d-040e4d1c92e1",
+          "canonicalKey": "barbell front raise",
+          "muscleGroup": "shoulders",
+          "pattern": "raise",
+          "validationSources": [
+            "public_library",
+            "observed_history"
+          ],
+          "publicUrls": [
+            "https://tonal.com/blogs/movements?page=10",
+            "https://tonal.com/blogs/movements?page=6"
+          ],
+          "recentHistory": {
+            "setCount": 32,
+            "workoutCount": 2,
+            "avgLoad": 13.4,
+            "avgReps": 10,
+            "avgVolume": 269.7
+          },
+          "programming": {
+            "sets": "2-3",
+            "reps": "10-15",
+            "rir": "1-2",
+            "note": "Use this to finish shoulders without turning the day into junk volume."
+          },
+          "alternates": [],
+          "selectionReason": "Validated by public Tonal movement library, your workout history, 32 tracked sets, ~13.4 lb recent average load."
+        },
+        {
+          "slot": "triceps_1",
+          "title": "Triceps Extension",
+          "movementId": "8571813d-b302-4cbe-a3b5-cc805a046b7d",
+          "canonicalKey": "triceps extension",
+          "muscleGroup": "triceps",
+          "pattern": "extension",
+          "validationSources": [
+            "observed_history"
+          ],
+          "publicUrls": [],
+          "recentHistory": {
+            "setCount": 41,
+            "workoutCount": 2,
+            "avgLoad": 39.4,
+            "avgReps": 12.5,
+            "avgVolume": 490
+          },
+          "programming": {
+            "sets": "3",
+            "reps": "10-15",
+            "rir": "1-2",
+            "note": "Lock in elbow-friendly reps and keep tension on triceps."
+          },
+          "alternates": [
+            "Overhead Triceps Extension"
+          ],
+          "selectionReason": "Validated by your workout history, 41 tracked sets, ~39.4 lb recent average load."
+        },
+        {
+          "slot": "triceps_2",
+          "title": "Overhead Triceps Extension",
+          "movementId": "9b0b0dad-6f86-4832-9dee-e6eaf4fad8b9",
+          "canonicalKey": "overhead triceps extension",
+          "muscleGroup": "triceps",
+          "pattern": "extension",
+          "validationSources": [
+            "observed_history"
+          ],
+          "publicUrls": [],
+          "recentHistory": {
+            "setCount": 31,
+            "workoutCount": 2,
+            "avgLoad": 32.3,
+            "avgReps": 12.6,
+            "avgVolume": 404.8
+          },
+          "programming": {
+            "sets": "2-3",
+            "reps": "12-15",
+            "rir": "1-2",
+            "note": "Optional second triceps slot if elbows feel good and recovery is solid."
+          },
+          "alternates": [
+            "Triceps Extension"
+          ],
+          "selectionReason": "Validated by your workout history, 31 tracked sets, ~32.3 lb recent average load."
+        }
+      ]
+    },
+    "pull": {
+      "theme": "lats + upper back + biceps with stable machine-supported pulling patterns",
+      "whyThisFits": "Pull day uses the row and pulldown patterns you already repeat most, then adds simple lat and biceps work without inventing unsupported movements.",
+      "movements": [
+        {
+          "slot": "row",
+          "title": "Barbell Bent Over Row",
+          "movementId": "ec9edd5f-4745-45b7-b78b-b7368839ca38",
+          "canonicalKey": "barbell bent over row",
+          "muscleGroup": "back",
+          "pattern": "row",
+          "validationSources": [
+            "public_library",
+            "observed_history"
+          ],
+          "publicUrls": [
+            "https://tonal.com/blogs/movements?page=10",
+            "https://tonal.com/blogs/movements?page=9",
+            "https://tonal.com/blogs/movements?page=7"
+          ],
+          "recentHistory": {
+            "setCount": 37,
+            "workoutCount": 2,
+            "avgLoad": 46.2,
+            "avgReps": 7.1,
+            "avgVolume": 657.6
+          },
+          "programming": {
+            "sets": "4",
+            "reps": "6-10",
+            "rir": "1-2",
+            "note": "Main horizontal pull. Stay strict and own the torso position."
+          },
+          "alternates": [],
+          "selectionReason": "Validated by public Tonal movement library, your workout history, 37 tracked sets, ~46.2 lb recent average load."
+        },
+        {
+          "slot": "lat_pulldown",
+          "title": "Neutral Grip Lat Pulldown",
+          "movementId": "0c498470-12f9-4b8b-83e8-940e70f7b967",
+          "canonicalKey": "neutral lat pulldown",
+          "muscleGroup": "lats",
+          "pattern": "pull_down",
+          "validationSources": [
+            "public_library",
+            "observed_history"
+          ],
+          "publicUrls": [
+            "https://tonal.com/blogs/movements?page=10",
+            "https://tonal.com/blogs/movements?page=9",
+            "https://tonal.com/blogs/movements?page=2",
+            "https://tonal.com/blogs/movements?page=5",
+            "https://tonal.com/blogs/movements?page=6"
+          ],
+          "recentHistory": {
+            "setCount": 37,
+            "workoutCount": 2,
+            "avgLoad": 45.7,
+            "avgReps": 8.9,
+            "avgVolume": 856.5
+          },
+          "programming": {
+            "sets": "4",
+            "reps": "6-10",
+            "rir": "1-2",
+            "note": "Primary vertical pull. Keep shoulders down and ribs stacked."
+          },
+          "alternates": [
+            "Straight Arm Pulldown"
+          ],
+          "selectionReason": "Validated by public Tonal movement library, your workout history, 37 tracked sets, ~45.7 lb recent average load."
+        },
+        {
+          "slot": "lat_accessory",
+          "title": "Straight Arm Pulldown",
+          "movementId": "f94f667d-5fe2-4bf7-b87e-ca705d5b627d",
+          "canonicalKey": "barbell straight arm pulldown",
+          "muscleGroup": "lats",
+          "pattern": "pull_down",
+          "validationSources": [
+            "public_library",
+            "observed_history"
+          ],
+          "publicUrls": [
+            "https://tonal.com/blogs/movements?page=9",
+            "https://tonal.com/blogs/movements?page=2",
+            "https://tonal.com/blogs/movements?page=8"
+          ],
+          "recentHistory": {
+            "setCount": 31,
+            "workoutCount": 2,
+            "avgLoad": 20.1,
+            "avgReps": 11.9,
+            "avgVolume": 479
+          },
+          "programming": {
+            "sets": "3",
+            "reps": "10-15",
+            "rir": "1-2",
+            "note": "Smooth lat accessory volume without stealing recovery from compounds."
+          },
+          "alternates": [
+            "Neutral Grip Lat Pulldown"
+          ],
+          "selectionReason": "Validated by public Tonal movement library, your workout history, 31 tracked sets, ~20.1 lb recent average load."
+        },
+        {
+          "slot": "biceps",
+          "title": "Barbell Biceps Curl",
+          "movementId": "0b5e580d-f813-4f4e-81ae-2ed559f88a93",
+          "canonicalKey": "barbell biceps curl",
+          "muscleGroup": "biceps",
+          "pattern": "curl",
+          "validationSources": [
+            "observed_history"
+          ],
+          "publicUrls": [],
+          "recentHistory": {
+            "setCount": 36,
+            "workoutCount": 2,
+            "avgLoad": 24.4,
+            "avgReps": 8,
+            "avgVolume": 387.8
+          },
+          "programming": {
+            "sets": "3",
+            "reps": "8-12",
+            "rir": "1-2",
+            "note": "Simple arm work. Full range and no torso swing."
+          },
+          "alternates": [],
+          "selectionReason": "Validated by your workout history, 36 tracked sets, ~24.4 lb recent average load."
+        },
+        {
+          "slot": "trunk",
+          "title": "Lateral Bridge With Row",
+          "movementId": "d509c836-0e78-48d5-8daf-3900add72be4",
+          "canonicalKey": "lateral bridge w row",
+          "muscleGroup": "core",
+          "pattern": "anti_rotation",
+          "validationSources": [
+            "public_library",
+            "observed_history"
+          ],
+          "publicUrls": [
+            "https://tonal.com/blogs/movements?page=3"
+          ],
+          "recentHistory": {
+            "setCount": 50,
+            "workoutCount": 2,
+            "avgLoad": 35.2,
+            "avgReps": 13.5,
+            "avgVolume": 484.2
+          },
+          "programming": {
+            "sets": "2-3",
+            "reps": "10-15 / side",
+            "rir": "2",
+            "note": "Use this as trunk control work that still complements the pull day."
+          },
+          "alternates": [],
+          "selectionReason": "Validated by public Tonal movement library, your workout history, 50 tracked sets, ~35.2 lb recent average load."
+        }
+      ]
+    },
+    "legs": {
+      "theme": "single-leg quad work + hinge + frontal-plane glute work with trunk control",
+      "whyThisFits": "Leg day mirrors the lower-body patterns you already use most on Tonal, which keeps the plan realistic and trackable.",
+      "movements": [
+        {
+          "slot": "quad_anchor",
+          "title": "Barbell Front Rack Split Squat",
+          "movementId": "c7737825-dd6f-44b4-9b25-6ee66b43d07d",
+          "canonicalKey": "split squat",
+          "muscleGroup": "quads",
+          "pattern": "lunge",
+          "validationSources": [
+            "public_library",
+            "observed_history"
+          ],
+          "publicUrls": [
+            "https://tonal.com/blogs/movements?page=11",
+            "https://tonal.com/blogs/movements?page=8",
+            "https://tonal.com/blogs/movements?page=4",
+            "https://tonal.com/blogs/movements?page=3",
+            "https://tonal.com/blogs/movements?page=10"
+          ],
+          "recentHistory": {
+            "setCount": 60,
+            "workoutCount": 2,
+            "avgLoad": 23.7,
+            "avgReps": 6,
+            "avgVolume": 289.8
+          },
+          "programming": {
+            "sets": "4",
+            "reps": "6-10 / side",
+            "rir": "1-2",
+            "note": "Main quad pattern. Start here and drive the session."
+          },
+          "alternates": [],
+          "selectionReason": "Validated by public Tonal movement library, your workout history, 60 tracked sets, ~23.7 lb recent average load."
+        },
+        {
+          "slot": "hinge_anchor",
+          "title": "Barbell RDL",
+          "movementId": "ef5f1802-a99e-4e56-b473-32bbf353fb73",
+          "canonicalKey": "barbell rdl",
+          "muscleGroup": "hamstrings",
+          "pattern": "hinge",
+          "validationSources": [
+            "public_library",
+            "observed_history"
+          ],
+          "publicUrls": [
+            "https://tonal.com/blogs/movements?page=10",
+            "https://tonal.com/blogs/movements?page=9",
+            "https://tonal.com/blogs/movements?page=8",
+            "https://tonal.com/blogs/movements?page=3",
+            "https://tonal.com/blogs/movements?page=7"
+          ],
+          "recentHistory": {
+            "setCount": 43,
+            "workoutCount": 2,
+            "avgLoad": 53.5,
+            "avgReps": 6.1,
+            "avgVolume": 655.6
+          },
+          "programming": {
+            "sets": "4",
+            "reps": "6-10",
+            "rir": "1-2",
+            "note": "Main posterior-chain lift. Keep hamstrings loaded and spine quiet."
+          },
+          "alternates": [],
+          "selectionReason": "Validated by public Tonal movement library, your workout history, 43 tracked sets, ~53.5 lb recent average load."
+        },
+        {
+          "slot": "frontal_plane",
+          "title": "Lateral Lunge",
+          "movementId": "f8bad1ec-c502-4379-b2f4-e9198245e534",
+          "canonicalKey": "resisted lateral lunge",
+          "muscleGroup": "glutes",
+          "pattern": "lunge",
+          "validationSources": [
+            "public_library",
+            "observed_history"
+          ],
+          "publicUrls": [
+            "https://tonal.com/blogs/movements",
+            "https://tonal.com/blogs/movements?page=4"
+          ],
+          "recentHistory": {
+            "setCount": 36,
+            "workoutCount": 2,
+            "avgLoad": 21.9,
+            "avgReps": 10,
+            "avgVolume": 219.3
+          },
+          "programming": {
+            "sets": "3",
+            "reps": "8-12 / side",
+            "rir": "1-2",
+            "note": "Good change-of-plane work for hips and glutes without huge recovery cost."
+          },
+          "alternates": [],
+          "selectionReason": "Validated by public Tonal movement library, your workout history, 36 tracked sets, ~21.9 lb recent average load."
+        },
+        {
+          "slot": "rotational_core",
+          "title": "ISO Split Squat Lift",
+          "movementId": "b68dd564-eb27-4b76-904f-67e25cf6de8c",
+          "canonicalKey": "iso split squat lift",
+          "muscleGroup": "core",
+          "pattern": "rotation",
+          "validationSources": [
+            "public_library",
+            "observed_history"
+          ],
+          "publicUrls": [
+            "https://tonal.com/blogs/movements?page=4"
+          ],
+          "recentHistory": {
+            "setCount": 30,
+            "workoutCount": 2,
+            "avgLoad": 13.1,
+            "avgReps": 10.4,
+            "avgVolume": 137.4
+          },
+          "programming": {
+            "sets": "2-3",
+            "reps": "10-12 / side",
+            "rir": "2",
+            "note": "Finish with trunk work that keeps the lower day athletic and controlled."
+          },
+          "alternates": [
+            "Standing Chop"
+          ],
+          "selectionReason": "Validated by public Tonal movement library, your workout history, 30 tracked sets, ~13.1 lb recent average load."
+        }
+      ]
+    }
+  }
+}
