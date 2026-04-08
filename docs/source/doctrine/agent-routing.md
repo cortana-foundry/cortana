@@ -48,7 +48,7 @@ Quiet maintenance watchers should return exactly `NO_REPLY` on healthy paths.
 - Status claims must be check-backed (CI/cron/runtime verification before declaring green).
 - If wrong, correct quickly and post the verified state.
 
-For Researcher bootstrap + usage details, see `docs/source/architecture/researcher-bot-bootstrap.md`.
+For Researcher lane identity and operating details, see `identities/researcher/`.
 
 ## Monitor/Covenant Telegram troubleshooting
 

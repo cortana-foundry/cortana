@@ -1,6 +1,9 @@
 # OpenClaw Overview
 
-OpenClaw-specific planning docs in `cortana` currently live under:
+There are no active OpenClaw planning docs in `cortana` right now.
 
-- [PRD](../../../docs/source/planning/openclaw/prd/prd-openclaw-existing-codex-session-attach.md)
-- [Tickets](../../../docs/source/planning/openclaw/tickets/tickets-openclaw-existing-codex-session-attach.md)
+If new OpenClaw planning work starts again, place it under:
+
+- `docs/source/planning/openclaw/prd/`
+- `docs/source/planning/openclaw/techspec/`
+- `docs/source/planning/openclaw/implementation/`

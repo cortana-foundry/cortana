@@ -6,5 +6,4 @@ Primary source material:
 
 - [Covenant README](../../../covenant/README.md)
 - [Covenant orchestration](../../../docs/source/architecture/covenant-orchestration-v2.md)
-- [Covenant identity spec](../../../docs/source/architecture/covenant-agent-identity-spec-v1.md)
 - [Covenant integration strategy](../../../docs/source/architecture/covenant-integration-strategy.md)
