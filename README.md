@@ -558,7 +558,7 @@ graph TD
 ├── docs/               # Durable source docs (see docs/README.md)
 ├── tools/              # Internal automation tools (bash/py/ts, etc.)
 ├── skills/             # Installed OpenClaw skills
-├── memory/             # Daily logs + archives + fitness/mission data
+├── memory/             # Curated notes + selected generated summaries
 ├── covenant/           # Covenant agent framework + role docs
 ├── cortical-loop/      # World/SAE/council-style reasoning artifacts
 ├── immune-system/      # Immune/incident/playbook scripts and notes
@@ -653,12 +653,22 @@ Installed OpenClaw skills (non‑exhaustive):
 
 ### 3.5 `memory/`
 
-- Daily notes: `memory/YYYY-MM-DD.md`
-- Fitness and health data: `memory/fitness/*.json`
-- Research and long‑form analysis: `memory/research-*.md`
-- Archive pipeline: `memory/archive/YYYY/MM/` (with daily files moved here)
+- Tracked, durable memory:
+  - `MEMORY.md`
+  - Daily notes: `memory/YYYY-MM-DD*.md`
+  - Curated research/playbooks/upgrades/mission plans
+  - Evergreen fitness notes: `memory/fitness/README.md`, `memory/fitness/insights.md`
+- Runtime/generated memory artifacts:
+  - sent markers, heartbeat/cache snapshots, and other machine-written JSON
+  - fitness payloads, weekly summaries, and next-session plans under `memory/fitness/`
+  - archive copies under `memory/archive/YYYY/MM/`
 
-Cortana treats files here as **ground truth memory**, with consolidation into Postgres + embeddings.
+Policy:
+- Curated Markdown can be reviewed and committed.
+- Generated JSON/state under `memory/` is runtime-only and should stay out of Git.
+- Archive copies are consolidation byproducts, not reviewable source-of-truth.
+
+Cortana treats curated notes plus `MEMORY.md` as durable memory, with consolidation into Postgres + embeddings.
 
 ### 3.6 `covenant/`
 
