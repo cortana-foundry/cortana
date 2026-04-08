@@ -5,7 +5,7 @@ This directory stores Hamel's daily fitness data from Whoop and Tonal.
 ## Structure
 - `YYYY-MM-DD.json` - Daily fitness snapshots (morning + evening data)
 - `weekly/` - Weekly summary reports
-- `programs/current-tonal-catalog.json` - Generated observed Tonal workout/movement catalog
+- `programs/current-tonal-catalog.json` - Generated observed Tonal workout/movement catalog built from live `http://localhost:3033/tonal/data` payloads via `tools/fitness/tonal-program-catalog.ts`, then persisted by `tools/fitness/tonal-plan-artifact.ts`
 - `programs/tonal-public-movement-catalog.json` - Generated public Tonal movement library scrape with `pplBucket` and `metricReady`
 - `programs/tonal-ppl-v1.json` - Curated Tonal-supported push/pull/legs split built from the public catalog plus your observed machine history
 
@@ -22,6 +22,22 @@ This directory stores Hamel's daily fitness data from Whoop and Tonal.
 - `http://localhost:3033/whoop/data` - Whoop API (auto-refreshes tokens)
 - `http://localhost:3033/tonal/data` - Tonal API (cached workout history)
 
+## Flow
+- `memory/fitness/programs/current-tonal-catalog.json` = your real observed Tonal history
+- `memory/fitness/programs/tonal-public-movement-catalog.json` = Tonal's public movement library snapshot
+- `memory/fitness/programs/tonal-ppl-v1.json` = curated PPL output built by combining the two
+
+Practical flow:
+- start with `current-tonal-catalog.json` to understand what you actually perform on Tonal
+- use `tonal-public-movement-catalog.json` to confirm public Tonal support and bucket movements for planning
+- curate `tonal-ppl-v1.json` from the overlap plus high-confidence observed-only movements that are clearly valid on your machine
+
+## How `current-tonal-catalog.json` Is Generated
+- Source payload: `http://localhost:3033/tonal/data`
+- Normalization + catalog builder: `tools/fitness/tonal-program-catalog.ts` via `buildTonalProgramCatalog(...)`
+- Persist step: `tools/fitness/tonal-plan-artifact.ts` writes the repo snapshot to `memory/fitness/programs/current-tonal-catalog.json`
+- Practical meaning: this file reflects the Tonal movements you have actually performed, with observed set counts, loads, reps, volume, and latest workout timing
+
 ## Catalog Builders
-- `npx tsx tools/fitness/tonal-public-movement-catalog.ts` - Scrape Tonal's public Movement Library pages into a local catalog for PPL planning and Tonal-valid exercise selection
-- `npx tsx tools/fitness/tonal-ppl-v1.ts` - Build a committed PPL v1 artifact from Tonal-valid movements that are actually present in your own history
+- `npx tsx tools/fitness/tonal-public-movement-catalog.ts` - Scrape Tonal's public Movement Library pages into a local catalog for PPL planning and Tonal-valid exercise selection (ex. `memory/fitness/programs/tonal-public-movement-catalog.json`)
+- `npx tsx tools/fitness/tonal-ppl-v1.ts` - Build a committed PPL v1 artifact from Tonal-valid movements that are actually present in your own history (ex. `memory/fitness/programs/tonal-ppl-v1.json`)
