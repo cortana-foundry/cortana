@@ -17,6 +17,8 @@ Do not treat every markdown file in this repo as the same kind of thing.
 
 Only the last layer belongs under `docs/` and `knowledge/`.
 
+`docs/archive/` is for historical material that should remain accessible but should not read as current truth.
+
 ## What Stays Outside `docs/`
 
 ### Root boot doctrine
@@ -155,6 +157,16 @@ Current shared templates:
 - `techspec-template.md`
 - `implementation-template.md`
 
+### `docs/archive/`
+
+Use for:
+
+- old research
+- implementation notes that are no longer front-door material
+- superseded or low-signal design docs you do not want in the main docs tree
+
+Do not create new active docs here.
+
 ## Knowledge Layer Rules
 
 Use `knowledge/domains/` when you want a new reader or LLM to quickly understand:
@@ -223,6 +235,8 @@ If you create a new planning family, keep the same three-document shape unless t
 4. Update relevant README/index files if discoverability changes.
 5. Verify markdown links before finishing.
 
+If a doc is still useful but no longer belongs in the active reading path, move it to `docs/archive/` instead of leaving it in `docs/source/`.
+
 ## Anti-Patterns
 
 Avoid these:
@@ -232,4 +246,5 @@ Avoid these:
 - putting session memory into `docs/`
 - putting identity doctrine into `knowledge/`
 - creating canonical summary pages inside raw planning folders
+- treating archived docs as current source-of-truth docs
 - leaving config or tests pointed at deleted doc paths

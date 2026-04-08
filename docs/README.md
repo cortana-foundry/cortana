@@ -23,6 +23,7 @@ It does **not** replace:
 - `source/prompts/` - reusable prompt artifacts
 - `source/planning/` - PRDs, tech specs, implementation plans, and roadmaps
 - `source/planning/templates/` - shared planning templates for PRDs, tech specs, and implementation plans
+- `archive/` - historical or low-signal docs kept for reference but not treated as current reading
 
 ## Most Important Source Docs
 
@@ -39,3 +40,4 @@ It does **not** replace:
 - [Memory engine design](./source/architecture/memory-engine-design.md)
 - [Runtime deploy model](./source/architecture/runtime-deploy-model.md)
 - [Sub-agent reliability runbook](./source/runbook/subagent-reliability-runbook.md)
+- [Archive guide](./archive/README.md)
