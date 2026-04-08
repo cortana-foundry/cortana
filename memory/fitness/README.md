@@ -7,6 +7,7 @@ This directory stores Hamel's daily fitness data from Whoop and Tonal.
 - `weekly/` - Weekly summary reports
 - `programs/current-tonal-catalog.json` - Generated observed Tonal workout/movement catalog
 - `programs/tonal-public-movement-catalog.json` - Generated public Tonal movement library scrape with `pplBucket` and `metricReady`
+- `programs/tonal-ppl-v1.json` - Curated Tonal-supported push/pull/legs split built from the public catalog plus your observed machine history
 
 ## Data Sources
 - **Whoop**: Sleep, recovery, strain, HRV, workouts
@@ -23,3 +24,4 @@ This directory stores Hamel's daily fitness data from Whoop and Tonal.
 
 ## Catalog Builders
 - `npx tsx tools/fitness/tonal-public-movement-catalog.ts` - Scrape Tonal's public Movement Library pages into a local catalog for PPL planning and Tonal-valid exercise selection
+- `npx tsx tools/fitness/tonal-ppl-v1.ts` - Build a committed PPL v1 artifact from Tonal-valid movements that are actually present in your own history
