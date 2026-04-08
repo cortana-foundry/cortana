@@ -39,5 +39,6 @@ Practical flow:
 - Practical meaning: this file reflects the Tonal movements you have actually performed, with observed set counts, loads, reps, volume, and latest workout timing
 
 ## Catalog Builders
+- `npx tsx tools/fitness/refresh-current-tonal-catalog.ts` - Refresh the observed Tonal history snapshot directly from `http://localhost:3033/tonal/data` (ex. `memory/fitness/programs/current-tonal-catalog.json`)
 - `npx tsx tools/fitness/tonal-public-movement-catalog.ts` - Scrape Tonal's public Movement Library pages into a local catalog for PPL planning and Tonal-valid exercise selection (ex. `memory/fitness/programs/tonal-public-movement-catalog.json`)
 - `npx tsx tools/fitness/tonal-ppl-v1.ts` - Build a committed PPL v1 artifact from Tonal-valid movements that are actually present in your own history (ex. `memory/fitness/programs/tonal-ppl-v1.json`)
