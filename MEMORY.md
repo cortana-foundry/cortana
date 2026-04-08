@@ -117,7 +117,7 @@
 - REM sleep: chronically low (~9.4%); weekend schedule drift is a major issue.
 - Recovery improved from ~40% to 85–93% range; Feb 18 had a 26% red day (HRV 83.4, RHR 57).
 - Weight: **140 lbs** (not 175); protein target 112–140g/day.
-- Workout: Tonal program "12 Weeks to Jacked" (around Week 8/12) plus Peloton cardio; typical workout time ~05:30.
+- Workout: Tonal plus cardio; typical workout time ~05:30.
 
 ## Lessons & System Design
 
@@ -150,17 +150,17 @@
 - **Session reconciler**: `tools/session-reconciler/reconcile-sessions.sh` — reconciles ghost sessions/runs.
 - **Heartbeat state validator**: `tools/heartbeat/validate-heartbeat-state.sh` — validates state file integrity before writes.
 
-## Current Priorities (Feb 2026 snapshot)
+## Current Priorities (2026)
 
-- Fitness and sleep optimization (maintain high recovery, fix REM + weekend drift).
-- CANSLIM trading system and alerts (backtester built; daily/weekly alerts live).
-- Master’s program EM-605 (e.g., HW 597 completed Feb 27).
-- Portfolio diversification research (current tilt: ~95% tech / 100% US; portfolio size ~71k).
-- Model migration toward OpenAI Codex as primary, Anthropic as fallback.
+- Fitness, recovery, and sleep consistency with useful data and sustainable training.
+- Cortana/OpenClaw reliability: reduce drift, brittle cron behavior, auth fragility, and operator babysitting.
+- Mission Control and remote operations: keep Telegram, reminders, dashboards, market lanes, and fitness lanes stable.
+- Stevens coursework: stay ahead of deadlines and avoid reactive crunch.
+- Portfolio, market, mortgage, and housing awareness with better tooling and cleaner signals.
+- Build the health metrics product into something genuinely useful.
 
 ## Travel & API
 
-- Upcoming: **Punta Cana** Mar 25–29 @ Paradisus Palma Real (ref 2600896858).
 - OpenAI Pro: ~$200/month budget; monitor usage closely and raise early warnings.
 
 ## Vision
