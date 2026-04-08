@@ -7,6 +7,7 @@ import { readJsonFile } from "../lib/json-file.js";
 import { createApprovalRequest, recordApprovalDecision } from "../lib/mission-control-ledger.js";
 
 const DEFAULT_CONFIG = path.join(os.homedir(), ".openclaw", "openclaw.json");
+const DEFAULT_ROUTING = path.join(os.homedir(), ".openclaw", "state", "system-routing.json");
 
 const HIGH_RISK_KEYWORDS = [
   "external email",
@@ -46,9 +47,9 @@ function loadOpenclawConfig(configPath: string): Record<string, any> {
   return cfg;
 }
 
-function approvalRouting(configPath: string): { accountId: string; chatId: string | null } {
-  const cfg = loadOpenclawConfig(configPath);
-  const approvals = cfg?.channels?.telegram?.systemRouting?.approvals;
+function approvalRouting(routingPath = DEFAULT_ROUTING): { accountId: string; chatId: string | null } {
+  const routing = readJsonFile<Record<string, any>>(routingPath);
+  const approvals = routing?.telegram?.approvals;
   const accountId = String(approvals?.accountId || "default");
   const chatId = approvals?.chatId !== undefined && approvals?.chatId !== null ? String(approvals.chatId) : null;
   return { accountId, chatId };
@@ -58,7 +59,7 @@ function telegramToken(configPath: string): string {
   const envToken = process.env.TELEGRAM_BOT_TOKEN;
   if (envToken) return envToken;
   const cfg = loadOpenclawConfig(configPath);
-  const routing = approvalRouting(configPath);
+  const routing = approvalRouting();
   const token = cfg?.channels?.telegram?.botToken
     ?? cfg?.channels?.telegram?.accounts?.[routing.accountId]?.botToken
     ?? cfg?.channels?.telegram?.accounts?.default?.botToken;
@@ -72,7 +73,7 @@ function telegramToken(configPath: string): string {
 
 function configuredChatId(configPath: string): string | null {
   if (process.env.TELEGRAM_CHAT_ID) return String(process.env.TELEGRAM_CHAT_ID);
-  const routing = approvalRouting(configPath);
+  const routing = approvalRouting();
   if (routing.chatId) return routing.chatId;
   const cfg = loadOpenclawConfig(configPath);
   const telegram = cfg?.channels?.telegram;
