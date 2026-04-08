@@ -88,6 +88,11 @@ Periodically (every few days), use a heartbeat to:
 3. Update `MEMORY.md` with distilled learnings
 4. Remove outdated info from MEMORY.md that's no longer relevant
 
+Memory hygiene rules:
+- Treat curated Markdown (`MEMORY.md`, daily notes, research/playbooks, evergreen fitness notes) as durable memory.
+- Treat generated state under `memory/` (`*-sent.json`, heartbeat/cache snapshots, archive copies, fitness payloads/weekly summaries/plans/catalogs) as runtime-only.
+- Runtime-only memory artifacts are not commit-worthy and should stay untracked.
+
 Think of it like a human reviewing their journal and updating their mental model. Daily files are raw notes; MEMORY.md is curated wisdom.
 
 The goal: Be helpful without being annoying. Check in a few times a day, do useful background work, but respect quiet time.
