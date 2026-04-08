@@ -370,12 +370,6 @@
       "groupAllowFrom": [
         8171372724
       ],
-      "systemRouting": {
-        "approvals": {
-          "accountId": "default",
-          "chatId": "8171372724"
-        }
-      },
       "groupPolicy": "allowlist",
       "streaming": "off",
       "accounts": {

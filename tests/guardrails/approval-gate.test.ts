@@ -18,6 +18,10 @@ beforeEach(() => {
   createApprovalRequest.mockReset();
   recordApprovalDecision.mockReset();
   createApprovalRequest.mockReturnValue("11111111-1111-1111-1111-111111111111");
+  readJsonFile.mockImplementation((filePath?: string) => {
+    if (String(filePath).endsWith("/state/system-routing.json")) return null;
+    return { channels: { telegram: {} } };
+  });
 });
 
 afterEach(() => {
@@ -54,7 +58,10 @@ describe("approval-gate", () => {
   it("rejects cleanly when chat lookup throws", async () => {
     const consoleCapture = captureConsole();
     process.env.TELEGRAM_BOT_TOKEN = "token";
-    readJsonFile.mockReturnValue({ channels: { telegram: { allowFrom: [] } } });
+    readJsonFile.mockImplementation((filePath?: string) => {
+      if (String(filePath).endsWith("/state/system-routing.json")) return null;
+      return { channels: { telegram: { allowFrom: [] } } };
+    });
     const fetchSpy = vi.fn(async () => {
       throw new Error("fetch failed");
     });
@@ -77,7 +84,10 @@ describe("approval-gate", () => {
   it("creates and rejects an approval when no chat id is available", async () => {
     const consoleCapture = captureConsole();
     process.env.TELEGRAM_BOT_TOKEN = "token";
-    readJsonFile.mockReturnValue({ channels: { telegram: {} } });
+    readJsonFile.mockImplementation((filePath?: string) => {
+      if (String(filePath).endsWith("/state/system-routing.json")) return null;
+      return { channels: { telegram: {} } };
+    });
     const fetchSpy = vi.fn(async () => ({
       ok: true,
       json: async () => ({ ok: true, result: [] }),
@@ -103,22 +113,28 @@ describe("approval-gate", () => {
     const consoleCapture = captureConsole();
     process.env.TELEGRAM_BOT_TOKEN = "";
     delete process.env.TELEGRAM_CHAT_ID;
-    readJsonFile.mockReturnValue({
-      channels: {
-        telegram: {
-          systemRouting: {
+    readJsonFile.mockImplementation((filePath?: string) => {
+      if (String(filePath).endsWith("/state/system-routing.json")) {
+        return {
+          telegram: {
             approvals: {
               accountId: "default",
               chatId: "8171372724",
             },
           },
-          accounts: {
-            default: {
-              botToken: "config-token",
+        };
+      }
+      return {
+        channels: {
+          telegram: {
+            accounts: {
+              default: {
+                botToken: "config-token",
+              },
             },
           },
         },
-      },
+      };
     });
 
     const fetchSpy = vi.fn(async (input: RequestInfo | URL) => {

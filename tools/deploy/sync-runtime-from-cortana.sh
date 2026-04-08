@@ -153,6 +153,10 @@ npx tsx "$ROOT_DIR/tools/openclaw/runtime-config-sync.ts" \
   --source "$SOURCE_REPO/config/openclaw.json" \
   --runtime "$RUNTIME_HOME/.openclaw/openclaw.json" >/dev/null
 
+log "Syncing system routing state"
+mkdir -p "$RUNTIME_HOME/.openclaw/state"
+cp "$SOURCE_REPO/config/system-routing.json" "$RUNTIME_HOME/.openclaw/state/system-routing.json"
+
 log "Installing gateway Gog shim into runtime bin"
 npx tsx "$ROOT_DIR/tools/gog/install-gog-shim.ts" \
   --path "$RUNTIME_HOME/.openclaw/bin/gog" >/dev/null
