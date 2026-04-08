@@ -858,7 +858,6 @@ The current autonomy stabilization work gives Cortana:
 - `docs/source/reference/heartbeat-sql-reference.md` – SQL reference for heartbeats
 - `docs/source/doctrine/autonomy-policy.md` – autonomy doctrine, boundaries, remediation model, rollout/drill entrypoints
 - `docs/source/architecture/autonomy-stabilization-overview.md` – plain-English map of the autonomy stack built across Steps 1–11
-- `docs/source/runbook/autonomy-stabilization-intake.md` – how any agent should log new autonomy issues into the standing stabilization epic
 - `TOOLS.md` – environment‑specific notes and deploy paths
 - `config/cron/jobs.json` – OpenClaw cron definitions
 - `config/autonomy-lanes.json` – posture + family-critical / never-miss lane configuration

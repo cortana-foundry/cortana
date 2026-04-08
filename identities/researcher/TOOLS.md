@@ -1,7 +1,7 @@
 # TOOLS.md – Researcher lane notes
 
 - Primary workspace root: `/Users/hd/Developer/cortana`
-- Researcher bootstrap doc: `/Users/hd/Developer/cortana/docs/source/architecture/researcher-bot-bootstrap.md`
+- Researcher identity docs: `/Users/hd/Developer/cortana/identities/researcher/`
 - Default prompt template: `/Users/hd/Developer/cortana/config/researcher/default-prompt.md`
 - Start helper: `bash /Users/hd/Developer/cortana/tools/researcher/start-researcher.sh`
 - Web research: use `web_search` / `web_fetch`; prefer primary sources

@@ -165,10 +165,7 @@ When evaluating whether autonomy is working well, focus on only a few things:
 Standing epic:
 - `Autonomy Stabilization / Production Tuning`
 
-Shared intake doc:
-- `docs/source/runbook/autonomy-stabilization-intake.md`
-
-Use that intake doc when logging issues from any agent lane.
+Use the task board plus the autonomy doctrine pages when logging issues from any agent lane.
 
 ## Current intended mode
 
