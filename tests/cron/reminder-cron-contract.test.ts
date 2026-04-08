@@ -37,4 +37,20 @@ describe("reminder cron contract", () => {
     expect(message).toContain("security: full");
     expect(message).toContain("ask: off");
   });
+
+  it("forces deferred gateway restart through explicit non-interactive exec settings", () => {
+    const jobs = loadJobs();
+    const restart = jobs.find((job) => job.id === "a9c37f59-8f34-4c59-bb53-8a2b6d3fb3f8");
+    const message = String(restart?.payload?.message ?? "");
+
+    expect(restart?.payload?.timeoutSeconds).toBe(120);
+    expect(message).toContain("First action must be one `exec` tool call");
+    expect(message).toContain("Do not read files, search the repo, inspect skills");
+    expect(message).toContain("bash /Users/hd/Developer/cortana/tools/openclaw/post-update.sh --restart-if-pending");
+    expect(message).toContain("workdir: /Users/hd/.openclaw/workspaces/cron-maintenance");
+    expect(message).toContain("host: gateway");
+    expect(message).toContain("security: full");
+    expect(message).toContain("ask: off");
+    expect(message).toContain("Do not ask for approval.");
+  });
 });
