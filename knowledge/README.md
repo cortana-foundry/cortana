@@ -3,6 +3,7 @@
 This directory is the compiled wiki layer for `cortana`.
 
 In the Karpathy-style workflow:
+- exploratory intake and generated research outputs live in `research/`
 - raw source material lives in `docs/source/`
 - live doctrine and continuity still live at the repo root, `memory/`, and `identities/`
 - `knowledge/` is where the LLM-maintained current-truth summaries should live
@@ -34,6 +35,11 @@ Use `docs/source/` for:
 - runbooks
 - architecture notes
 - doctrine source material
+
+Use `research/` for:
+- collected source material
+- exploratory derived outputs
+- topic work that has not yet been promoted into the compiled wiki
 
 Use `docs/archive/` when a document is still worth keeping in git but no longer belongs in the active reading path.
 

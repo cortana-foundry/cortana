@@ -9,6 +9,7 @@ It does **not** replace:
 - Covenant role scaffolds in `covenant/`
 
 In the LLM wiki model:
+- `research/` = exploration, collected inputs, and derived outputs
 - `docs/source/` = raw source material and durable artifacts
 - `knowledge/` = compiled current-truth wiki
 - `docs/archive/` = historical overflow kept out of the active front door
@@ -16,6 +17,7 @@ In the LLM wiki model:
 ## Start Here
 
 - [Documentation authoring guide](./source/architecture/documentation-authoring-guide.md)
+- [Research workspace](../research/README.md)
 - [Canonical knowledge index](../knowledge/indexes/systems.md)
 
 ## Layout
@@ -26,6 +28,8 @@ In the LLM wiki model:
 - `source/planning/` - PRDs, tech specs, implementation plans, and roadmaps
 - `source/planning/templates/` - shared planning templates for PRDs, tech specs, and implementation plans
 - `archive/` - historical or low-signal docs kept for reference but not treated as current reading
+
+Use `research/` when the material is still exploratory and should not yet become canonical or a durable source artifact.
 
 ## Most Important Source Docs
 

@@ -7,6 +7,7 @@ This repo is **Cortana’s command brain** – memory, policy, orchestration, cr
 Documentation placement and authoring rules live in [`docs/source/architecture/documentation-authoring-guide.md`](docs/source/architecture/documentation-authoring-guide.md).
 
 Documentation follows a Karpathy-style LLM wiki split:
+- exploratory research lives in `research/`
 - raw source material lives in `docs/source/` plus the repo's live doctrine/memory files
 - compiled current-truth wiki pages live in `knowledge/`
 - historical or low-signal material lives in `docs/archive/`
