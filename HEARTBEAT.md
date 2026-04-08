@@ -29,6 +29,14 @@ Use `memory/heartbeat-state.json` to select the stalest 1–2 delegated checks p
 - Strategic tech/news situational-awareness scan
 - Email triage / inbox-operational summaries
 - **Single owner lane for operational cron / maintenance alerts** (even when another agent executes the underlying check)
+- Current Monitor heartbeat entrypoints:
+  - task board hygiene: `npx tsx /Users/hd/Developer/cortana/tools/task-board/hygiene.ts`
+  - feedback pipeline reconciliation: `npx tsx /Users/hd/Developer/cortana/tools/feedback/pipeline-reconciliation.ts`
+  - session size guard: `npx tsx /Users/hd/Developer/cortana/tools/session/session-hygiene.ts`
+  - subagent watchdog: `npx tsx /Users/hd/Developer/cortana/tools/subagent-watchdog/check-subagents-with-retry.ts --active-minutes 15 --max-runtime-seconds 900 --cooldown-seconds 900 --no-emit-terminal`
+  - tech/news situational scan: `npx tsx /Users/hd/Developer/cortana/tools/news/tech-news-check.ts`
+  - email triage / inbox-operational scan: `npx tsx /Users/hd/Developer/cortana/tools/email/inbox_to_execution.ts --output-json`
+- Do not invent or call deprecated heartbeat wrappers such as `tools/news/tech-news-heartbeat.ts` or `tools/email/triage-heartbeat.ts`.
 
 ### Oracle (`agent:oracle:main`)
 - Portfolio + market pulse (market hours only; see threshold below)

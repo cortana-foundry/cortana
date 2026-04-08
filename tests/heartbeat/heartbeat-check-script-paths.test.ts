@@ -22,4 +22,21 @@ describe("heartbeat check script compatibility paths", () => {
   it("provides rotated tech news entrypoint", () => {
     expect(existsSync("tools/news/tech-news-check.ts")).toBe(true);
   });
+
+  it("provides inbox-operational entrypoint", () => {
+    expect(existsSync("tools/email/inbox_to_execution.ts")).toBe(true);
+  });
+
+  it("documents current heartbeat entrypoints instead of deprecated wrappers", () => {
+    const rootHeartbeat = readFileSync("HEARTBEAT.md", "utf8");
+    const monitorHeartbeat = readFileSync("identities/monitor/HEARTBEAT.md", "utf8");
+
+    expect(rootHeartbeat).toContain("tools/news/tech-news-check.ts");
+    expect(rootHeartbeat).toContain("tools/email/inbox_to_execution.ts --output-json");
+    expect(rootHeartbeat).toContain("Do not invent or call deprecated heartbeat wrappers");
+
+    expect(monitorHeartbeat).toContain("tools/news/tech-news-check.ts");
+    expect(monitorHeartbeat).toContain("tools/email/inbox_to_execution.ts --output-json");
+    expect(monitorHeartbeat).toContain("Do not call deprecated wrappers");
+  });
 });
