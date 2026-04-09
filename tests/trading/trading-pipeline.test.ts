@@ -582,6 +582,39 @@ Summary: scanned 2 | evaluated 1 | threshold-passed 1 | BUY 0 | WATCH 1 | NO_BUY
     expect(report).toContain("Summary: BUY 0 | WATCH 3 | NO_BUY 0");
   });
 
+  it("degrades safely when Dip Buyer times out and still returns a unified snapshot", async () => {
+    const { report, snapshot } = await runTradingPipelineDetailed({
+      runCommand: (_cmd, args) => {
+        if (args[0] === "canslim_alert.py") {
+          return JSON.stringify(
+            buildStrategyPayload("canslim", {
+              summary: { scanned: 120, evaluated: 1, threshold_passed: 1, buy_count: 0, watch_count: 1, no_buy_count: 0 },
+              signals: [{ symbol: "AAPL", score: 7, action: "WATCH", reason: "Watch setup", data_source: "schwab", data_staleness_seconds: 0 }],
+              render_lines: [
+                "CANSLIM Scan",
+                "Market: confirmed_uptrend | Position Sizing: 100%",
+                "Status: Trend healthy.",
+                "Summary: scanned 120 | evaluated 1 | threshold-passed 1 | BUY 0 | WATCH 1 | NO_BUY 0",
+                "• AAPL (7/12) → WATCH",
+              ],
+            }),
+          );
+        }
+        throw new Error("Dip Buyer scan timed out after 360000ms");
+      },
+      council: async () => ({ verdicts: [] }),
+    });
+
+    expect(snapshot.decision).toBe("WATCH");
+    expect(snapshot.strategies.canslim.watch).toBe(1);
+    expect(snapshot.strategies.dipBuyer.outcomeClass).toBe("analysis_failed");
+    expect(snapshot.strategies.dipBuyer.watch).toBe(0);
+    expect(report).toContain("Dip Buyer: scanned 120 | evaluated 0 | threshold-passed 0 | emitted BUY 0 / WATCH 0 / NO_BUY 0");
+    expect(report).toContain("Blockers: Dip Buyer scanner timed out under degraded market-data conditions");
+    expect(report).toContain("Top blocker: Dip Buyer scanner timed out under degraded market-data conditions");
+    expect(report).toContain("Summary: BUY 0 | WATCH 1 | NO_BUY 0");
+  });
+
   it("enforces CANSLIM correction hard gate and skips council when blocked", async () => {
     const canslimCorrectionBuy = `📈 Trading Advisor - CANSLIM Scan
 Market: correction | Position Sizing: 0%
