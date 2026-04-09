@@ -566,14 +566,14 @@ graph TD
 ├── skills/             # Installed OpenClaw skills
 ├── memory/             # Curated notes + selected generated summaries
 ├── covenant/           # Covenant agent framework + role docs
-├── cortical-loop/      # World/SAE/council-style reasoning artifacts
+├── cortical-loop/      # Event-driven nervous system (watchers, evaluator, wake rules)
 ├── immune-system/      # Immune/incident/playbook scripts and notes
 ├── proprioception/     # Self-model, budget, throttle logic
 ├── sae/                # Situational awareness engine assets
 ├── knowledge/          # Canonical domain pages + Covenant knowledge outputs
 ├── migrations/         # Database migrations for cortana DB
 ├── agents/, canvas/    # Agent harness support + Canvas configs
-└── tmp/, logs/, ...    # Scratch + operational logs
+└── tmp/, var/, ...     # Scratch + operational state
 ```
 
 ### 3.1 `docs/`

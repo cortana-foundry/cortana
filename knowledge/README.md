@@ -51,5 +51,5 @@ knowledge/
 └── domains/
 ```
 
-`INDEX.md` is legacy.
+`INDEX.md` is the registry-style front door.
 `indexes/` and `domains/` are the active compiled-wiki entrypoints.
