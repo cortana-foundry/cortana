@@ -156,8 +156,8 @@ Use for planning artifacts and roadmaps.
 Current planning domains:
 
 - `spartan/`
-- `trading/`
-- `openclaw/`
+
+Trading planning docs are now owned by `cortana-external/backtester/docs/source/prd/`, not by `cortana/docs/source/planning/`.
 
 Within a planning domain, use typed subfolders when appropriate:
 

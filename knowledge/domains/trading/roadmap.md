@@ -1,7 +1,5 @@
 # Trading Roadmap
 
-Current source docs:
-
-- [Trading cron base enrichment decoupling PRD](../../../docs/source/planning/trading/prd/prd-trading-cron-base-enrichment-notify-decoupling.md)
+Current trading roadmap source docs now live in `cortana-external/backtester/docs/source/prd/`.
 
 Archived trading implementation notes and completed/stale PRDs live under `docs/archive/planning/trading/`.
