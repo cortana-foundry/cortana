@@ -392,6 +392,21 @@ Summary: 1 candidates | BUY 0 | WATCH 0 | NO_BUY 1
     expect(dipCall).toContain("90");
   });
 
+  it("uses the unified default timeout budget for Dip Buyer scans", async () => {
+    const calls: Array<{ args: string[]; timeoutMs?: number }> = [];
+
+    await runTradingPipeline({
+      runCommand: (_cmd, args, options) => {
+        calls.push({ args, timeoutMs: options?.timeoutMs });
+        return args[0] === "canslim_alert.py" ? CANSLIM_NO_BUY : DIP_NO_BUY;
+      },
+      council: async () => ({ verdicts: [] }),
+    });
+
+    const dipCall = calls.find((call) => call.args[0] === "dipbuyer_alert.py");
+    expect(dipCall?.timeoutMs).toBe(360_000);
+  });
+
   it("preserves merged chunk summaries so combined CANSLIM output is parsed correctly", async () => {
     process.env.TRADING_SCAN_LIMIT_CANSLIM = "4";
     process.env.TRADING_SCAN_CHUNK_SIZE_CANSLIM = "2";

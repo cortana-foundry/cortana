@@ -10,6 +10,8 @@ import { parseSignals, runTradingCouncil, type CouncilVerdict, type TradingSigna
 
 const DEFAULT_SCAN_LIMIT = 120;
 export const BACKTESTER_CWD = "/Users/hd/Developer/cortana-external/backtester";
+const DEFAULT_CANSLIM_SCAN_TIMEOUT_MS = 360_000;
+const DEFAULT_DIPBUYER_SCAN_TIMEOUT_MS = 360_000;
 const BACKTESTER_ENV_PATH = resolve(BACKTESTER_CWD, ".env");
 const SHARED_EXTERNAL_ENV_PATH = "/Users/hd/Developer/cortana-external/.env";
 const DEFAULT_BUY_DECISION_CALIBRATION_PATH = resolve(
@@ -571,8 +573,8 @@ async function runChunkedStrategy(
   const chunkSize = Math.min(getChunkSize(name) || scanLimit, scanLimit);
   const timeoutMs = Number(
     name === "CANSLIM"
-      ? process.env.TRADING_SCAN_TIMEOUT_MS_CANSLIM ?? 360_000
-      : process.env.TRADING_SCAN_TIMEOUT_MS_DIP ?? 180_000,
+      ? process.env.TRADING_SCAN_TIMEOUT_MS_CANSLIM ?? DEFAULT_CANSLIM_SCAN_TIMEOUT_MS
+      : process.env.TRADING_SCAN_TIMEOUT_MS_DIP ?? DEFAULT_DIPBUYER_SCAN_TIMEOUT_MS,
   );
 
   if (chunkSize <= 0 || scanLimit <= chunkSize) {
