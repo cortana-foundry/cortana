@@ -71,6 +71,7 @@ This is the Karpathy-style intake and synthesis layer:
 
 - `research/raw/` for collected source material
 - `research/derived/` for generated outputs such as briefs, comparisons, slides, and Q&A artifacts
+- `research/llm-wiki-workflow.md` for the exact ingest -> bucket -> derive -> promote loop
 
 `research/` is not the same as `memory/`.
 It is for topic exploration, not daily continuity.

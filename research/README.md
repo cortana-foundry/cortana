@@ -13,6 +13,7 @@ Use this area when the work is still exploratory, comparative, or synthesis-heav
 
 - `raw/` - clipped articles, imported notes, source documents, image references, and rough inputs
 - `derived/` - generated briefs, comparisons, slide decks, Q&A outputs, and temporary synthesis artifacts
+- [llm-wiki-workflow.md](./llm-wiki-workflow.md) - exact intake, bucketing, synthesis, and promotion process
 
 ## Active Topics
 
