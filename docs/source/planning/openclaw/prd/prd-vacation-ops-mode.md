@@ -263,9 +263,9 @@ Tier 1 (`NO-GO` if broken after allowed remediation):
 - Gmail / inbox triage
 - fitness service
 - Schwab auth / quote smoke
-- backtester app health if it underpins remote watchlist review
+- backtester app health
 - GitHub machine identity consistency (`cortana-hd`)
-- browser CDP if it is required by Tier 0 or Tier 1 paths
+- browser CDP watchdog path
 
 Tier 2 (`WARN` if broken):
 - market scans
@@ -283,6 +283,19 @@ Tier 3 (`INFO` only):
 - `WARN` if Tier 0 and Tier 1 are green but one or more Tier 2 systems are degraded.
 - `PASS` only if Tier 0 and Tier 1 are green and no unresolved Tier 2 issue exceeds the configured warning threshold.
 
+#### Readiness decision matrix
+
+The readiness command must evaluate in this order and stop as soon as the highest-severity terminal condition is known:
+
+1. Any Tier 0 red result immediately yields `NO-GO`.
+2. Any Tier 1 red result triggers the full deterministic remediation ladder for that system.
+3. If a Tier 1 system is still red after remediation and verification, the overall result is `NO-GO`.
+4. If readiness execution cannot complete or cannot produce evidence for a required check, the overall result is `FAIL`.
+5. If all Tier 0 and Tier 1 checks are green but one or more Tier 2 checks are degraded past their configured threshold, the overall result is `WARN`.
+6. Only when Tier 0 and Tier 1 are green and Tier 2 has not crossed its warning threshold may the result be `PASS`.
+
+Stale degraded evidence must be overwritten by newer healthy verification for the same system before the final result is computed. The command must never blend stale red evidence with newer green evidence into an ambiguous intermediate state.
+
 ---
 
 ### Requirement 2 - Pre-Vacation Prep Workflow
@@ -299,11 +312,13 @@ Tier 3 (`INFO` only):
 
 - Prep must be manually triggerable by command.
 - Prep must also be triggerable by natural language intent such as “I leave tomorrow for 10 days”.
-- Prep may recommend an ideal audit window using travel/flight calendar context.
+- Prep may recommend an ideal audit window using travel/flight calendar context, but the recommendation must be advisory only.
+- Prep timing must be deterministic: compute the preferred prep start in Hamel’s travel timezone when available, otherwise fall back to the configured operator timezone, and default the recommendation to approximately `24` hours before departure.
 - Prep must be allowed to request Hamel’s approval for interactive reauth where needed.
 - Prep must not auto-perform interactive reauth without Hamel’s explicit involvement.
 - Prep must record which auth or approval steps were completed.
 - Prep must re-run verification after any manual auth refresh step.
+- Prep must mark any still-pending interactive auth dependency explicitly as `AUTH_REQUIRED` rather than silently passing it.
 
 ---
 
@@ -327,6 +342,28 @@ While active, vacation mode must:
 - preserve bounded self-heal
 - prevent autonomous interactive reauth
 - maintain morning and evening operator summaries to `monitor`
+
+Vacation mode enable semantics:
+
+- enable may happen only after a readiness run returns `PASS` or `WARN`
+- `PASS` means all Tier 0 and Tier 1 checks are green and Tier 2 is within threshold
+- `WARN` means Tier 0 and Tier 1 are green, and the operator accepts the remaining Tier 2 degradation
+- enable must persist the canonical vacation window, write the runtime mirror, and disable `Daily Auto-Update` in that order
+- enable must not run if any Tier 0 or unresolved Tier 1 check is red
+
+Vacation mode disable semantics:
+
+- disable may be manual or automatic
+- manual disable must be idempotent and safe when vacation mode is already inactive
+- auto-expire must trigger at the configured `end_at` and must be the same code path used to restore paused state
+- disable must restore `Daily Auto-Update` before emitting the `normal ops resumed` summary
+- disable must close out the vacation ledger window and preserve the historical audit trail
+
+Vacation mode auto-expire semantics:
+
+- auto-expire must only use the stored `end_at` from the canonical vacation window
+- auto-expire must not depend on wall-clock heuristics or best-effort polling alone
+- if the process restarts after the end time, the next guard or summary run must observe the expired state and complete disablement
 
 Auto-disable must:
 
@@ -392,6 +429,25 @@ The daily vacation summary must:
 - include self-heal count in the last `24h`
 - include human-required blockers count
 - include at most one short line describing any active degradation
+- follow a fixed operator-first text template so the same state always renders the same shape
+
+The machine-readable summary payload must include at minimum:
+
+- `window_id`
+- `period`
+- `generated_at`
+- `timezone`
+- `overall_state`
+- `control_plane_state`
+- `reminders_state`
+- `market_fitness_news_state`
+- `self_heal_count_24h`
+- `human_required_blockers`
+- `active_degradation`
+- `next_action`
+- `delivery_channel`
+
+The text message should be derived from that payload and stay short enough to read on mobile without scrolling a long paragraph.
 
 The summary must not become a large heartbeat essay.
 
@@ -417,6 +473,21 @@ Vacation-mode alerts must:
 #### Ledger requirements
 
 Vacation mode state and the vacation incident ledger must be stored canonically in Postgres.
+
+The canonical incident model must be first-class, not implied through check or action rows. Each vacation-window incident should capture:
+
+- incident id
+- window id
+- first observed time
+- last observed time
+- system / component key
+- tier
+- current status (`open`, `degraded`, `human_required`, `resolved`)
+- whether human action is required
+- latest check evidence
+- latest action evidence
+- resolution reason
+- resolution time
 
 Repo or runtime files may mirror the currently active vacation window only to support local script execution, but those files must not be treated as the system of record.
 

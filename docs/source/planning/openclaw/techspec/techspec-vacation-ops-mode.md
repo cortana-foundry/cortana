@@ -47,10 +47,12 @@ What must be deterministic and test-covered:
 
 - tier classification
 - go / no-go logic
+- readiness decision ordering and terminal outcomes
 - readiness result derivation
 - vacation state transitions
 - allowed remediation ladder and stop conditions
 - daily summary schema
+- summary payload and text template
 - Postgres state persistence and recovery
 - disabling and restoring `Daily Auto-Update`
 - auto-disable on vacation end date
@@ -123,6 +125,8 @@ Notes:
 
 - One row per explicit vacation operation.
 - `summary_payload` is the machine-readable source of truth; `summary_text` is derived output.
+- `summary_payload` must be a stable JSON contract, not an unstructured blob.
+- `summary_text` must be a short deterministic rendering of the payload, suitable for Telegram.
 - This table provides historical operator auditability independent of Telegram message history.
 
 ---
@@ -149,6 +153,7 @@ Notes:
 - `status` is intentionally normalized so the readiness runner can derive a consistent final result without parsing prose.
 - `freshness_at` is mandatory for any result based on historical evidence rather than immediate probe output.
 - A fresh healthy verification newer than a degraded result must clear stale degraded state in readiness aggregation.
+- `freshness_at` is also used when updating `cortana_vacation_incidents` so the incident ledger resolves stale degradations deterministically.
 
 ---
 
@@ -175,6 +180,65 @@ Notes:
 - This is the repair ledger.
 - It is intentionally separate from check results so a single degraded incident can record multiple attempted repair steps.
 - This table supports the post-vacation retrospective and daily self-heal counts.
+
+#### [NEW] `cortana_vacation_incidents`
+
+| Constraints | Column Name | Column Type | Notes |
+|-------------|-------------|-------------|-------|
+| `PRIMARY KEY` | `id` | `BIGSERIAL` | canonical incident id |
+| `REFERENCES cortana_vacation_windows(id) NOT NULL` | `vacation_window_id` | `BIGINT` | parent window |
+| `NULL` | `run_id` | `BIGINT` | most recent run that observed the incident |
+| `NULL` | `latest_check_result_id` | `BIGINT` | pointer to the current evidence row |
+| `NULL` | `latest_action_id` | `BIGINT` | pointer to the latest remediation action |
+| `NOT NULL` | `system_key` | `TEXT` | stable component key |
+| `NOT NULL` | `tier` | `SMALLINT` | `0`, `1`, `2`, or `3` |
+| `NOT NULL` | `status` | `TEXT` | `open`, `degraded`, `human_required`, `resolved` |
+| `NOT NULL DEFAULT FALSE` | `human_required` | `BOOLEAN` | whether Hamel intervention is needed |
+| `NOT NULL` | `first_observed_at` | `TIMESTAMPTZ` | incident start |
+| `NOT NULL` | `last_observed_at` | `TIMESTAMPTZ` | last time the condition was observed |
+| `NULL` | `resolved_at` | `TIMESTAMPTZ` | incident close time |
+| `NULL` | `resolution_reason` | `TEXT` | `healthy`, `manual`, `expired`, `remediated`, `acknowledged` |
+| `NULL` | `symptom` | `TEXT` | short machine summary of what failed |
+| `NOT NULL DEFAULT '{}'::jsonb` | `detail` | `JSONB` | evidence, thresholds, history, and operator notes |
+| `NOT NULL DEFAULT NOW()` | `created_at` | `TIMESTAMPTZ` | creation time |
+| `NOT NULL DEFAULT NOW()` | `updated_at` | `TIMESTAMPTZ` | update time |
+
+Notes:
+
+- This is the canonical vacation incident ledger and should be the source of truth for open, degraded, human-required, and resolved state.
+- A check result may create or update an incident; a remediation action may update the same incident; a fresh healthy check must resolve the incident when the resolution rule is satisfied.
+- The incident table exists specifically so the operator view and retrospective do not need to infer state by joining raw checks and actions ad hoc.
+
+#### Readiness decision matrix
+
+Readiness evaluation must be ordered and terminal:
+
+1. Execute Tier 0 checks first.
+2. If any Tier 0 check is red, return `NO-GO` immediately.
+3. Execute Tier 1 checks and their bounded remediation ladder.
+4. If any Tier 1 check remains red after remediation and verification, return `NO-GO`.
+5. If readiness execution itself fails to complete or misses required evidence, return `FAIL`.
+6. Execute Tier 2 checks.
+7. If Tier 0 and Tier 1 are green and Tier 2 exceeds its configured thresholds, return `WARN`.
+8. If Tier 0 and Tier 1 are green and Tier 2 remains within threshold, return `PASS`.
+
+Fresh healthy evidence must supersede stale degraded evidence for the same `system_key` before the final result is emitted. The aggregator must not collapse live and stale evidence into one ambiguous status.
+
+#### State transition ordering
+
+Vacation state transitions must be explicit and atomic at the application level:
+
+- `prep` creates or updates the canonical window in `prep` state and records any needed auth work
+- `readiness` records the tiered results, remediation attempts, and final recommendation
+- `enable` may proceed only after the latest readiness result is `PASS` or accepted `WARN`
+- `enable` must write Postgres first, then write the runtime mirror, then disable `Daily Auto-Update`, then emit the activation summary
+- `disable` may be manual or automatic
+- `auto-expire` is the same disable flow triggered by the stored `end_at`
+- `disable` must restore `Daily Auto-Update` before the resume summary is sent
+- `disable` must clear or archive the runtime mirror after canonical Postgres state is updated
+- repeated `disable` calls must be idempotent
+
+If the process restarts after `end_at`, the next status or guard evaluation must detect the expired window from Postgres and complete disablement using the same transition path.
 
 ---
 
@@ -279,6 +343,33 @@ Tier 2 thresholds encoded in config:
 - background intel / secondary enrichments
   - `warn_after_consecutive_failures = 2`
   - `warn_after_stale_hours = 12`
+
+### Summary Contract
+
+The vacation summary generator must emit a stable payload with these fields:
+
+- `window_id`
+- `period`
+- `generated_at`
+- `timezone`
+- `overall_state`
+- `control_plane_state`
+- `reminders_state`
+- `market_fitness_news_state`
+- `self_heal_count_24h`
+- `human_required_blockers`
+- `active_degradation`
+- `next_action`
+- `delivery_channel`
+
+The Telegram text form must be a short deterministic render of that payload:
+
+- first line: overall state and short operator label
+- second line: one sentence describing the current situation
+- third line: grouped component health
+- fourth line: active issue or next action, if any
+
+The generator must not emit raw JSON to the operator channel except under explicit `--json` mode. If a field is absent, it should be rendered as `unknown` or omitted, never guessed.
 
 ---
 
