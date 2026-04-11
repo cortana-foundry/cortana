@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
-import { sourceRepoRoot } from "../lib/paths.js";
+import { fileURLToPath } from "node:url";
+import { resolveRepoPath, sourceRepoRoot } from "../lib/paths.js";
 import type {
   Tier2ThresholdClass,
   VacationActionKind,
@@ -9,7 +10,28 @@ import type {
   VacationTier,
 } from "./types.js";
 
-export const VACATION_OPS_CONFIG_PATH = path.join(sourceRepoRoot(), "config", "vacation-ops.json");
+const MODULE_DIR = path.dirname(fileURLToPath(import.meta.url));
+const MODULE_REPO_ROOT = path.resolve(MODULE_DIR, "..", "..");
+const CONFIG_RELATIVE_PATH = path.join("config", "vacation-ops.json");
+
+function candidateConfigPaths(): string[] {
+  return [
+    process.env.CORTANA_VACATION_OPS_CONFIG_PATH,
+    resolveRepoPath(CONFIG_RELATIVE_PATH),
+    path.join(MODULE_REPO_ROOT, CONFIG_RELATIVE_PATH),
+    path.join(sourceRepoRoot(), CONFIG_RELATIVE_PATH),
+  ].filter((value, index, values): value is string => Boolean(value) && values.indexOf(value) === index);
+}
+
+export function resolveVacationOpsConfigPath(): string {
+  for (const candidate of candidateConfigPaths()) {
+    if (fs.existsSync(candidate)) return candidate;
+  }
+
+  throw new Error(`Vacation ops config not found. Checked: ${candidateConfigPaths().join(", ")}`);
+}
+
+export const VACATION_OPS_CONFIG_PATH = resolveVacationOpsConfigPath();
 
 export const REQUIRED_SYSTEM_KEYS = [
   "gateway_service",
@@ -108,6 +130,6 @@ export function parseVacationOpsConfig(raw: unknown): VacationOpsConfig {
   return raw as VacationOpsConfig;
 }
 
-export function loadVacationOpsConfig(configPath = VACATION_OPS_CONFIG_PATH): VacationOpsConfig {
+export function loadVacationOpsConfig(configPath = resolveVacationOpsConfigPath()): VacationOpsConfig {
   return parseVacationOpsConfig(JSON.parse(fs.readFileSync(configPath, "utf8")) as unknown);
 }
