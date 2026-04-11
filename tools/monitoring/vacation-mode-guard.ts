@@ -2,7 +2,9 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { loadAutonomyConfig } from "./autonomy-lanes.ts";
+import { loadVacationOpsConfig } from "../vacation/vacation-config.js";
+import { getActiveVacationWindow, reconcileVacationMirror } from "../vacation/vacation-state.js";
+import { disableVacationMode } from "../vacation/vacation-state-machine.js";
 
 type CronJob = {
   id?: string;
@@ -47,12 +49,20 @@ function quarantineJob(job: CronJob): void {
 }
 
 function main(): void {
-  const config = loadAutonomyConfig();
-  const vacation = config.vacationMode;
-  if (!vacation.enabled) {
+  const config = loadVacationOpsConfig();
+  const activeWindow = getActiveVacationWindow();
+  if (!activeWindow) {
     console.log("NO_REPLY");
     return;
   }
+
+  if (Date.now() >= Date.parse(activeWindow.end_at)) {
+    const expired = disableVacationMode({ config, reason: "expired" });
+    console.log(expired.summaryText);
+    return;
+  }
+
+  reconcileVacationMirror();
 
   const doc = readRuntimeJobs();
   if (!doc || !Array.isArray(doc.jobs)) {
@@ -60,8 +70,8 @@ function main(): void {
     return;
   }
 
-  const threshold = Math.max(1, Number(vacation.quarantineAfterConsecutiveErrors || 1));
-  const matchers = vacation.fragileCronMatchers;
+  const threshold = Math.max(1, Number(config.guard.quarantineAfterConsecutiveErrors || 1));
+  const matchers = config.guard.fragileCronMatchers;
   const quarantined: string[] = [];
   const now = Date.now();
 
