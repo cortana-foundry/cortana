@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const getActiveVacationWindow = vi.hoisted(() => vi.fn());
 const getLatestReadinessRun = vi.hoisted(() => vi.fn());
@@ -28,13 +28,23 @@ vi.mock("../../tools/vacation/vacation-state.ts", () => ({
 }));
 
 describe("vacation state machine", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    getActiveVacationWindow.mockReturnValue(null);
+    getVacationWindow.mockReturnValue(null);
+  });
+
   it("rejects enable when the latest readiness run is stale", async () => {
+    createVacationWindow.mockReturnValue({
+      id: 11,
+      label: "vacation-2026-04-20",
+      state_snapshot: {},
+    });
     getLatestReadinessRun.mockReturnValue({
       id: 1,
       readiness_outcome: "pass",
       completed_at: "2026-04-10T00:00:00.000Z",
     });
-    getActiveVacationWindow.mockReturnValue(null);
     const { enableVacationMode } = await import("../../tools/vacation/vacation-state-machine.ts");
     expect(() => enableVacationMode({
       config: {
@@ -42,28 +52,34 @@ describe("vacation state machine", () => {
         timezone: "America/New_York",
         pausedJobIds: ["af9e1570-3ba2-4d10-a807-91cdfc2df18b"],
       } as any,
+      startAt: "2026-04-20T12:00:00.000Z",
+      endAt: "2026-04-30T12:00:00.000Z",
     })).toThrow(/stale/);
+    expect(getLatestReadinessRun).toHaveBeenCalledWith(11);
   });
 
-  it("records only the jobs actually paused during enable", async () => {
+  it("scopes readiness to the resolved window before enabling", async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-04-11T13:00:00.000Z"));
     try {
-      getLatestReadinessRun.mockReturnValue({
-        id: 7,
-        readiness_outcome: "pass",
-        completed_at: "2026-04-11T12:00:00.000Z",
-      });
-      getActiveVacationWindow.mockReturnValue(null);
       createVacationWindow.mockReturnValue({
-        id: 1,
+        id: 42,
         label: "vacation-2026-04-20",
         state_snapshot: {},
       });
+      getLatestReadinessRun.mockImplementation((windowId?: number | null) => (
+        windowId === 42
+          ? {
+              id: 7,
+              readiness_outcome: "pass",
+              completed_at: "2026-04-11T12:00:00.000Z",
+            }
+          : null
+      ));
       startVacationRun.mockReturnValue({ id: 9 });
       setRuntimeCronJobsEnabled.mockReturnValue(["job-a"]);
       updateVacationWindow.mockReturnValue({
-        id: 1,
+        id: 42,
         label: "vacation-2026-04-20",
         state_snapshot: { paused_job_ids: ["job-a"] },
       });
@@ -81,7 +97,9 @@ describe("vacation state machine", () => {
       });
 
       expect(result.pausedJobIds).toEqual(["job-a"]);
-      expect(updateVacationWindow).toHaveBeenCalledWith(1, expect.objectContaining({
+      expect(getLatestReadinessRun).toHaveBeenCalledWith(42);
+      expect(createVacationWindow.mock.invocationCallOrder[0]).toBeLessThan(getLatestReadinessRun.mock.invocationCallOrder[0]);
+      expect(updateVacationWindow).toHaveBeenCalledWith(42, expect.objectContaining({
         stateSnapshot: expect.objectContaining({
           paused_job_ids: ["job-a"],
           latest_readiness_run_id: 7,

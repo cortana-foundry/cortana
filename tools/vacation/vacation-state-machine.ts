@@ -43,13 +43,6 @@ export function enableVacationMode(params: {
   triggerSource?: VacationRunRow["trigger_source"];
 }): { window: VacationWindowRow; summaryText: string; pausedJobIds: string[]; run: VacationRunRow } {
   const config = params.config ?? loadVacationOpsConfig();
-  const latestReadiness = getLatestReadinessRun(params.vacationWindowId ?? null);
-  if (!isFreshReadinessRun(latestReadiness, config.readinessFreshnessHours)) {
-    throw new Error("Cannot enable vacation mode from a stale or non-green readiness run.");
-  }
-  if (latestReadiness.readiness_outcome !== "pass" && latestReadiness.readiness_outcome !== "warn") {
-    throw new Error(`Cannot enable vacation mode from readiness outcome ${String(latestReadiness.readiness_outcome)}`);
-  }
   if (getActiveVacationWindow()) {
     throw new Error("Vacation mode is already active.");
   }
@@ -67,6 +60,14 @@ export function enableVacationMode(params: {
       configSnapshot: config as unknown as Record<string, unknown>,
       stateSnapshot: {},
     });
+  }
+
+  const latestReadiness = getLatestReadinessRun(window.id);
+  if (!isFreshReadinessRun(latestReadiness, config.readinessFreshnessHours)) {
+    throw new Error("Cannot enable vacation mode from a stale or non-green readiness run.");
+  }
+  if (latestReadiness.readiness_outcome !== "pass" && latestReadiness.readiness_outcome !== "warn") {
+    throw new Error(`Cannot enable vacation mode from readiness outcome ${String(latestReadiness.readiness_outcome)}`);
   }
 
   const run = startVacationRun({

@@ -22,15 +22,41 @@ type RuntimeJob = {
   };
 };
 
+type CronRunEntry = {
+  ts?: number;
+  action?: string;
+  status?: string;
+  nextRunAtMs?: number;
+  deliveryStatus?: string;
+};
+
+type LanesConfig = {
+  familyCriticalCronNames?: string[];
+};
+
+type SessionStoreEntry = {
+  updatedAt?: string | number;
+  sessionId?: string;
+  sessionFile?: string;
+  status?: string;
+  outcome?: { status?: string } | string;
+  result?: unknown;
+  done?: boolean;
+};
+
 export type VacationCheckEnvironment = {
   now?: () => Date;
   spawn?: typeof spawnSync;
   runtimeCronFile?: string;
+  runtimeCronRunsDir?: string;
+  lanesConfigFile?: string;
   mainSessionStore?: string;
   monitorSessionStore?: string;
   missionControlUrl?: string;
   marketDataBaseUrl?: string;
 };
+
+const CRITICAL_CRON_OVERDUE_MS = 60 * 60 * 1000;
 
 function nowIso(env: VacationCheckEnvironment): string {
   return (env.now ?? (() => new Date()))().toISOString();
@@ -108,6 +134,179 @@ function readRuntimeJob(env: VacationCheckEnvironment, name: string): RuntimeJob
   return doc.jobs.find((job) => String(job.name ?? "") === name) ?? null;
 }
 
+function readRuntimeJobs(env: VacationCheckEnvironment): RuntimeJob[] {
+  const runtimeCronFile = env.runtimeCronFile ?? resolveRuntimeStatePath("cron", "jobs.json");
+  const doc = readJson<{ jobs?: RuntimeJob[] }>(runtimeCronFile);
+  return Array.isArray(doc?.jobs) ? doc.jobs : [];
+}
+
+function readLatestCronRun(env: VacationCheckEnvironment, jobId: string | undefined): CronRunEntry | null {
+  if (!jobId) return null;
+  const runPath = path.join(env.runtimeCronRunsDir ?? resolveRuntimeStatePath("cron", "runs"), `${jobId}.jsonl`);
+  try {
+    const raw = fs.readFileSync(runPath, "utf8").trim();
+    if (!raw) return null;
+    const lines = raw.split("\n");
+    for (let i = lines.length - 1; i >= 0; i -= 1) {
+      const line = lines[i]?.trim();
+      if (!line) continue;
+      const parsed = JSON.parse(line) as CronRunEntry;
+      if (parsed?.action === "finished") return parsed;
+    }
+  } catch {
+    return null;
+  }
+  return null;
+}
+
+function parseTimestampMs(value: unknown): number {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string" && value.trim()) {
+    const numeric = Number(value);
+    if (Number.isFinite(numeric) && numeric > 0) return numeric;
+    const parsed = Date.parse(value);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return 0;
+}
+
+function isFailedStatus(value: string): boolean {
+  return ["error", "failed"].includes(value);
+}
+
+function hasPositiveCompletionEvidence(entry: SessionStoreEntry): boolean {
+  const directStatus = String(entry.status ?? "").trim().toLowerCase();
+  if (["completed", "done", "success", "succeeded", "ok"].includes(directStatus)) return true;
+
+  if (typeof entry.outcome === "string") {
+    const outcomeStatus = entry.outcome.trim().toLowerCase();
+    if (["completed", "done", "success", "succeeded", "ok"].includes(outcomeStatus)) return true;
+  }
+
+  if (entry.outcome && typeof entry.outcome === "object") {
+    const outcomeStatus = String(entry.outcome.status ?? "").trim().toLowerCase();
+    if (["completed", "done", "success", "succeeded", "ok"].includes(outcomeStatus)) return true;
+  }
+
+  if (entry.result != null) {
+    if (typeof entry.result === "string" && entry.result.trim()) return true;
+    if (typeof entry.result === "object" && Object.keys(entry.result as Record<string, unknown>).length > 0) return true;
+  }
+
+  return entry.done === true;
+}
+
+function resolveSessionArtifactPath(storePath: string, entry: SessionStoreEntry): string | null {
+  if (typeof entry.sessionFile === "string" && entry.sessionFile.trim()) {
+    return path.isAbsolute(entry.sessionFile) ? entry.sessionFile : path.resolve(path.dirname(storePath), entry.sessionFile);
+  }
+  if (typeof entry.sessionId === "string" && entry.sessionId.trim()) {
+    return path.join(path.dirname(storePath), `${entry.sessionId}.jsonl`);
+  }
+  return null;
+}
+
+function readCriticalCronDeliveryEvidence(config: VacationOpsConfig, env: VacationCheckEnvironment): {
+  ok: boolean;
+  freshnessAt: string | null;
+  detail: Record<string, unknown>;
+} {
+  const jobs = readRuntimeJobs(env);
+  if (!jobs.length) {
+    return {
+      ok: false,
+      freshnessAt: null,
+      detail: { reason: "runtime_jobs_unavailable" },
+    };
+  }
+
+  const lanes = readJson<LanesConfig>(env.lanesConfigFile ?? path.join(sourceRepoRoot(), "config", "autonomy-lanes.json"));
+  const criticalNames = (lanes?.familyCriticalCronNames ?? []).map((name) => String(name)).filter(Boolean);
+  if (!criticalNames.length) {
+    return {
+      ok: false,
+      freshnessAt: null,
+      detail: { reason: "critical_cron_names_missing" },
+    };
+  }
+
+  const nowMs = currentTime(env).getTime();
+  const matchedJobs = criticalNames
+    .map((name) => jobs.find((job) => String(job.name ?? "") === name) ?? null)
+    .filter((job): job is RuntimeJob => Boolean(job));
+  const missingJobs = criticalNames.filter((name) => !matchedJobs.some((job) => String(job.name ?? "") === name));
+
+  if (!matchedJobs.length) {
+    return {
+      ok: false,
+      freshnessAt: null,
+      detail: { reason: "critical_cron_jobs_missing", missingJobs },
+    };
+  }
+
+  const evaluations = matchedJobs.map((job) => {
+    const latestRun = readLatestCronRun(env, job.id);
+    const latestRunTs = parseTimestampMs(latestRun?.ts);
+    const stateLastRunAtMs = Number(job.state?.lastRunAtMs ?? 0);
+    const useLatestRun = latestRunTs > 0 && latestRunTs >= stateLastRunAtMs;
+    const lastObservedAtMs = useLatestRun ? latestRunTs : stateLastRunAtMs;
+    const nextRunAtMs = parseTimestampMs(useLatestRun ? latestRun?.nextRunAtMs : job.state?.nextRunAtMs);
+    const overdue = nextRunAtMs > 0 && nowMs - nextRunAtMs > CRITICAL_CRON_OVERDUE_MS;
+    const lastStatus = String((useLatestRun ? latestRun?.status : job.state?.lastRunStatus ?? job.state?.lastStatus) ?? "").toLowerCase();
+    const lastDeliveryStatus = String((useLatestRun ? latestRun?.deliveryStatus : job.state?.lastDeliveryStatus) ?? "").toLowerCase();
+    const consecutiveErrors = Number(job.state?.consecutiveErrors ?? 0);
+    const hasDeliveryEvidence = lastObservedAtMs > 0 && lastDeliveryStatus.length > 0;
+    const deliveryFailed = ["error", "failed", "not-delivered"].includes(lastDeliveryStatus);
+    const ok = job.enabled !== false
+      && hasDeliveryEvidence
+      && !overdue
+      && consecutiveErrors < 2
+      && !isFailedStatus(lastStatus)
+      && !deliveryFailed;
+
+    return {
+      jobId: job.id ?? null,
+      jobName: String(job.name ?? "unknown"),
+      enabled: job.enabled !== false,
+      evidenceSource: useLatestRun ? "run_ledger" : "runtime_state",
+      observedAt: lastObservedAtMs > 0 ? new Date(lastObservedAtMs).toISOString() : null,
+      nextRunAt: nextRunAtMs > 0 ? new Date(nextRunAtMs).toISOString() : null,
+      overdue,
+      lastStatus,
+      lastDeliveryStatus,
+      consecutiveErrors,
+      hasDeliveryEvidence,
+      ok,
+    };
+  });
+
+  const healthyEvidence = evaluations
+    .filter((item) => item.ok)
+    .sort((a, b) => Date.parse(String(b.observedAt ?? 0)) - Date.parse(String(a.observedAt ?? 0)));
+
+  if (!healthyEvidence.length) {
+    return {
+      ok: false,
+      freshnessAt: null,
+      detail: {
+        reason: "critical_cron_delivery_unverified",
+        missingJobs,
+        evaluatedJobs: evaluations,
+      },
+    };
+  }
+
+  return {
+    ok: true,
+    freshnessAt: healthyEvidence[0]?.observedAt ?? null,
+    detail: {
+      evidenceJob: healthyEvidence[0],
+      missingJobs,
+      evaluatedJobs: evaluations,
+    },
+  };
+}
+
 function cronCheck(config: VacationOpsConfig, env: VacationCheckEnvironment, systemKey: string, name: string): VacationCheckResultRow {
   const job = readRuntimeJob(env, name);
   if (!job) return buildResult(config, systemKey, "red", { reason: "runtime_job_missing", jobName: name });
@@ -128,16 +327,51 @@ function cronCheck(config: VacationOpsConfig, env: VacationCheckEnvironment, sys
   }, freshnessAt);
 }
 
-function sessionCheck(config: VacationOpsConfig, systemKey: string, storePath: string, prefix: string): VacationCheckResultRow {
-  const parsed = readJson<Record<string, unknown>>(storePath);
+function sessionCheck(config: VacationOpsConfig, env: VacationCheckEnvironment, systemKey: string, storePath: string, prefix: string): VacationCheckResultRow {
+  const parsed = readJson<Record<string, SessionStoreEntry>>(storePath);
   if (!parsed) return buildResult(config, systemKey, "red", { reason: "session_store_unreadable", storePath });
   const keys = Object.keys(parsed);
-  const matched = keys.filter((key) => key === prefix || key.startsWith(`${prefix}:telegram:`) || key.startsWith(`${prefix}:main`));
-  return buildResult(config, systemKey, matched.length > 0 ? "green" : "red", {
+  const matched = keys.filter((key) => key === prefix || key.startsWith(`${prefix}:`));
+  if (!matched.length) {
+    return buildResult(config, systemKey, "red", {
+      reason: "session_key_missing",
+      storePath,
+      totalKeys: keys.length,
+    });
+  }
+
+  const freshnessMs = config.readinessFreshnessHours * 60 * 60 * 1000;
+  const nowMs = currentTime(env).getTime();
+  const evidence = matched
+    .map((key) => {
+      const entry = parsed[key] ?? {};
+      const updatedAtMs = parseTimestampMs(entry.updatedAt);
+      const sessionFile = resolveSessionArtifactPath(storePath, entry);
+      const exists = Boolean(sessionFile && fs.existsSync(sessionFile));
+      const sizeBytes = exists && sessionFile ? fs.statSync(sessionFile).size : 0;
+      return {
+        key,
+        updatedAt: updatedAtMs > 0 ? new Date(updatedAtMs).toISOString() : null,
+        updatedAtMs,
+        fresh: updatedAtMs > 0 && nowMs - updatedAtMs <= freshnessMs,
+        sessionFile,
+        sessionFileExists: exists,
+        sessionFileSizeBytes: sizeBytes,
+        positiveCompletionEvidence: hasPositiveCompletionEvidence(entry),
+      };
+    })
+    .sort((a, b) => b.updatedAtMs - a.updatedAtMs);
+
+  const verified = evidence.find((entry) => entry.fresh && entry.sessionFileExists && entry.sessionFileSizeBytes > 0) ?? null;
+  return buildResult(config, systemKey, verified ? "green" : "red", {
     storePath,
     matchedKeys: matched,
+    verifiedSession: verified,
+    latestSession: evidence[0] ?? null,
+    missingArtifactKeys: evidence.filter((entry) => !entry.sessionFileExists || entry.sessionFileSizeBytes <= 0).map((entry) => entry.key),
+    staleKeys: evidence.filter((entry) => !entry.fresh).map((entry) => entry.key),
     totalKeys: keys.length,
-  });
+  }, verified?.updatedAt ?? evidence[0]?.updatedAt ?? null);
 }
 
 function httpProbe(env: VacationCheckEnvironment, url: string): { ok: boolean; detail: Record<string, unknown>; freshnessAt: string } {
@@ -181,10 +415,14 @@ function checkTelegramDelivery(config: VacationOpsConfig, env: VacationCheckEnvi
   const jsonStatus = run(env, "openclaw", ["status", "--json"]);
   const textStatus = run(env, "openclaw", ["status"]);
   const merged = `${jsonStatus.stdout}\n${jsonStatus.stderr}\n${textStatus.stdout}\n${textStatus.stderr}`;
-  const ok = jsonStatus.status === 0 && textStatus.status === 0 && /Telegram:\s*configured/i.test(jsonStatus.stdout || "") && /Telegram[^\n]*(?:OK|configured)/i.test(merged);
+  const transportConfigured = /Telegram:\s*configured/i.test(jsonStatus.stdout || "") && /Telegram[^\n]*(?:OK|configured)/i.test(merged);
+  const deliveryEvidence = readCriticalCronDeliveryEvidence(config, env);
+  const ok = jsonStatus.status === 0 && textStatus.status === 0 && transportConfigured && deliveryEvidence.ok;
   return buildResult(config, "telegram_delivery", ok ? "green" : "red", {
-    detail: compact(merged),
-  });
+    transportConfigured,
+    statusDetail: compact(merged),
+    deliveryEvidence: deliveryEvidence.detail,
+  }, deliveryEvidence.freshnessAt);
 }
 
 function checkMissionControl(config: VacationOpsConfig, env: VacationCheckEnvironment): VacationCheckResultRow {
@@ -339,9 +577,9 @@ export function runSystemCheck(config: VacationOpsConfig, env: VacationCheckEnvi
     case "telegram_delivery":
       return checkTelegramDelivery(config, env);
     case "main_agent_delivery":
-      return sessionCheck(config, systemKey, mainStore, "agent:main");
+      return sessionCheck(config, env, systemKey, mainStore, "agent:main");
     case "monitor_agent_delivery":
-      return sessionCheck(config, systemKey, monitorStore, "agent:monitor");
+      return sessionCheck(config, env, systemKey, monitorStore, "agent:monitor");
     case "mission_control":
       return checkMissionControl(config, env);
     case "tailscale_remote_access":
