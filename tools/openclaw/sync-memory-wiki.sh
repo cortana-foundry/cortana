@@ -78,4 +78,22 @@ apply_synthesis \
   --source-id source.cortana-external-docs-overview \
   --source-id source.cortana-external-systems-index
 
-"$OPENCLAW_BIN" wiki compile --json
+compile_json="$("$OPENCLAW_BIN" wiki compile --json)"
+
+printf '%s\n' "$compile_json" | node -e '
+let raw = "";
+process.stdin.setEncoding("utf8");
+process.stdin.on("data", (chunk) => { raw += chunk; });
+process.stdin.on("end", () => {
+  try {
+    const parsed = JSON.parse(raw);
+    const counts = parsed.pageCounts ?? {};
+    const updatedFiles = Array.isArray(parsed.updatedFiles) ? parsed.updatedFiles : [];
+    console.log(
+      `[memory-wiki] compile complete entity=${counts.entity ?? 0} concept=${counts.concept ?? 0} source=${counts.source ?? 0} synthesis=${counts.synthesis ?? 0} report=${counts.report ?? 0} updated_files=${updatedFiles.length}`
+    );
+  } catch (error) {
+    console.log("[memory-wiki] compile complete");
+  }
+});
+'
