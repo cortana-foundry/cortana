@@ -654,7 +654,9 @@ Shared shell helpers now live in `tools/lib/` (notably `idempotency.sh`) to keep
 OpenClaw runtime helpers:
 
 - `tools/openclaw/sync-memory-wiki.sh` – refreshes the isolated `memory-wiki` vault from curated docs in `cortana` and `cortana-external`
+- `tools/openclaw/sync-memory-wiki-if-needed.sh` – runs the wiki refresh only when curated wiki source files changed in `cortana` or `cortana-external`
 - `tools/openclaw/post-update.sh` – post-update runtime repair/sync steps after OpenClaw upgrades
+- `.githooks/post-merge` – automatically runs the post-merge sync flow when Git merges update the local repo
 
 ### 3.4 `skills/`
 
@@ -696,6 +698,7 @@ Policy:
 
 Cortana treats curated notes plus `MEMORY.md` as durable memory, with consolidation into Postgres + embeddings.
 OpenClaw Dreaming may inspect imported insights and memory-palace pages from the isolated wiki vault, but those compiled/imported artifacts remain runtime state unless intentionally promoted into tracked docs.
+The repo post-merge flow now conditionally refreshes the isolated wiki when curated front-door docs changed.
 
 ### 3.6 `covenant/`
 
