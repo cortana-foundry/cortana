@@ -11,7 +11,7 @@ import {
   startVacationRun,
   updateVacationWindow,
 } from "./vacation-state.js";
-import { disableVacationMode, enableVacationMode } from "./vacation-state-machine.js";
+import { disableVacationMode, enableVacationMode, unpauseVacationJobs } from "./vacation-state-machine.js";
 import { summarizeActiveVacation } from "./vacation-summary.js";
 import type { VacationRecommendation, VacationRunRow } from "./types.js";
 
@@ -65,6 +65,10 @@ export function recommendVacationWindow(startAt: string, endAt: string, timezone
 
 function prepVacationWindow(args: ParsedArgs) {
   const config = loadVacationOpsConfig();
+  const active = getActiveVacationWindow();
+  if (active) {
+    throw new Error(`Cannot start vacation preflight while vacation mode is already active for ${active.label}. Disable the active window before starting a new prep window.`);
+  }
   const defaults = defaultWindow(args.timezone ?? config.timezone);
   let window = args.windowId ? getVacationWindow(args.windowId) : null;
   const recommendation = recommendVacationWindow(args.start ?? defaults.start, args.end ?? defaults.end, args.timezone ?? defaults.timezone);
@@ -145,6 +149,11 @@ export function runVacationOps(argv = process.argv.slice(2)): number {
       case "disable": {
         const reason = (args.reason as "manual" | "expired" | "cancelled" | undefined) ?? "manual";
         const payload = disableVacationMode({ reason });
+        console.log(args.json ? JSON.stringify(payload, null, 2) : payload.summaryText);
+        return 0;
+      }
+      case "unpause": {
+        const payload = unpauseVacationJobs();
         console.log(args.json ? JSON.stringify(payload, null, 2) : payload.summaryText);
         return 0;
       }
