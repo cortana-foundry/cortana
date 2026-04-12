@@ -32,3 +32,23 @@ Notes:
 - This is an operator sync, not a broad crawler.
 - It keeps the wiki aligned with curated source docs without importing private chat exports.
 - Runtime wiki state stays under `~/.openclaw/wiki/cortana`; it does not write tracked repo memory.
+
+## Conditional Post-Merge Gate
+
+Only refresh the wiki when curated source files changed:
+
+```bash
+/Users/hd/Developer/cortana/tools/openclaw/sync-memory-wiki-if-needed.sh
+```
+
+Watched files:
+
+- `README.md`
+- `docs/README.md`
+- `knowledge/indexes/systems.md`
+
+It is also called from:
+
+```bash
+/Users/hd/Developer/cortana/tools/repo/post-merge-sync.sh
+```

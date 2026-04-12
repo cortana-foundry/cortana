@@ -21,6 +21,7 @@
 - Git policy: runtime-owned; do not treat the isolated vault as tracked durable memory
 - Promotion rule: if a wiki-derived insight becomes durable truth, promote it deliberately into tracked docs, `MEMORY.md`, or daily memory markdown
 - Repo-native refresh path: `/Users/hd/Developer/cortana/tools/openclaw/sync-memory-wiki.sh` ingests the curated `README`/`docs`/`knowledge` front doors from `cortana` and `cortana-external`, then refreshes the topology syntheses
+- Post-merge automation path: `/Users/hd/Developer/cortana/tools/openclaw/sync-memory-wiki-if-needed.sh` only calls the full refresh when the watched curated source files changed
 
 ### Episodic (`cortana_memory_episodic`)
 - `id`, `happened_at`, `summary`, `details`, `participants[]`, `tags[]`

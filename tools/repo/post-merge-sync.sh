@@ -4,3 +4,4 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 bash "$ROOT/tools/repo/post-pr-cleanup.sh"
 bash "$ROOT/tools/deploy/sync-runtime-from-cortana.sh" "$@"
+bash "$ROOT/tools/openclaw/sync-memory-wiki-if-needed.sh" --repo-root "$ROOT"
