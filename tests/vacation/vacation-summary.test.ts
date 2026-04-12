@@ -25,6 +25,7 @@ describe("vacation summary", () => {
     });
     const text = renderVacationSummaryText(payload);
     expect(text).toContain("Vacation Ops AM");
+    expect(text).toContain("🔄 Daily Auto-Update (notify Hamel)");
     expect(text.split("\n")).toHaveLength(4);
   });
 });

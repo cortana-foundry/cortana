@@ -134,4 +134,36 @@ describe("vacation state machine", () => {
       true,
     );
   });
+
+  it("can manually unpause jobs while keeping vacation mode active", async () => {
+    getActiveVacationWindow.mockReturnValue({
+      id: 12,
+      label: "vacation-2026-04-20",
+      state_snapshot: {
+        paused_job_ids: ["af9e1570-3ba2-4d10-a807-91cdfc2df18b"],
+      },
+    });
+    getLatestReadinessRun.mockReturnValue({ id: 99 });
+    startVacationRun.mockReturnValue({ id: 8 });
+    setRuntimeCronJobsEnabled.mockReturnValue(["af9e1570-3ba2-4d10-a807-91cdfc2df18b"]);
+    updateVacationWindow.mockReturnValue({
+      id: 12,
+      label: "vacation-2026-04-20",
+      status: "active",
+      state_snapshot: { paused_job_ids: [] },
+    });
+    finishVacationRun.mockReturnValue({ id: 8 });
+
+    const { unpauseVacationJobs } = await import("../../tools/vacation/vacation-state-machine.ts");
+    const result = unpauseVacationJobs();
+
+    expect(result.restoredJobIds).toEqual(["af9e1570-3ba2-4d10-a807-91cdfc2df18b"]);
+    expect(setRuntimeCronJobsEnabled).toHaveBeenCalledWith(["af9e1570-3ba2-4d10-a807-91cdfc2df18b"], true);
+    expect(updateVacationWindow).toHaveBeenCalledWith(12, expect.objectContaining({
+      stateSnapshot: expect.objectContaining({
+        paused_job_ids: [],
+        manually_restored_job_ids: ["af9e1570-3ba2-4d10-a807-91cdfc2df18b"],
+      }),
+    }));
+  });
 });

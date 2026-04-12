@@ -1,5 +1,8 @@
+import fs from "node:fs";
+import path from "node:path";
 import { loadVacationOpsConfig } from "./vacation-config.js";
 import { isFreshReadinessRun } from "./readiness-engine.js";
+import { sourceRepoRoot } from "../lib/paths.js";
 import {
   archiveVacationMirror,
   buildVacationMirror,
@@ -27,11 +30,81 @@ function activeStatusForDisable(reason: string): VacationWindowRow["status"] {
   return "completed";
 }
 
-function buildTransitionSummary(window: VacationWindowRow, kind: "enabled" | "disabled", pausedJobIds: string[]): string {
-  if (kind === "enabled") {
-    return `🏖️ Vacation mode enabled.\nWindow ${window.label} active until ${window.end_at}.\nPaused jobs: ${pausedJobIds.length}.`;
+function resolveJobNames(jobIds: string[]): string[] {
+  if (!jobIds.length) return [];
+  try {
+    const raw = fs.readFileSync(path.join(sourceRepoRoot(), "config", "cron", "jobs.json"), "utf8");
+    const parsed = JSON.parse(raw) as { jobs?: Array<{ id?: string; name?: string }> };
+    const nameMap = new Map(
+      (parsed.jobs ?? [])
+        .map((job) => [String(job.id ?? ""), String(job.name ?? "").trim()] as const)
+        .filter(([id, name]) => Boolean(id) && Boolean(name)),
+    );
+    return jobIds.map((id) => nameMap.get(id) ?? id);
+  } catch {
+    return jobIds;
   }
-  return `🏁 Vacation mode disabled.\nWindow ${window.label} resumed normal ops.\nRestored jobs: ${pausedJobIds.length}.`;
+}
+
+function buildTransitionSummary(window: VacationWindowRow, kind: "enabled" | "disabled", pausedJobIds: string[]): string {
+  const labels = resolveJobNames(pausedJobIds);
+  const jobsLine = labels.length ? labels.join(", ") : "none";
+  if (kind === "enabled") {
+    return `🏖️ Vacation mode enabled.\nWindow ${window.label} active until ${window.end_at}.\nPaused jobs: ${jobsLine}.`;
+  }
+  return `🏁 Vacation mode disabled.\nWindow ${window.label} resumed normal ops.\nRestored jobs: ${jobsLine}.`;
+}
+
+export function unpauseVacationJobs(): {
+  window: VacationWindowRow | null;
+  summaryText: string;
+  restoredJobIds: string[];
+  run: VacationRunRow | null;
+} {
+  const active = getActiveVacationWindow();
+  if (!active) {
+    return {
+      window: null,
+      summaryText: "Vacation mode is inactive. No vacation-managed jobs are paused.",
+      restoredJobIds: [],
+      run: null,
+    };
+  }
+
+  const pausedJobIds = snapshotJobIds(active, "paused_job_ids");
+  if (!pausedJobIds.length) {
+    return {
+      window: active,
+      summaryText: "Vacation mode is active, but no vacation-managed jobs are currently paused.",
+      restoredJobIds: [],
+      run: null,
+    };
+  }
+
+  const run = startVacationRun({
+    vacationWindowId: active.id,
+    runType: "disable",
+    triggerSource: "manual_command",
+    dryRun: false,
+  });
+  const restoredJobIds = setRuntimeCronJobsEnabled(pausedJobIds, true);
+  const window = updateVacationWindow(active.id, {
+    stateSnapshot: {
+      ...(active.state_snapshot ?? {}),
+      paused_job_ids: [],
+      manually_restored_job_ids: restoredJobIds,
+    },
+  });
+  writeVacationMirror(buildVacationMirror(window, getLatestReadinessRun(active.id)?.id ?? null));
+  const summaryText = restoredJobIds.length
+    ? `⏯️ Vacation jobs resumed.\nWindow ${window.label} kept vacation mode active.\nRestored jobs: ${resolveJobNames(restoredJobIds).join(", ")}.`
+    : "Vacation job unpause requested, but no runtime jobs needed changes.";
+  const completedRun = finishVacationRun(run.id, {
+    state: "completed",
+    summaryPayload: { restoredJobIds, kind: "manual_unpause" },
+    summaryText,
+  });
+  return { window, summaryText, restoredJobIds, run: completedRun };
 }
 
 export function enableVacationMode(params: {

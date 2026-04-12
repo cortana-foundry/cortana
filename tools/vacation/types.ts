@@ -183,6 +183,10 @@ export type VacationSummaryPayload = {
   latest_readiness_run_id: number | null;
   active_systems: string[];
   degraded_systems: string[];
+  paused_jobs?: Array<{
+    id: string;
+    name: string | null;
+  }>;
   self_heal_count: number;
   degradation_summary: string;
 };
