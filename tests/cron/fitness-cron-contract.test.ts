@@ -59,6 +59,12 @@ describe("fitness cron contract", () => {
     expect(morningMessage).toContain("VOICE rewrite gate");
     expect(morningMessage).toContain("tonal_sessions_today");
     expect(morningMessage).toContain("tonal_total_volume_today");
+    expect(morningMessage).toContain("Do not start with a metric stack, heading, or numbered list");
+    expect(morningMessage).toContain("Do not use literal labels or memo phrasing");
+    expect(morningMessage).toContain("Confidence is low");
+    expect(morningMessage).toContain("Top 5 priorities");
+    expect(morningMessage).toContain("You're 🟡 at 53");
+    expect(morningMessage).toContain("Use at most one metric unless a second one clearly changes the call");
     expect(morningMessage).toContain("insight_mark_sql");
     expect(morningMessage).not.toContain("'health' = ANY(domains)");
 
@@ -93,6 +99,11 @@ describe("fitness cron contract", () => {
     expect(weeklyMessage).toContain("do not output only \"unknown\"");
     expect(weeklyMessage).toContain("state uncertainty rather than claiming zero strength output");
     expect(weeklyMessage).toContain("next 24 hours");
+    expect(weeklyMessage).toContain("4-5 sentences max");
+    expect(weeklyMessage).toContain("Call out the one hard truth that matters most, in prose rather than as a label");
+    expect(weeklyMessage).toContain("Do not start with a heading, metric stack, `Key insight`, `Current-state assessment`, or `Top 5` framing");
+    expect(weeklyMessage).toContain("Do not use numbered lists, memo labels, or phrases like `Hard truth:`, `Confidence is low`, `Overall trajectory:`, or `Next week actions:`");
+    expect(weeklyMessage).toContain("Mention at most 2 metrics, and only when they directly support the call");
     expect(weeklyMessage).toContain("weekly_file_path");
     expect(weeklyMessage).toContain("weekly_repo_file_path");
     expect(weeklyMessage).toContain("do not fail the cron");
