@@ -21,6 +21,13 @@ describe("Spartan fitness voice playbook", () => {
     expect(content).toContain("\"This is a day to train hard but clean.\"");
     expect(content).toContain("\"Today should feel solid if you stay disciplined.\"");
     expect(content).toContain("\"Action:\"");
+    expect(content).toContain("\"Hard truth:\"");
+    expect(content).toContain("\"Confidence is low\"");
+    expect(content).toContain("\"Next week actions:\"");
+    expect(content).toContain("\"Overall trajectory:\"");
+    expect(content).toContain("\"You're 🟡 at 53\"");
     expect(content).toContain("\"Longevity impact\"");
+    expect(content).toContain("No labels, headers, numbered lists, or memo framing");
+    expect(content).toContain("Good uncertainty phrasing");
   });
 });
