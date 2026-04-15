@@ -55,7 +55,7 @@ describe("openai-cron-auth-guard", () => {
               id: "job-1",
               name: "☀️ Morning brief (Hamel)",
               enabled: true,
-              payload: { model: "openai-codex/gpt-5.1" },
+              payload: { model: "openai-codex/gpt-5.4" },
             },
           ],
         };
@@ -65,7 +65,7 @@ describe("openai-cron-auth-guard", () => {
           models: {
             providers: { openai: { apiKey: "live-key" } },
             available: {
-              "openai-codex/gpt-5.1": {},
+              "openai-codex/gpt-5.4": {},
               "openai-codex/gpt-5.3-codex": {},
             },
           },
@@ -76,7 +76,7 @@ describe("openai-cron-auth-guard", () => {
           models: {
             providers: { openai: { apiKey: "__OPENCLAW_REDACTED__" } },
             available: {
-              "openai-codex/gpt-5.1": {},
+              "openai-codex/gpt-5.4": {},
               "openai-codex/gpt-5.3-codex": {},
             },
           },
@@ -305,7 +305,7 @@ describe("openai-cron-auth-guard", () => {
               id: "job-1",
               name: "☀️ Morning brief (Hamel)",
               enabled: true,
-              payload: { model: "openai-codex/gpt-5.1" },
+              payload: { model: "openai-codex/gpt-5.4" },
             },
           ],
         };
@@ -315,7 +315,7 @@ describe("openai-cron-auth-guard", () => {
           models: {
             providers: { openai: { apiKey: "live-key" } },
             available: {
-              "openai-codex/gpt-5.1": {},
+              "openai-codex/gpt-5.4": {},
               "openai-codex/gpt-5.3-codex": {},
             },
           },

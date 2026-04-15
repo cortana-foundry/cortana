@@ -59,7 +59,7 @@
 - **Models by role**:
   - Cortana (main): Anthropic Opus 4.6.
   - Huragok / Researcher / Oracle: `model="codex"` (Codex 5.3).
-  - Librarian / Monitor: `model="openai-codex/gpt-5.1"`.
+  - Librarian / Monitor: `model="openai-codex/gpt-5.4"`.
   - Every `sessions_spawn` must include the correct model; no exceptions.
 - **Sub-agent labels**: required for every spawn → `{covenant-agent}-{task-slug}` (e.g., `huragok-cron-symlink`, `librarian-docs-update`, `monitor-portfolio-check`). Generic labels are forbidden.
 - **Sub-agent relay protocol**: completions are summarized by Cortana to Hamel in ≤10 words; full details go to memory/daily notes when needed.
