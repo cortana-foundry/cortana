@@ -299,6 +299,7 @@ Every task dispatch must include these fields in plain language:
 3. **Execution steps** — numbered when precision is needed.
 4. **Verification requirement** — how to prove success.
 5. **Delivery contract** — message tool details (`channel=telegram`, `target=<PRIMARY_TELEGRAM_TARGET>`, `accountId=<owner>` when required).
+   Healthy delegated heartbeat/maintenance paths stay silent by returning `NO_REPLY` in-session only; do not send a literal `NO_REPLY` through Telegram.
 6. **No-relay rule** — whether to avoid sending result back through Cortana.
 
 #### Example (valid)

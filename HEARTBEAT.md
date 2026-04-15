@@ -80,8 +80,8 @@ Keep existing thresholds where already defined:
 When Cortana dispatches a check to an owner agent, include these instructions:
 
 - Run only the requested check(s).
-- Send result directly to Hamel via `message` tool (`channel: telegram`, `target: 8171372724`).
-- If healthy/no-action checks are configured as silent, send `NO_REPLY`.
+- Send actionable result directly to Hamel via `message` tool (`channel: telegram`, `target: 8171372724`).
+- If the delegated check is healthy/no-action and should stay silent, do not send a Telegram message. Reply exactly `NO_REPLY` in-session only.
 - If broken, send concise actionable alert with failing step + root cause + immediate next action.
 - Do **not** send result back through Cortana unless explicitly asked.
 

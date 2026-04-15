@@ -9,6 +9,9 @@ When you receive a heartbeat poll (message matches the configured heartbeat prom
 If the active workspace `HEARTBEAT.md` defines an explicit healthy-path token such as `HEARTBEAT_OK` or `NO_REPLY`, use that exact token with no greeting, summary, emoji, or follow-up question.
 Do not silently suppress an explicit healthy-path token. `HEARTBEAT_OK` and `NO_REPLY` are different contracts.
 
+This exact-token rule applies to direct heartbeat replies in the active workspace/session. It does not mean delegated `sessions_send` heartbeat tasks should send those tokens through the `message` tool.
+For delegated heartbeat tasks, a healthy silent path means: do not send a Telegram message, and reply `NO_REPLY` in-session only.
+
 Default heartbeat prompt:
 `Read HEARTBEAT.md if it exists (workspace context). Follow it strictly. Do not infer or repeat old tasks from prior chats. If nothing needs attention, reply HEARTBEAT_OK.`
 
