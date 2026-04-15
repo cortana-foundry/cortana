@@ -100,7 +100,10 @@ SELECT json_build_object(
       'createdAt', l.timestamp
     ) ORDER BY l.timestamp DESC)
     FROM latest_open l
+    LEFT JOIN cortana_tasks t
+      ON t.id = l.followup_task_id
     WHERE l.status IN ('escalate','skipped')
+      AND (l.followup_task_id IS NULL OR t.status IN ('ready', 'in_progress'))
   ), '[]'::json),
   'incidentReviews', COALESCE((
     SELECT json_agg(json_build_object(

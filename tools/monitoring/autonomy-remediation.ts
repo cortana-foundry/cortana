@@ -77,6 +77,10 @@ function sqlEscape(value: string): string {
   return value.replaceAll("'", "''");
 }
 
+function sqlQuote(value: string): string {
+  return `'${sqlEscape(value)}'`;
+}
+
 function psql(sql: string): string {
   const proc = spawnSync(PSQL, [DB, "-X", "-q", "-t", "-A", "-v", "ON_ERROR_STOP=1", "-c", sql], {
     cwd: ROOT,
@@ -632,6 +636,57 @@ RETURNING id::text;
   return created ? Number(created) : null;
 }
 
+function resolveOpenFollowUps(item: RemediationItem): number[] {
+  const system = sqlEscape(item.system);
+  const resolutionStatus = sqlEscape(item.status);
+  const detail = sqlEscape(item.detail);
+  const action = sqlEscape(item.action ?? "none");
+  const ids = psql(`
+WITH open_followups AS (
+  SELECT id
+  FROM cortana_tasks
+  WHERE status IN ('ready', 'in_progress')
+    AND source = 'autonomy-remediation'
+    AND metadata->>'followup_system' = '${system}'
+), closed AS (
+  UPDATE cortana_tasks t
+  SET status = 'completed',
+      completed_at = COALESCE(t.completed_at, NOW()),
+      outcome = CASE
+        WHEN COALESCE(t.outcome, '') = '' THEN format(
+          'Auto-resolved by autonomy remediation after %s verification.\\nDetail: %s\\nAction: %s',
+          ${sqlQuote(item.status)},
+          ${sqlQuote(item.detail)},
+          ${sqlQuote(item.action ?? "none")}
+        )
+        WHEN POSITION('Auto-resolved by autonomy remediation' IN t.outcome) > 0 THEN t.outcome
+        ELSE t.outcome || E'\\nAuto-resolved by autonomy remediation after ${item.status} verification.\\nDetail: ${detail}\\nAction: ${action}'
+      END,
+      metadata = COALESCE(t.metadata, '{}'::jsonb)
+        || jsonb_build_object(
+          'followup_resolved',
+          jsonb_build_object(
+            'at', NOW(),
+            'status', '${resolutionStatus}',
+            'detail', '${detail}',
+            'action', '${action}'
+          )
+        ),
+      updated_at = CURRENT_TIMESTAMP
+  WHERE t.id IN (SELECT id FROM open_followups)
+  RETURNING t.id
+)
+SELECT COALESCE(json_agg(id), '[]'::json)::text
+FROM closed;
+`);
+  try {
+    const parsed = JSON.parse(ids) as number[];
+    return Array.isArray(parsed) ? parsed.map((id) => Number(id)).filter(Number.isFinite) : [];
+  } catch {
+    return [];
+  }
+}
+
 function latestStatusForSystem(system: string): string | null {
   const out = psql(`
 SELECT COALESCE(metadata->>'status', '')
@@ -646,7 +701,39 @@ LIMIT 1;
 }
 
 function logActionResult(item: RemediationItem): RemediationItem {
+  const resolvedFollowUpTaskIds =
+    item.status === "healthy" || item.status === "remediated" ? resolveOpenFollowUps(item) : [];
+
+  const verification = sqlEscape((item.verification ?? '').slice(0, 2000));
+  const action = sqlEscape(item.action ?? 'none');
+  const escalationPath = sqlEscape(item.escalationPath ?? 'review locally');
+  const policyLesson = sqlEscape(item.policyLesson ?? 'n/a');
+  const laneLabel = sqlEscape(item.laneLabel ?? (item.familyCritical ? 'family-critical' : 'routine'));
+  const resolvedIdsJson = sqlEscape(JSON.stringify(resolvedFollowUpTaskIds));
+
   if (item.status === 'healthy') {
+    psql(`
+INSERT INTO cortana_events (event_type, source, severity, message, metadata)
+VALUES (
+  'autonomy_action_result',
+  'autonomy-remediation',
+  'info',
+  '${sqlEscape(`${item.system} healthy: ${item.detail}`)}',
+  jsonb_build_object(
+    'system', '${sqlEscape(item.system)}',
+    'status', 'healthy',
+    'detail', '${sqlEscape(item.detail)}',
+    'action', '${action}',
+    'verification', '${verification}',
+    'verification_status', '${item.verificationStatus ?? 'verified'}',
+    'escalation_path', '${escalationPath}',
+    'policy_lesson', '${policyLesson}',
+    'family_critical', ${item.familyCritical ? 'true' : 'false'},
+    'lane_label', '${laneLabel}',
+    'resolved_followup_task_ids', '${resolvedIdsJson}'::jsonb
+  )
+);
+`);
     resolveIncident(`remediation:${item.system}`, {
       source: "autonomy-remediation",
       summary: `${item.system} healthy`,
@@ -687,11 +774,6 @@ VALUES (
   const followUpTaskId = createOrReuseFollowUp(item);
   item.followUpTaskId = followUpTaskId;
   const severity = item.status === 'remediated' ? 'info' : item.familyCritical ? 'error' : 'warning';
-  const verification = sqlEscape((item.verification ?? '').slice(0, 2000));
-  const action = sqlEscape(item.action ?? 'none');
-  const escalationPath = sqlEscape(item.escalationPath ?? 'review locally');
-  const policyLesson = sqlEscape(item.policyLesson ?? 'n/a');
-  const laneLabel = sqlEscape(item.laneLabel ?? (item.familyCritical ? 'family-critical' : 'routine'));
   psql(`
 INSERT INTO cortana_events (event_type, source, severity, message, metadata)
 VALUES (
@@ -710,7 +792,8 @@ VALUES (
     'policy_lesson', '${policyLesson}',
     'family_critical', ${item.familyCritical ? 'true' : 'false'},
     'lane_label', '${laneLabel}',
-    'followup_task_id', ${followUpTaskId ?? 'NULL'}
+    'followup_task_id', ${followUpTaskId ?? 'NULL'},
+    'resolved_followup_task_ids', '${resolvedIdsJson}'::jsonb
   )
 );
 `);
