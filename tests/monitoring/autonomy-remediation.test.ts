@@ -87,6 +87,13 @@ describe("autonomy-remediation", () => {
     expect(output).toContain('"system": "session"');
     expect(output).toContain('"status": "remediated"');
     expect(output).toContain('"posture": "balanced"');
+    expect(spawnSync).toHaveBeenCalledWith(
+      "/opt/homebrew/opt/postgresql@17/bin/psql",
+      expect.arrayContaining([
+        expect.stringContaining("UPDATE cortana_tasks t"),
+      ]),
+      expect.anything(),
+    );
     expect(exitSpy).toHaveBeenCalledWith(0);
   });
 
@@ -135,5 +142,59 @@ describe("autonomy-remediation", () => {
     expect(output).toContain('"status": "escalate"');
     expect(spawnSync).not.toHaveBeenCalledWith("openclaw", ["gateway", "restart"], expect.anything());
     expect(exitSpy).toHaveBeenCalledWith(1);
+  });
+
+  it("logs healthy status and resolves stale follow-up tasks when the session lane is healthy", async () => {
+    const exitSpy = mockExit();
+    const consoleSpy = captureConsole();
+    setArgv([]);
+    fsMock.readFileSync.mockImplementation(() => {
+      throw new Error("missing state");
+    });
+
+    const psqlSql: string[] = [];
+    spawnSync.mockImplementation((cmd: string, args: string[]) => {
+      if (cmd === "openclaw" && args.join(" ") === "gateway status --no-probe") {
+        return { status: 0, stdout: "running", stderr: "" } as any;
+      }
+      if (cmd === "npx" && String(args[2]).includes("check-cron-delivery.ts")) {
+        return { status: 0, stdout: "", stderr: "" } as any;
+      }
+      if (cmd === "npx" && String(args[2]).includes("openai-cron-auth-guard.ts")) {
+        return { status: 0, stdout: JSON.stringify({ ok: true, affected: 0 }), stderr: "" } as any;
+      }
+      if (cmd === "npx" && String(args[2]).includes("cron-auto-retry.ts")) {
+        return { status: 0, stdout: JSON.stringify({ retried: 0, skipped: 0, failedAgain: 0 }), stderr: "" } as any;
+      }
+      if (cmd === "npx" && String(args[2]).includes("session-lifecycle-policy.ts")) {
+        return { status: 0, stdout: JSON.stringify({ status: "healthy" }), stderr: "" } as any;
+      }
+      if (cmd === "npx" && String(args[2]).includes("runtime-integrity-check.ts")) {
+        return { status: 0, stdout: JSON.stringify({ overall_ok: true, results: [] }), stderr: "" } as any;
+      }
+      if (cmd === "/opt/homebrew/opt/postgresql@17/bin/psql") {
+        const sql = String(args.at(-1) ?? "");
+        psqlSql.push(sql);
+        if (sql.includes("SELECT COALESCE(metadata->>'status', '')")) {
+          return { status: 0, stdout: "escalate", stderr: "" } as any;
+        }
+        if (sql.includes("SELECT COALESCE(json_agg(id), '[]'::json)::text")) {
+          return { status: 0, stdout: "[478]", stderr: "" } as any;
+        }
+        return { status: 0, stdout: "", stderr: "" } as any;
+      }
+      throw new Error(`unexpected spawn ${cmd} ${args.join(" ")}`);
+    });
+
+    await importFresh("../../tools/monitoring/autonomy-remediation.ts");
+    await flushModuleSideEffects();
+    consoleSpy.restore();
+
+    const output = consoleSpy.logs.join("\n");
+    expect(output).toContain('"system": "session"');
+    expect(output).toContain('"status": "healthy"');
+    expect(psqlSql.some((sql) => sql.includes("UPDATE cortana_tasks t"))).toBe(true);
+    expect(psqlSql.some((sql) => sql.includes("'resolved_followup_task_ids', '[478]'::jsonb"))).toBe(true);
+    expect(exitSpy).toHaveBeenCalledWith(0);
   });
 });
