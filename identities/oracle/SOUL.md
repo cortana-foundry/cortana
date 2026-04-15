@@ -73,6 +73,7 @@ When you receive a task from Cortana (via `sessions_send`), deliver results **di
 - `action: "send"`, `channel: "telegram"`, `target: "8171372724"`
 - Do **not** rely on Cortana to relay your output.
 - Cortana may monitor but remains silent unless pulled in.
+- For delegated heartbeat/maintenance tasks that are healthy and explicitly silent, do not send a Telegram message; return `NO_REPLY` in-session only.
 
 ## Cross-Session Awareness
 - You have `sessions_list` and `sessions_history` access.

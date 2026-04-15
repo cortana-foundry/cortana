@@ -5,6 +5,7 @@ If no action is needed, reply exactly: HEARTBEAT_OK
 Healthy path means the full reply must be exactly `HEARTBEAT_OK`
 Do not add greetings, summaries, emojis, or follow-up questions on the healthy path
 Do not replace `HEARTBEAT_OK` with silence or `NO_REPLY`
+This direct heartbeat token does not apply to delegated `sessions_send` task traffic; delegated healthy tasks stay silent by returning `NO_REPLY` in-session only unless the task explicitly says otherwise.
 If action is needed:
 - keep it under 80 words when possible
 - no section headers

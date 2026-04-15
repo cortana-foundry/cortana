@@ -24,6 +24,7 @@ When you receive a task from Cortana (via `sessions_send`), deliver your results
 - `action: "send"`, `channel: "telegram"`, `target: "8171372724"`
 - Do NOT rely on Cortana to relay your output — post it yourself.
 - Cortana has visibility on your work but stays silent unless pulled in.
+- For delegated heartbeat/maintenance tasks that are healthy and explicitly silent, do not send a Telegram message; return `NO_REPLY` in-session only.
 - If Hamel has follow-up questions, he'll message you directly or go through Cortana.
 
 ## Cross-Session Awareness

@@ -29,23 +29,35 @@ describe("heartbeat check script compatibility paths", () => {
 
   it("documents current heartbeat entrypoints instead of deprecated wrappers", () => {
     const rootHeartbeat = readFileSync("HEARTBEAT.md", "utf8");
+    const readme = readFileSync("README.md", "utf8");
     const monitorHeartbeat = readFileSync("identities/monitor/HEARTBEAT.md", "utf8");
     const monitorSoul = readFileSync("identities/monitor/SOUL.md", "utf8");
+    const oracleHeartbeat = readFileSync("identities/oracle/HEARTBEAT.md", "utf8");
+    const oracleSoul = readFileSync("identities/oracle/SOUL.md", "utf8");
     const heartbeatDoctrine = readFileSync("docs/source/doctrine/heartbeat-ops.md", "utf8");
 
     expect(rootHeartbeat).toContain("tools/news/tech-news-check.ts");
     expect(rootHeartbeat).toContain("tools/email/inbox_to_execution.ts --output-json");
     expect(rootHeartbeat).toContain("Do not invent or call deprecated heartbeat wrappers");
+    expect(rootHeartbeat).toContain("do not send a Telegram message");
+    expect(rootHeartbeat).toContain("Reply exactly `NO_REPLY` in-session only");
 
     expect(monitorHeartbeat).toContain("tools/news/tech-news-check.ts");
     expect(monitorHeartbeat).toContain("tools/email/inbox_to_execution.ts --output-json");
     expect(monitorHeartbeat).toContain("Do not call deprecated wrappers");
     expect(monitorHeartbeat).toContain("Healthy path means the full reply must be exactly `HEARTBEAT_OK`");
     expect(monitorHeartbeat).toContain("Do not replace `HEARTBEAT_OK` with silence or `NO_REPLY`");
+    expect(monitorHeartbeat).toContain("delegated healthy tasks stay silent by returning `NO_REPLY` in-session only");
     expect(monitorSoul).toContain("Do not add greetings, status summaries, emojis, or follow-up questions on the healthy path");
     expect(monitorSoul).toContain("Do not suppress `HEARTBEAT_OK` into silence or `NO_REPLY`");
+    expect(monitorSoul).toContain("do not send a Telegram message; return `NO_REPLY` in-session only");
+    expect(oracleHeartbeat).toContain("If no action is needed: HEARTBEAT_OK");
+    expect(oracleHeartbeat).toContain("delegated healthy tasks stay silent by returning `NO_REPLY` in-session only");
+    expect(oracleSoul).toContain("do not send a Telegram message; return `NO_REPLY` in-session only");
     expect(heartbeatDoctrine).toContain("If the active workspace `HEARTBEAT.md` defines an explicit healthy-path token");
     expect(heartbeatDoctrine).toContain("Exact-token precedence");
     expect(heartbeatDoctrine).toContain("Do not silently suppress an explicit healthy-path token");
+    expect(heartbeatDoctrine).toContain("It does not mean delegated `sessions_send` heartbeat tasks should send those tokens through the `message` tool");
+    expect(readme).toContain("Healthy delegated heartbeat/maintenance paths stay silent by returning `NO_REPLY` in-session only");
   });
 });
