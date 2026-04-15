@@ -57,7 +57,6 @@
       "models": {
         "openai-codex/gpt-5.3": {},
         "openai-codex/gpt-5.3-codex": {},
-        "openai-codex/gpt-5.1": {},
         "openai-codex/gpt-5.4": {}
       },
       "workspace": "/Users/hd/Developer/cortana",
@@ -106,7 +105,7 @@
           "end": "23:00"
         },
         "every": "30m",
-        "model": "openai-codex/gpt-5.1",
+        "model": "openai-codex/gpt-5.4",
         "includeReasoning": false
       },
       "maxConcurrent": 4,
@@ -173,7 +172,7 @@
       {
         "id": "monitor",
         "workspace": "/Users/hd/Developer/cortana/identities/monitor",
-        "model": "openai-codex/gpt-5.1"
+        "model": "openai-codex/gpt-5.4"
       },
       {
         "id": "arbiter",

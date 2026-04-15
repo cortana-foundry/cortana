@@ -37,7 +37,7 @@ interface VotePayload {
 }
 
 const PARTICIPANTS = ["risk-analyst", "momentum-analyst", "fundamentals-analyst"] as const;
-const VOTER_MODEL = "openai-codex/gpt-5.1";
+const VOTER_MODEL = "openai-codex/gpt-5.4";
 const SYNTHESIS_MODEL = "openai-codex/gpt-5.2-codex";
 
 function jsonError(message: string): string {

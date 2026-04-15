@@ -17,13 +17,13 @@ describe("validate-agent-profile-sync", () => {
       agents: {
         list: [
           { id: "main", workspace: "/repo", model: { primary: "openai-codex/gpt-5.4" } },
-          { id: "monitor", workspace: "/repo/identities/monitor", model: "openai-codex/gpt-5.1" },
+          { id: "monitor", workspace: "/repo/identities/monitor", model: "openai-codex/gpt-5.4" },
         ],
       },
     });
     writeJson(path.join(root, "config", "agent-profiles.json"), [
       { id: "main", workspace: "/repo", model: "openai-codex/gpt-5.4", identityNamespace: "main" },
-      { id: "monitor", workspace: "/repo/identities/monitor", model: "openai-codex/gpt-5.1", identityNamespace: "monitor" },
+      { id: "monitor", workspace: "/repo/identities/monitor", model: "openai-codex/gpt-5.4", identityNamespace: "monitor" },
     ]);
     writeJson(path.join(root, "config", "identity-namespaces.json"), {
       defaultNamespace: "main",
@@ -51,9 +51,9 @@ describe("validate-agent-profile-sync", () => {
       },
     });
     writeJson(path.join(root, "config", "agent-profiles.json"), [
-      { id: "main", workspace: "/repo", model: "openai-codex/gpt-5.1", identityNamespace: "main" },
+      { id: "main", workspace: "/repo", model: "openai-codex/gpt-5.3-codex", identityNamespace: "main" },
       { id: "spartan", workspace: "/repo/identities/spartan", model: "openai-codex/gpt-5.3-codex" },
-      { id: "old-agent", workspace: "/repo", model: "openai-codex/gpt-5.1" },
+      { id: "old-agent", workspace: "/repo", model: "openai-codex/gpt-5.4" },
     ]);
     writeJson(path.join(root, "config", "identity-namespaces.json"), {
       defaultNamespace: "main",

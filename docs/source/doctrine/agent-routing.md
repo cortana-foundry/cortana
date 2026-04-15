@@ -9,11 +9,11 @@ This system runs multiple agents, each with its own workspace, model, and sessio
 | Agent | Purpose | Workspace | Model | Accepts DMs? |
 |-------|---------|-----------|-------|-------------|
 | **main** (Cortana) | Primary assistant, conversation, coordination | `/Users/hd/Developer/cortana` | opus | Yes (Telegram, webchat) |
-| cron-health | Health checks (X session, fitness service, etc.) | `~/.openclaw/workspaces/cron-health` | gpt-5.1 | No — cron only |
+| cron-health | Health checks (X session, fitness service, etc.) | `~/.openclaw/workspaces/cron-health` | gpt-5.4 | No — cron only |
 | cron-comms | Communication checks | `~/.openclaw/workspaces/cron-comms` | gpt-5.3-codex | No — cron only |
 | cron-fitness | Fitness data | `~/.openclaw/workspaces/cron-fitness` | gpt-5.3-codex | No — cron only |
 | cron-market | Market analysis | `~/.openclaw/workspaces/cron-market` | gpt-5.3-codex | No — cron only |
-| cron-maintenance | System updates | `~/.openclaw/workspaces/cron-maintenance` | gpt-5.1 | No — cron only |
+| cron-maintenance | System updates | `~/.openclaw/workspaces/cron-maintenance` | gpt-5.4 | No — cron only |
 | **huragok** | Standalone Huragok identity (dedicated Telegram-bound lane + spawn target) | `/Users/hd/Developer/cortana/identities/huragok` | gpt-5.3-codex | Yes (bound group/channel) |
 | **researcher** | Dedicated investigation/research execution lane for Cortana delegation | `/Users/hd/Developer/cortana/identities/researcher` | gpt-5.3-codex | No — spawn target only |
 | **oracle** | Strategic judgment / foresight lane | `/Users/hd/Developer/cortana/identities/oracle` | gpt-5.3-codex | Yes (bound group/channel) |

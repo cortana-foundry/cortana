@@ -7,7 +7,7 @@
 1. **Model validation**
    - Allowed:
      - `openai-codex/gpt-5.3-codex`
-     - `openai-codex/gpt-5.1`
+     - `openai-codex/gpt-5.4`
      - `anthropic/claude-opus-4-6`
    - Rejects shorthand aliases like `codex`.
 2. **Git auth**
