@@ -50,6 +50,26 @@ run_or_echo() {
   fi
 }
 
+resolve_main_remote_ref() {
+  local upstream=""
+  local candidate=""
+
+  upstream="$(git rev-parse --abbrev-ref --symbolic-full-name main@{upstream} 2>/dev/null || true)"
+  if [[ -n "$upstream" ]]; then
+    printf '%s\n' "$upstream"
+    return 0
+  fi
+
+  for candidate in "origin/main" "upstream/main"; do
+    if git show-ref --verify --quiet "refs/remotes/$candidate"; then
+      printf '%s\n' "$candidate"
+      return 0
+    fi
+  done
+
+  return 1
+}
+
 count_tracked_dirty() {
   git status --porcelain | awk 'substr($0,1,1)!="?" || substr($0,2,1)!="?"' | wc -l | tr -d ' '
 }
@@ -75,7 +95,7 @@ for repo in "${REPOS[@]}"; do
 
   pushd "$repo" >/dev/null
 
-  git fetch origin --prune --quiet
+  git fetch --all --prune --quiet
 
   if ! git show-ref --verify --quiet refs/heads/main; then
     echo "missing local main branch"
@@ -86,22 +106,18 @@ for repo in "${REPOS[@]}"; do
 
   current_branch="$(git rev-parse --abbrev-ref HEAD)"
 
-  # Ensure main tracks origin/main
-  if git show-ref --verify --quiet refs/remotes/origin/main; then
-    upstream="$(git rev-parse --abbrev-ref --symbolic-full-name main@{upstream} 2>/dev/null || true)"
-    if [[ "$upstream" != "origin/main" ]]; then
-      git branch --set-upstream-to=origin/main main >/dev/null
-      echo "set upstream: main -> origin/main"
-    fi
-  else
-    echo "missing origin/main remote ref"
+  main_remote_ref="$(resolve_main_remote_ref || true)"
+  if [[ -z "$main_remote_ref" ]]; then
+    echo "missing tracked main remote ref"
     overall_rc=1
+  else
+    echo "main_remote_ref=$main_remote_ref"
   fi
 
   ahead=0
   behind=0
-  if git show-ref --verify --quiet refs/remotes/origin/main; then
-    read -r ahead behind < <(git rev-list --left-right --count main...origin/main)
+  if [[ -n "$main_remote_ref" ]]; then
+    read -r ahead behind < <(git rev-list --left-right --count "main...$main_remote_ref")
   fi
 
   tracked_dirty="$(count_tracked_dirty)"
@@ -118,7 +134,9 @@ for repo in "${REPOS[@]}"; do
       echo "fix mode: dry-run"
     fi
     run_or_echo git checkout main
-    run_or_echo git reset --hard origin/main
+    if [[ -n "$main_remote_ref" ]]; then
+      run_or_echo git reset --hard "$main_remote_ref"
+    fi
     run_or_echo git clean -fd
     run_or_echo git stash clear
   fi

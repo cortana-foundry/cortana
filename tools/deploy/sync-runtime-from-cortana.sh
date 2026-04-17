@@ -27,7 +27,7 @@ Usage:
   sync-runtime-from-cortana.sh [--source-repo <path>] [--compat-repo <path>] [--runtime-home <path>] [--skip-openclaw-check] [--skip-cron-sync] [--skip-compat-shim]
 
 Safety rules:
-  - source repo must be clean, on main, and exactly at origin/main
+  - source repo must be clean, on main, and exactly at its tracked main remote
   - if /Users/hd/Developer/cortana-deploy exists, it is preferred as the default source repo
   - no destructive reset is performed
   - existing ~/openclaw checkout is backed up before being replaced with a shim
@@ -45,6 +45,36 @@ die() {
 
 git_out() {
   git -C "$1" "${@:2}"
+}
+
+resolve_branch_remote_ref() {
+  local repo="$1"
+  local branch="$2"
+  local upstream=""
+  local candidate=""
+
+  upstream="$(git_out "$repo" rev-parse --abbrev-ref --symbolic-full-name "${branch}@{upstream}" 2>/dev/null || true)"
+  if [[ -n "$upstream" ]]; then
+    printf '%s\n' "$upstream"
+    return 0
+  fi
+
+  for candidate in "origin/$branch" "upstream/$branch"; do
+    if git_out "$repo" show-ref --verify --quiet "refs/remotes/$candidate"; then
+      printf '%s\n' "$candidate"
+      return 0
+    fi
+  done
+
+  return 1
+}
+
+fetch_remote_ref() {
+  local repo="$1"
+  local remote_ref="$2"
+  local remote="${remote_ref%%/*}"
+  local branch="${remote_ref#*/}"
+  git_out "$repo" fetch "$remote" "$branch" --prune --quiet
 }
 
 while [[ $# -gt 0 ]]; do
@@ -106,25 +136,28 @@ require_upstream() {
   local repo="$1"
   local label="$2"
   local expected="$3"
-  local upstream
-  upstream="$(git_out "$repo" rev-parse --abbrev-ref --symbolic-full-name '@{u}' 2>/dev/null || true)"
-  [[ "$upstream" == "origin/$expected" ]] || die "$label repo must track origin/$expected (found ${upstream:-none})"
+  local upstream=""
+  upstream="$(git_out "$repo" rev-parse --abbrev-ref --symbolic-full-name "${expected}@{upstream}" 2>/dev/null || true)"
+  [[ -n "$upstream" ]] || die "$label repo must track a remote $expected branch (found none)"
 }
 
 fetch_branch() {
   local repo="$1"
   local branch="$2"
-  git_out "$repo" fetch origin "$branch" --prune --quiet
+  local remote_ref=""
+  remote_ref="$(resolve_branch_remote_ref "$repo" "$branch")" || die "unable to resolve tracked remote for $repo:$branch"
+  fetch_remote_ref "$repo" "$remote_ref"
 }
 
 require_synced_with_origin() {
   local repo="$1"
   local label="$2"
   local branch="$3"
-  local head remote_head
+  local head remote_head remote_ref
   head="$(git_out "$repo" rev-parse HEAD)"
-  remote_head="$(git_out "$repo" rev-parse "origin/$branch")"
-  [[ "$head" == "$remote_head" ]] || die "$label repo is not synced with origin/$branch"
+  remote_ref="$(resolve_branch_remote_ref "$repo" "$branch")" || die "unable to resolve tracked remote for $repo:$branch"
+  remote_head="$(git_out "$repo" rev-parse "$remote_ref")"
+  [[ "$head" == "$remote_head" ]] || die "$label repo is not synced with $remote_ref"
 }
 
 previous_compat_commit=""

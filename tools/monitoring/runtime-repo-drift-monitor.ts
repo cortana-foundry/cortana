@@ -29,8 +29,9 @@ type RepoState = {
   branch: string;
   upstream: string;
   head: string;
-  originHead: string;
-  remoteUrl: string;
+  trackedRef: string;
+  trackedHead: string;
+  trackedRemoteUrl: string;
   clean: boolean;
   changedPaths: string[];
 };
@@ -92,6 +93,14 @@ function run(cmd: string, cwd: string): string {
   }).trim();
 }
 
+function tryRun(cmd: string, cwd: string): string {
+  try {
+    return run(cmd, cwd);
+  } catch {
+    return "";
+  }
+}
+
 function repoExists(repo: string): boolean {
   return fs.existsSync(`${repo}/.git`);
 }
@@ -135,16 +144,38 @@ function isShimmedRuntime(sourceRepo: string, runtimeRepo: string): boolean {
   }
 }
 
+function resolveTrackedMainRef(repo: string, branch: string, upstream: string): string {
+  if (upstream) return upstream;
+
+  for (const candidate of [`origin/${branch}`, `upstream/${branch}`]) {
+    if (tryRun(`git rev-parse ${candidate}`, repo)) return candidate;
+  }
+
+  return "";
+}
+
+function fetchTrackedMainRef(repo: string, trackedRef: string): void {
+  if (!trackedRef) return;
+  const [remote, ...branchParts] = trackedRef.split("/");
+  const branch = branchParts.join("/");
+  if (!remote || !branch) return;
+  run(`git fetch ${remote} ${branch} --prune --quiet`, repo);
+}
+
 function collectRepoState(repo: string, branch: string): RepoState {
-  run(`git fetch origin ${branch} --prune --quiet`, repo);
+  const upstream = tryRun("git rev-parse --abbrev-ref --symbolic-full-name @{u}", repo);
+  const trackedRef = resolveTrackedMainRef(repo, branch, upstream);
+  fetchTrackedMainRef(repo, trackedRef);
   const changedPaths = collectChangedPaths(repo);
+  const trackedRemote = trackedRef.split("/")[0] ?? "origin";
   return {
     repo,
     branch: run("git rev-parse --abbrev-ref HEAD", repo),
-    upstream: run("git rev-parse --abbrev-ref --symbolic-full-name @{u}", repo),
+    upstream,
     head: run("git rev-parse HEAD", repo),
-    originHead: run(`git rev-parse origin/${branch}`, repo),
-    remoteUrl: run("git remote get-url origin", repo),
+    trackedRef,
+    trackedHead: trackedRef ? run(`git rev-parse ${trackedRef}`, repo) : "",
+    trackedRemoteUrl: trackedRemote ? tryRun(`git remote get-url ${trackedRemote}`, repo) : "",
     clean: changedPaths.every((repoPath) => !isMeaningfulDriftPath(repoPath)),
     changedPaths,
   };
@@ -163,12 +194,12 @@ function assessSource(state: RepoState, expectedBranch: string): DriftAssessment
     });
   }
 
-  if (state.upstream !== `origin/${expectedBranch}`) {
+  if (!state.upstream) {
     findings.push({
       check,
       actionable: true,
-      reason: "source repo is not tracking origin/main",
-      details: { expected: `origin/${expectedBranch}`, actual: state.upstream },
+      reason: "source repo main has no configured upstream",
+      details: { expectedBranch },
     });
   }
 
@@ -180,12 +211,12 @@ function assessSource(state: RepoState, expectedBranch: string): DriftAssessment
     });
   }
 
-  if (state.head !== state.originHead) {
+  if (state.head !== state.trackedHead) {
     findings.push({
       check,
       actionable: true,
-      reason: "source repo is not synced with origin/main",
-      details: { head: state.head, originHead: state.originHead },
+      reason: "source repo is not synced with its tracked main remote",
+      details: { head: state.head, trackedRef: state.trackedRef, trackedHead: state.trackedHead },
     });
   }
 
@@ -196,12 +227,12 @@ function assessRuntime(state: RepoState, source: RepoState, expectedBranch: stri
   const check: Check = { label: "runtime-repo", repo: state.repo };
   const findings: DriftAssessment[] = [];
 
-  if (state.remoteUrl !== source.remoteUrl) {
+  if (state.trackedRemoteUrl !== source.trackedRemoteUrl) {
     findings.push({
       check,
       actionable: true,
-      reason: "runtime repo remote does not match source repo remote",
-      details: { sourceRemote: source.remoteUrl, runtimeRemote: state.remoteUrl },
+      reason: "runtime repo tracked remote does not match source repo tracked remote",
+      details: { sourceRemote: source.trackedRemoteUrl, runtimeRemote: state.trackedRemoteUrl },
     });
   }
 
@@ -214,12 +245,12 @@ function assessRuntime(state: RepoState, source: RepoState, expectedBranch: stri
     });
   }
 
-  if (state.upstream !== `origin/${expectedBranch}`) {
+  if (!state.upstream) {
     findings.push({
       check,
       actionable: true,
-      reason: "runtime repo is not tracking origin/main",
-      details: { expected: `origin/${expectedBranch}`, actual: state.upstream },
+      reason: "runtime repo main has no configured upstream",
+      details: { expectedBranch },
     });
   }
 
