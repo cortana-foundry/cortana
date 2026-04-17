@@ -167,4 +167,29 @@ describe("sync-runtime-from-cortana.sh", () => {
     expect(result.status).not.toBe(0);
     expect(`${result.stdout}\n${result.stderr}`).toContain("compat repo has local changes");
   });
+
+  it("accepts a source repo whose main tracks upstream/main instead of origin/main", () => {
+    const fixture = makeFixture();
+    const fork = path.join(fixture.root, "fork.git");
+
+    runOrThrow("git", ["init", "--bare", fork]);
+    git(fixture.source, "remote", "rename", "origin", "upstream");
+    git(fixture.source, "remote", "add", "origin", fork);
+    git(fixture.source, "branch", "--set-upstream-to=upstream/main", "main");
+
+    fs.writeFileSync(path.join(fixture.source, "README.md"), "source split-remote\n", "utf8");
+    git(fixture.source, "add", "README.md");
+    git(fixture.source, "commit", "-m", "split remote deployable change");
+    git(fixture.source, "push", "upstream", "main");
+
+    const result = runOrThrow(
+      "bash",
+      [script, "--source-repo", fixture.source, "--runtime-repo", fixture.runtime, "--runtime-home", fixture.home],
+      process.cwd(),
+      { HOME: fixture.home, PATH: `${fixture.bin}:${process.env.PATH}`, CORTANA_SOURCE_REPO: fixture.source },
+    );
+
+    expect(result.stdout).toContain("Runtime deploy complete");
+    expect(fs.realpathSync(fixture.runtime)).toBe(fs.realpathSync(fixture.source));
+  });
 });

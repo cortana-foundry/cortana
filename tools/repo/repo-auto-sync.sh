@@ -79,6 +79,34 @@ sanitize_branch_token() {
     | xargs
 }
 
+resolve_main_remote_ref() {
+  local repo="$1"
+  local upstream=""
+  local candidate=""
+
+  upstream="$(git -C "$repo" rev-parse --abbrev-ref --symbolic-full-name main@{upstream} 2>/dev/null || true)"
+  if [[ -n "$upstream" ]]; then
+    printf '%s\n' "$upstream"
+    return 0
+  fi
+
+  for candidate in "origin/main" "upstream/main"; do
+    if git -C "$repo" show-ref --verify --quiet "refs/remotes/$candidate"; then
+      printf '%s\n' "$candidate"
+      return 0
+    fi
+  done
+
+  return 1
+}
+
+main_remote_components() {
+  local remote_ref="$1"
+  local remote="${remote_ref%%/*}"
+  local branch="${remote_ref#*/}"
+  printf '%s\t%s\n' "$remote" "$branch"
+}
+
 is_temp_worktree_path() {
   local worktree_path="${1%/}/"
   [[ "$worktree_path" == /tmp/* || "$worktree_path" == /private/tmp/* ]]
@@ -247,13 +275,15 @@ worktree_branch_name_from_ref() {
   fi
 }
 
-branch_is_merged_into_origin_main() {
+branch_is_merged_into_main_remote() {
   local repo="$1"
   local branch="$2"
+  local main_remote_ref=""
 
   git -C "$repo" show-ref --verify --quiet "refs/heads/$branch" || return 1
-  git -C "$repo" rev-parse --verify --quiet "origin/main" >/dev/null || return 1
-  git -C "$repo" merge-base --is-ancestor "$branch" "origin/main"
+  main_remote_ref="$(resolve_main_remote_ref "$repo")" || return 1
+  git -C "$repo" rev-parse --verify --quiet "$main_remote_ref" >/dev/null || return 1
+  git -C "$repo" merge-base --is-ancestor "$branch" "$main_remote_ref"
 }
 
 auto_stash_dirty_worktree() {
@@ -357,7 +387,7 @@ cleanup_stale_temp_worktrees() {
     branch_name="$(worktree_branch_name_from_ref "$branch_ref")"
     status="$(git -C "$worktree_path" status --porcelain --untracked-files=all 2>/dev/null || true)"
 
-    if [[ -n "$branch_name" ]] && branch_is_merged_into_origin_main "$repo" "$branch_name"; then
+    if [[ -n "$branch_name" ]] && branch_is_merged_into_main_remote "$repo" "$branch_name"; then
       if remove_temp_worktree_for_branch "$repo" "$branch_name" "$worktree_path"; then
         printf 'INFO repo=%s step=stale-temp-worktree detail=stale-temp-worktree-removed branch=%q worktree=%q age_hours=%s\n' \
           "$repo" "$branch_name" "$worktree_path" "$(( age_seconds / 3600 ))" >&2
@@ -484,8 +514,14 @@ ensure_clean_preflight() {
 
 cleanup_local_merged_branches() {
   local repo="$1"
+  local main_remote_ref=""
 
-  git -C "$repo" for-each-ref --format='%(refname:short)' refs/heads --merged origin/main \
+  main_remote_ref="$(resolve_main_remote_ref "$repo")" || {
+    queue_actionable_alert "$repo" "branch-cleanup" "missing-main-remote-ref"
+    return 0
+  }
+
+  git -C "$repo" for-each-ref --format='%(refname:short)' refs/heads --merged "$main_remote_ref" \
     | while IFS= read -r raw_branch; do
         local b
         b="$(sanitize_branch_token "$raw_branch")"
@@ -571,8 +607,9 @@ sync_repo() {
   cleanup_stale_temp_worktrees "$repo"
   git -C "$repo" checkout main >/dev/null 2>&1 || fail "$repo" "checkout" "git checkout main failed"
 
-  local ahead behind counts
-  counts="$(git -C "$repo" rev-list --left-right --count origin/main...HEAD)" || fail "$repo" "branch-state" "git rev-list origin/main...HEAD failed"
+  local ahead behind counts main_remote_ref pull_remote pull_branch
+  main_remote_ref="$(resolve_main_remote_ref "$repo")" || fail "$repo" "branch-state" "unable to resolve tracked main remote ref"
+  counts="$(git -C "$repo" rev-list --left-right --count "$main_remote_ref...HEAD")" || fail "$repo" "branch-state" "git rev-list $main_remote_ref...HEAD failed"
   behind="${counts%%$'\t'*}"
   ahead="${counts##*$'\t'}"
 
@@ -580,9 +617,10 @@ sync_repo() {
     queue_actionable_alert "$repo" "branch-state" "diverged-main-manual-intervention-required ahead=$ahead behind=$behind"
     return 0
   elif [[ "$ahead" -gt 0 ]]; then
-    queue_actionable_alert "$repo" "branch-state" "local-main-ahead ahead=$ahead behind=$behind"
+    queue_actionable_alert "$repo" "branch-state" "local-main-ahead remote_ref=$main_remote_ref ahead=$ahead behind=$behind"
   elif [[ "$behind" -gt 0 ]]; then
-    git -C "$repo" pull --ff-only origin main >/dev/null 2>&1 || fail "$repo" "pull" "git pull --ff-only origin main failed"
+    IFS=$'\t' read -r pull_remote pull_branch < <(main_remote_components "$main_remote_ref")
+    git -C "$repo" pull --ff-only "$pull_remote" "$pull_branch" >/dev/null 2>&1 || fail "$repo" "pull" "git pull --ff-only $pull_remote $pull_branch failed"
   else
     printf 'INFO repo=%s step=pull detail=already-up-to-date\n' "$repo" >&2
   fi
