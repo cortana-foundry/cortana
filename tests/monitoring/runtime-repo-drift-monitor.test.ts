@@ -29,8 +29,8 @@ type RepoMockState = {
   branch: string;
   upstream: string;
   head: string;
-  originHead: string;
-  remoteUrl: string;
+  trackedHead: string;
+  trackedRemoteUrl: string;
   clean: boolean;
   mergeBase?: Record<string, boolean>;
 };
@@ -72,8 +72,8 @@ describe("runtime-repo-drift-monitor", () => {
       if (cmd === "git rev-parse --abbrev-ref HEAD") return `${repo.branch}\n`;
       if (cmd === "git rev-parse --abbrev-ref --symbolic-full-name @{u}") return `${repo.upstream}\n`;
       if (cmd === "git rev-parse HEAD") return `${repo.head}\n`;
-      if (cmd === "git rev-parse origin/main") return `${repo.originHead}\n`;
-      if (cmd === "git remote get-url origin") return `${repo.remoteUrl}\n`;
+      if (cmd === "git rev-parse origin/main" || cmd === "git rev-parse upstream/main") return `${repo.trackedHead}\n`;
+      if (cmd === "git remote get-url origin" || cmd === "git remote get-url upstream") return `${repo.trackedRemoteUrl}\n`;
       if (cmd === "git status --porcelain --untracked-files=all") return repo.clean ? "" : " M README.md\n";
       if (cmd.startsWith("git merge-base --is-ancestor ")) {
         const parts = cmd.split(/\s+/);
@@ -103,16 +103,16 @@ describe("runtime-repo-drift-monitor", () => {
         branch: "main",
         upstream: "origin/main",
         head: "abc123",
-        originHead: "abc123",
-        remoteUrl: "git@github-cortana:hd719/cortana.git",
+        trackedHead: "abc123",
+        trackedRemoteUrl: "git@github-cortana:hd719/cortana.git",
         clean: true,
       },
       "/runtime": {
         branch: "main",
         upstream: "origin/main",
         head: "abc123",
-        originHead: "abc123",
-        remoteUrl: "git@github-cortana:hd719/cortana.git",
+        trackedHead: "abc123",
+        trackedRemoteUrl: "git@github-cortana:hd719/cortana.git",
         clean: true,
       },
     });
@@ -137,8 +137,8 @@ describe("runtime-repo-drift-monitor", () => {
       branch: "main",
       upstream: "origin/main",
       head: "abc123",
-      originHead: "abc123",
-      remoteUrl: "git@github-cortana:hd719/cortana.git",
+      trackedHead: "abc123",
+      trackedRemoteUrl: "git@github-cortana:hd719/cortana.git",
       clean: true,
     };
 
@@ -162,16 +162,16 @@ describe("runtime-repo-drift-monitor", () => {
         branch: "main",
         upstream: "origin/main",
         head: "abc123",
-        originHead: "abc123",
-        remoteUrl: "git@github-cortana:hd719/cortana.git",
+        trackedHead: "abc123",
+        trackedRemoteUrl: "git@github-cortana:hd719/cortana.git",
         clean: true,
       },
       "/Users/hd/openclaw": {
         branch: "main",
         upstream: "origin/main",
         head: "abc123",
-        originHead: "abc123",
-        remoteUrl: "git@github-cortana:hd719/cortana.git",
+        trackedHead: "abc123",
+        trackedRemoteUrl: "git@github-cortana:hd719/cortana.git",
         clean: true,
       },
     });
@@ -189,16 +189,16 @@ describe("runtime-repo-drift-monitor", () => {
         branch: "main",
         upstream: "origin/main",
         head: "def456",
-        originHead: "def456",
-        remoteUrl: "git@github-cortana:hd719/cortana.git",
+        trackedHead: "def456",
+        trackedRemoteUrl: "git@github-cortana:hd719/cortana.git",
         clean: true,
       },
       "/runtime": {
         branch: "main",
         upstream: "origin/main",
         head: "abc123",
-        originHead: "abc123",
-        remoteUrl: "git@github-cortana:hd719/cortana.git",
+        trackedHead: "abc123",
+        trackedRemoteUrl: "git@github-cortana:hd719/cortana.git",
         clean: true,
         mergeBase: {
           "abc123->def456": true,
@@ -268,8 +268,8 @@ describe("runtime-repo-drift-monitor", () => {
         branch: "main",
         upstream: "origin/main",
         head: "abc123",
-        originHead: "abc123",
-        remoteUrl: "git@github-cortana:hd719/cortana.git",
+        trackedHead: "abc123",
+        trackedRemoteUrl: "git@github-cortana:hd719/cortana.git",
         clean: false,
       },
     });
@@ -294,8 +294,8 @@ describe("runtime-repo-drift-monitor", () => {
         branch: "main",
         upstream: "origin/main",
         head: "abc123",
-        originHead: "abc123",
-        remoteUrl: "git@github-cortana:hd719/cortana.git",
+        trackedHead: "abc123",
+        trackedRemoteUrl: "git@github-cortana:hd719/cortana.git",
         clean: true,
       },
     });
@@ -310,5 +310,31 @@ describe("runtime-repo-drift-monitor", () => {
         }),
       ]),
     );
+  });
+
+  it("treats upstream/main as a healthy configured source of truth", async () => {
+    seedRepos({
+      "/source": {
+        branch: "main",
+        upstream: "upstream/main",
+        head: "abc123",
+        trackedHead: "abc123",
+        trackedRemoteUrl: "git@github-cortana:hd719/cortana.git",
+        clean: true,
+      },
+      "/runtime": {
+        branch: "main",
+        upstream: "upstream/main",
+        head: "abc123",
+        trackedHead: "abc123",
+        trackedRemoteUrl: "git@github-cortana:hd719/cortana.git",
+        clean: true,
+      },
+    });
+
+    const output = await runMonitor(["--json", "--source-repo", "/source", "--runtime-repo", "/runtime"]);
+    const payload = JSON.parse(output);
+    expect(payload.status).toBe("healthy");
+    expect(payload.actionable ?? []).toEqual([]);
   });
 });

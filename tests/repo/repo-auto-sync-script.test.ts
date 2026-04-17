@@ -18,9 +18,9 @@ describe("repo-auto-sync.sh hygiene policy", () => {
   it("keeps safe order: preflight before branch-state/pull, stale worktree cleanup before branch cleanup", () => {
     const syncRepoBody = script.match(/sync_repo\(\) \{([\s\S]*?)\n\}/)?.[1] ?? "";
     const preflight = syncRepoBody.indexOf("ensure_clean_preflight");
-    const branchState = syncRepoBody.indexOf("rev-list --left-right --count origin/main...HEAD");
+    const branchState = syncRepoBody.indexOf("rev-list --left-right --count \"$main_remote_ref...HEAD\"");
     const staleTemp = syncRepoBody.indexOf("cleanup_stale_temp_worktrees");
-    const pull = syncRepoBody.indexOf("pull --ff-only origin main");
+    const pull = syncRepoBody.indexOf("pull --ff-only \"$pull_remote\" \"$pull_branch\"");
     const cleanup = syncRepoBody.indexOf("cleanup_local_merged_branches");
 
     expect(syncRepoBody).toBeTruthy();
@@ -55,15 +55,16 @@ describe("repo-auto-sync.sh hygiene policy", () => {
     expect(script).toContain('detail=delete-skipped-worktree-blocked');
   });
 
-  it("only deletes local branches merged into origin/main and never remote branches", () => {
-    expect(script).toContain("for-each-ref --format='%(refname:short)' refs/heads --merged origin/main");
+  it("only deletes local branches merged into the tracked main remote and never remote branches", () => {
+    expect(script).toContain("resolve_main_remote_ref");
+    expect(script).toContain("for-each-ref --format='%(refname:short)' refs/heads --merged \"$main_remote_ref\"");
     expect(script).toContain('git -C "$repo" branch -d -- "$b"');
     expect(script).not.toContain("push --delete");
-    expect(script).not.toContain("refs/remotes");
+    expect(script).not.toContain("refs/remotes --merged");
   });
 
   it("handles ahead/diverged main safely before attempting pull", () => {
-    expect(script).toContain('rev-list --left-right --count origin/main...HEAD');
+    expect(script).toContain('rev-list --left-right --count "$main_remote_ref...HEAD"');
     expect(script).toContain('local-main-ahead');
     expect(script).toContain('diverged-main-manual-intervention-required');
     expect(script).toContain('queue_actionable_alert "$repo" "fetch" "git fetch --all --prune failed"');
