@@ -22,10 +22,11 @@ describe("stock market brief cron contract", () => {
     const summaryJob = json.jobs.find((entry) => entry.id === "a86ca3f9-38af-4672-ba3f-1911352f0319");
     const message = String(summaryJob?.payload?.message ?? "");
     expect(message).toContain("/tmp/cron-stock-market-brief.json");
-    expect(message).toContain("Artifact is source of truth");
-    expect(message).toContain("No portfolio section");
+    expect(message).toContain("stock-market-brief-notify.ts");
+    expect(message).toContain("If stdout is exactly NO_REPLY: return exactly NO_REPLY");
+    expect(message).toContain("Do not send routine daily commentary");
+    expect(message).toContain("Do not invent market details");
     expect(message).not.toContain("Beginner Corner");
-    expect(message).not.toContain("Include portfolio values + weights");
     expect(message).not.toContain("finance insights");
   });
 });
