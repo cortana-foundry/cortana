@@ -19,16 +19,12 @@ Use `memory/heartbeat-state.json` to select the stalest 1–2 delegated checks p
 ## Agent Ownership & Routing
 
 ### Monitor (`agent:monitor:main`)
-- Cron delivery checks (every heartbeat)
-- Session size guard (every heartbeat)
-- Subagent watchdog (every heartbeat)
-- Feedback pipeline reconciliation (every heartbeat)
 - System health / drift detection (daily health validation; drift watch)
 - Repo sync checks
-- Task board hygiene
 - Strategic tech/news situational-awareness scan
 - Email triage / inbox-operational summaries
 - **Single owner lane for operational cron / maintenance alerts** (even when another agent executes the underlying check)
+- Routine maintenance checks such as cron delivery, session hygiene, subagent watchdog, feedback reconciliation, and task-board hygiene are already covered by dedicated cron lanes. Do **not** dispatch those into `agent:monitor:main` on normal heartbeats unless a cron is stale/failing or Hamel explicitly asks.
 - Current Monitor heartbeat entrypoints:
   - task board hygiene: `npx tsx /Users/hd/Developer/cortana/tools/task-board/hygiene.ts`
   - feedback pipeline reconciliation: `npx tsx /Users/hd/Developer/cortana/tools/feedback/pipeline-reconciliation.ts`
@@ -67,12 +63,12 @@ Keep existing thresholds where already defined:
 - **X sentiment scan** (Oracle): same window/cadence as market pulse; skip if run within **6h**.
 - **Fitness** (Cortana local): **1× daily (morning)**; skip if already briefed today.
 - **Strategic tech/news situational-awareness scan** (Monitor): skip if run within **4h**.
-- **Task board hygiene** (Monitor): **every heartbeat**.
-- **Feedback pipeline reconciliation** (Monitor): **every heartbeat**.
-- **Session size guard** (Monitor): **every heartbeat**.
-- **Cron delivery monitoring** (Monitor): **every heartbeat**.
-- **Subagent watchdog** (Monitor): **every heartbeat**.
-- **System health / drift detection** (Monitor): **1× daily** for full validation; drift checks can run per heartbeat if lightweight.
+- **Task board hygiene** (Monitor): cron-owned, not heartbeat-dispatched during normal operation.
+- **Feedback pipeline reconciliation** (Monitor): cron-owned, not heartbeat-dispatched during normal operation.
+- **Session size guard** (Monitor): cron-owned, not heartbeat-dispatched during normal operation.
+- **Cron delivery monitoring** (Monitor): cron-owned, not heartbeat-dispatched during normal operation.
+- **Subagent watchdog** (Monitor): cron-owned, not heartbeat-dispatched during normal operation.
+- **System health / drift detection** (Monitor): **1× daily** for full validation; lightweight drift checks may run on heartbeat only when stale/failing signal exists.
 - **Repo sync checks** (Monitor): **2× daily** (recommended every ~12h).
 
 ## Dispatch Contract (Mandatory)
@@ -109,7 +105,7 @@ Otherwise: Cortana remains silent (`HEARTBEAT_OK` behavior preserved).
 
 1. Validate state each heartbeat: `npx tsx ~/Developer/cortana/tools/heartbeat/validate-heartbeat-state.ts`.
 2. Update `memory/heartbeat-state.json` every run and set `lastHeartbeat = Date.now()` at start.
-3. Select the stalest 1–2 delegated checks per heartbeat (plus required always-run checks).
+3. Select the stalest 1–2 delegated checks per heartbeat, but skip routine Monitor maintenance checks already owned by cron unless there is evidence of staleness/failure.
 4. Always route delegated checks through `sessions_send` to the owning agent session.
 5. Do **not** spawn sub-agents for routine heartbeat rotation.
 6. Cortana only performs lightweight local reads (state/calendar/fitness) and escalation synthesis.
