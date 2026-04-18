@@ -288,6 +288,7 @@ flowchart TB
 | Monitor | `agent:monitor:main` | `monitor` | runtime checks, cron delivery reliability, drift and watchdog checks, incident verification | Cortana for operator escalation |
 
 **Contract:** if task maps cleanly to one specialist lane, Cortana routes there first.
+**Heartbeat routing exception:** routine Monitor maintenance checks already covered by dedicated cron lanes should not be re-dispatched into `agent:monitor:main` on normal heartbeats. Use heartbeat dispatch for Monitor only when a cron is stale/failing or Hamel explicitly asks.
 **Telegram delivery contract:** owner-labeled alerts must send with the matching Telegram `accountId`. Monitor-owned alerts use `monitor`; approval prompts and direct operator conversation stay on `default`. `tools/notifications/telegram-delivery-guard.ts` enforces this mapping and falls back to `default` only when no owner-specific account exists.
 
 ### B) `sessions_send` TASK message schema (required)
