@@ -88,6 +88,7 @@ describe("inbox_to_execution wrapper", () => {
     expect(String(scriptSource)).toContain("def _run_with_timeout_retries");
     expect(String(scriptSource)).toContain("time.sleep(min(2.0, 0.5 * (attempt + 1)))");
     expect(String(scriptSource)).toContain("timed out after retries; continuing with partial inbox triage");
+    expect(String(scriptSource)).toContain("label=\"primary unread inbox scan\"");
     expect(String(scriptSource)).toContain("label=\"stale/orphan sent-thread lookup\"");
     expect(String(scriptSource)).toContain("\"warnings\": runner.warnings");
   });
