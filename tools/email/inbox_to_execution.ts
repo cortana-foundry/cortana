@@ -622,7 +622,12 @@ def run_pipeline(args: argparse.Namespace) -> int:
 
     runner = Runner(account=args.account, db=args.db, dry_run=args.dry_run, verbose=args.verbose)
 
-    raw = runner.gog_search(args.query, args.max_emails)
+    raw = runner.gog_search(
+        args.query,
+        args.max_emails,
+        best_effort=True,
+        label="primary unread inbox scan",
+    )
     emails = [normalize_email(x) for x in raw]
     now = datetime.now()
 
