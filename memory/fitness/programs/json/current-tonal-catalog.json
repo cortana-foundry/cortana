@@ -1,14 +1,25 @@
 {
   "userId": "709c25e4-e35f-39fe-a5c9-83f048f42498",
-  "generatedAt": "2026-04-19T22:20:27.856Z",
+  "generatedAt": "2026-04-20T10:20:16.513Z",
   "summary": {
-    "workoutsSeen": 98,
+    "workoutsSeen": 99,
     "movementsSeen": 155,
     "mappedMovementPct": 12.26,
     "strengthScoresPresent": true,
-    "latestWorkoutAt": "2026-04-19T13:13:20.351556Z"
+    "latestWorkoutAt": "2026-04-20T09:06:49.838843Z"
   },
   "recentWorkouts": [
+    {
+      "activityId": "71de8407-3c75-499e-8ca7-e178ebd1c815",
+      "workoutId": "28abe326-89c1-496b-b163-b6a7d60b8e7f",
+      "programId": "7c75828b-cee7-433e-b488-ac0360bcfaef",
+      "beginTime": "2026-04-20T09:06:49.838843Z",
+      "durationMinutes": 41.82,
+      "totalVolume": 19835,
+      "focus": "unknown",
+      "dominantMuscles": [],
+      "mappedMovementPct": 0
+    },
     {
       "activityId": "308d4a89-f051-4eb8-993f-2d66fe0efd0c",
       "workoutId": "c65a556f-55cb-4094-9ffa-34524be48bbe",
@@ -1090,6 +1101,21 @@
   ],
   "workouts": [
     {
+      "workoutId": "28abe326-89c1-496b-b163-b6a7d60b8e7f",
+      "programId": "7c75828b-cee7-433e-b488-ac0360bcfaef",
+      "workoutType": "PT",
+      "occurrences": 2,
+      "latestAt": "2026-04-20T09:06:49.838843Z",
+      "avgDurationMinutes": 39.24,
+      "avgVolume": 19534.5,
+      "movementIds": [],
+      "dominantMuscles": [],
+      "focus": "unknown",
+      "qualityFlags": [
+        "low_mapping_coverage"
+      ]
+    },
+    {
       "workoutId": "c65a556f-55cb-4094-9ffa-34524be48bbe",
       "programId": "7c75828b-cee7-433e-b488-ac0360bcfaef",
       "workoutType": "PT",
@@ -1163,21 +1189,6 @@
       "focus": "unknown",
       "qualityFlags": [
         "missing_program_id",
-        "low_mapping_coverage"
-      ]
-    },
-    {
-      "workoutId": "28abe326-89c1-496b-b163-b6a7d60b8e7f",
-      "programId": "7c75828b-cee7-433e-b488-ac0360bcfaef",
-      "workoutType": "PT",
-      "occurrences": 1,
-      "latestAt": "2026-04-14T09:33:26.319319Z",
-      "avgDurationMinutes": 36.65,
-      "avgVolume": 19234,
-      "movementIds": [],
-      "dominantMuscles": [],
-      "focus": "unknown",
-      "qualityFlags": [
         "low_mapping_coverage"
       ]
     },
@@ -2295,13 +2306,13 @@
         "e1d37e75-8bbc-4b22-aec9-4c4edd62ace7"
       ],
       "workoutIds": [
+        "28abe326-89c1-496b-b163-b6a7d60b8e7f",
         "c65a556f-55cb-4094-9ffa-34524be48bbe",
         "bf5d9d6d-c8cf-40c8-a29a-9da59eb6343e",
-        "5614390e-0510-4dc4-8984-96c377a750c3",
-        "28abe326-89c1-496b-b163-b6a7d60b8e7f"
+        "5614390e-0510-4dc4-8984-96c377a750c3"
       ],
-      "occurrences": 4,
-      "latestAt": "2026-04-19T13:13:20.351556Z",
+      "occurrences": 5,
+      "latestAt": "2026-04-20T09:06:49.838843Z",
       "dominantFocus": "unknown",
       "dominantMuscles": []
     },
@@ -2443,12 +2454,12 @@
       "pattern": "press",
       "mapped": true,
       "confidence": 0.98,
-      "setCount": 53,
+      "setCount": 58,
       "workoutCount": 2,
-      "lastSeenAt": "2026-04-14T09:45:03.167Z",
-      "avgLoad": 38.73,
-      "avgReps": 10.7,
-      "avgVolume": 824.23
+      "lastSeenAt": "2026-04-20T09:16:55.454Z",
+      "avgLoad": 39.75,
+      "avgReps": 10.65,
+      "avgVolume": 842.26
     },
     {
       "movementId": "f4d78bdf-f70c-4f3c-bccb-78e9ff80f9fb",
@@ -2676,6 +2687,21 @@
       "avgVolume": 1242.11
     },
     {
+      "movementId": "03c61400-a790-4fa9-bd34-961500820437",
+      "canonicalKey": "03c61400-a790-4fa9-bd34-961500820437",
+      "sampleTitle": null,
+      "muscleGroup": "unmapped",
+      "pattern": "other",
+      "mapped": false,
+      "confidence": 0.18,
+      "setCount": 32,
+      "workoutCount": 2,
+      "lastSeenAt": "2026-04-20T09:17:34.704Z",
+      "avgLoad": 19.32,
+      "avgReps": 11.34,
+      "avgVolume": 437.79
+    },
+    {
       "movementId": "5c740fbf-6d28-4fba-912d-040e4d1c92e1",
       "canonicalKey": "5c740fbf-6d28-4fba-912d-040e4d1c92e1",
       "sampleTitle": null,
@@ -2689,6 +2715,21 @@
       "avgLoad": 13.43,
       "avgReps": 10.04,
       "avgVolume": 269.69
+    },
+    {
+      "movementId": "97854f66-63ce-4d82-8d62-554a19174113",
+      "canonicalKey": "97854f66-63ce-4d82-8d62-554a19174113",
+      "sampleTitle": null,
+      "muscleGroup": "unmapped",
+      "pattern": "other",
+      "mapped": false,
+      "confidence": 0.18,
+      "setCount": 32,
+      "workoutCount": 2,
+      "lastSeenAt": "2026-04-20T09:26:46.965Z",
+      "avgLoad": 41.01,
+      "avgReps": 12.51,
+      "avgVolume": 554.49
     },
     {
       "movementId": "56d65783-2054-4517-aa07-03051b2224cc",
@@ -2856,21 +2897,6 @@
       "avgVolume": 584.6
     },
     {
-      "movementId": "03c61400-a790-4fa9-bd34-961500820437",
-      "canonicalKey": "03c61400-a790-4fa9-bd34-961500820437",
-      "sampleTitle": null,
-      "muscleGroup": "unmapped",
-      "pattern": "other",
-      "mapped": false,
-      "confidence": 0.18,
-      "setCount": 28,
-      "workoutCount": 2,
-      "lastSeenAt": "2026-04-14T09:45:55.575Z",
-      "avgLoad": 19.57,
-      "avgReps": 11.38,
-      "avgVolume": 444.71
-    },
-    {
       "movementId": "7d6175b3-1351-4dad-830e-632ab3e6ecb6",
       "canonicalKey": "7d6175b3-1351-4dad-830e-632ab3e6ecb6",
       "sampleTitle": null,
@@ -2884,6 +2910,21 @@
       "avgLoad": 26.11,
       "avgReps": 11.38,
       "avgVolume": 603.77
+    },
+    {
+      "movementId": "b4caae56-c6f8-430f-ac33-15d4fed8d8af",
+      "canonicalKey": "b4caae56-c6f8-430f-ac33-15d4fed8d8af",
+      "sampleTitle": null,
+      "muscleGroup": "unmapped",
+      "pattern": "other",
+      "mapped": false,
+      "confidence": 0.18,
+      "setCount": 28,
+      "workoutCount": 2,
+      "lastSeenAt": "2026-04-20T09:35:35.113Z",
+      "avgLoad": 34.32,
+      "avgReps": 11.53,
+      "avgVolume": 399.51
     },
     {
       "movementId": "c4f3f895-61c4-4916-9e11-6f3ec68e8dba",
@@ -2929,21 +2970,6 @@
       "avgLoad": 21.72,
       "avgReps": 8.02,
       "avgVolume": 347.99
-    },
-    {
-      "movementId": "97854f66-63ce-4d82-8d62-554a19174113",
-      "canonicalKey": "97854f66-63ce-4d82-8d62-554a19174113",
-      "sampleTitle": null,
-      "muscleGroup": "unmapped",
-      "pattern": "other",
-      "mapped": false,
-      "confidence": 0.18,
-      "setCount": 26,
-      "workoutCount": 2,
-      "lastSeenAt": "2026-04-14T09:53:47.094Z",
-      "avgLoad": 40.51,
-      "avgReps": 12.01,
-      "avgVolume": 522.21
     },
     {
       "movementId": "9806547f-2029-4c0a-94cc-d43b7b46da6c",
@@ -3049,21 +3075,6 @@
       "avgLoad": 32.64,
       "avgReps": 9.67,
       "avgVolume": 621.68
-    },
-    {
-      "movementId": "b4caae56-c6f8-430f-ac33-15d4fed8d8af",
-      "canonicalKey": "b4caae56-c6f8-430f-ac33-15d4fed8d8af",
-      "sampleTitle": null,
-      "muscleGroup": "unmapped",
-      "pattern": "other",
-      "mapped": false,
-      "confidence": 0.18,
-      "setCount": 22,
-      "workoutCount": 2,
-      "lastSeenAt": "2026-04-14T10:01:35.901Z",
-      "avgLoad": 33.28,
-      "avgReps": 11.71,
-      "avgVolume": 392.52
     },
     {
       "movementId": "c6f063ad-ffdc-4606-8352-c4bbf97c50ff",
@@ -3186,6 +3197,21 @@
       "avgVolume": 117.01
     },
     {
+      "movementId": "52f1a3a8-6a76-46b7-ba3b-d5ceba0ddbc9",
+      "canonicalKey": "52f1a3a8-6a76-46b7-ba3b-d5ceba0ddbc9",
+      "sampleTitle": null,
+      "muscleGroup": "unmapped",
+      "pattern": "other",
+      "mapped": false,
+      "confidence": 0.18,
+      "setCount": 20,
+      "workoutCount": 2,
+      "lastSeenAt": "2026-04-20T09:29:17.595Z",
+      "avgLoad": 21.59,
+      "avgReps": 13.8,
+      "avgVolume": 595.81
+    },
+    {
       "movementId": "9dd867e1-4304-4d85-b0bb-fcddce573c3c",
       "canonicalKey": "9dd867e1-4304-4d85-b0bb-fcddce573c3c",
       "sampleTitle": null,
@@ -3216,6 +3242,21 @@
       "avgVolume": 235.32
     },
     {
+      "movementId": "ea30d4b4-4b45-4dc6-a4ee-1b8a85eb88f9",
+      "canonicalKey": "ea30d4b4-4b45-4dc6-a4ee-1b8a85eb88f9",
+      "sampleTitle": null,
+      "muscleGroup": "unmapped",
+      "pattern": "other",
+      "mapped": false,
+      "confidence": 0.18,
+      "setCount": 20,
+      "workoutCount": 2,
+      "lastSeenAt": "2026-04-20T09:36:28.583Z",
+      "avgLoad": 26.84,
+      "avgReps": 12,
+      "avgVolume": 332.96
+    },
+    {
       "movementId": "3b3f0628-37ce-4985-ab71-8ae10141ed98",
       "canonicalKey": "3b3f0628-37ce-4985-ab71-8ae10141ed98",
       "sampleTitle": null,
@@ -3229,6 +3270,21 @@
       "avgLoad": 37.28,
       "avgReps": 8.66,
       "avgVolume": 624.09
+    },
+    {
+      "movementId": "e4263a8a-8246-4f18-9791-ad1bbea8b409",
+      "canonicalKey": "e4263a8a-8246-4f18-9791-ad1bbea8b409",
+      "sampleTitle": null,
+      "muscleGroup": "unmapped",
+      "pattern": "other",
+      "mapped": false,
+      "confidence": 0.18,
+      "setCount": 19,
+      "workoutCount": 2,
+      "lastSeenAt": "2026-04-20T09:43:58.542Z",
+      "avgLoad": 0,
+      "avgReps": 0,
+      "avgVolume": 370.79
     },
     {
       "movementId": "12d4e320-fc8a-43cd-842c-5934b4bba3c8",
@@ -3276,19 +3332,34 @@
       "avgVolume": 299.66
     },
     {
-      "movementId": "52f1a3a8-6a76-46b7-ba3b-d5ceba0ddbc9",
-      "canonicalKey": "52f1a3a8-6a76-46b7-ba3b-d5ceba0ddbc9",
+      "movementId": "d5555c40-95d3-4587-9fb7-f92c69ecc490",
+      "canonicalKey": "d5555c40-95d3-4587-9fb7-f92c69ecc490",
       "sampleTitle": null,
       "muscleGroup": "unmapped",
       "pattern": "other",
       "mapped": false,
       "confidence": 0.18,
-      "setCount": 17,
+      "setCount": 18,
       "workoutCount": 2,
-      "lastSeenAt": "2026-04-14T09:54:56.005Z",
-      "avgLoad": 21.41,
-      "avgReps": 13.4,
-      "avgVolume": 570.43
+      "lastSeenAt": "2026-04-20T09:42:44.695Z",
+      "avgLoad": 18.14,
+      "avgReps": 13.72,
+      "avgVolume": 497.17
+    },
+    {
+      "movementId": "eb067021-46de-433c-9262-deea70debde2",
+      "canonicalKey": "eb067021-46de-433c-9262-deea70debde2",
+      "sampleTitle": null,
+      "muscleGroup": "unmapped",
+      "pattern": "other",
+      "mapped": false,
+      "confidence": 0.18,
+      "setCount": 18,
+      "workoutCount": 2,
+      "lastSeenAt": "2026-04-20T09:28:47.049Z",
+      "avgLoad": 28.74,
+      "avgReps": 23.94,
+      "avgVolume": 688.68
     },
     {
       "movementId": "65ebd242-b9d3-405d-9922-0c6e3df0ce22",
@@ -3426,21 +3497,6 @@
       "avgVolume": 128.04
     },
     {
-      "movementId": "e4263a8a-8246-4f18-9791-ad1bbea8b409",
-      "canonicalKey": "e4263a8a-8246-4f18-9791-ad1bbea8b409",
-      "sampleTitle": null,
-      "muscleGroup": "unmapped",
-      "pattern": "other",
-      "mapped": false,
-      "confidence": 0.18,
-      "setCount": 16,
-      "workoutCount": 2,
-      "lastSeenAt": "2026-04-14T10:09:23.322Z",
-      "avgLoad": 0,
-      "avgReps": 0,
-      "avgVolume": 369.27
-    },
-    {
       "movementId": "f227965f-12fc-4d6a-8e80-5cf624e69e86",
       "canonicalKey": "f227965f-12fc-4d6a-8e80-5cf624e69e86",
       "sampleTitle": null,
@@ -3454,6 +3510,21 @@
       "avgLoad": 30.39,
       "avgReps": 8.22,
       "avgVolume": 252.45
+    },
+    {
+      "movementId": "0e17b36b-37b4-4c6f-accb-979dfaaf30d2",
+      "canonicalKey": "0e17b36b-37b4-4c6f-accb-979dfaaf30d2",
+      "sampleTitle": null,
+      "muscleGroup": "unmapped",
+      "pattern": "other",
+      "mapped": false,
+      "confidence": 0.18,
+      "setCount": 15,
+      "workoutCount": 2,
+      "lastSeenAt": "2026-04-20T09:43:18.673Z",
+      "avgLoad": 20.49,
+      "avgReps": 13.71,
+      "avgVolume": 561.62
     },
     {
       "movementId": "1f5e8776-3b9c-4fe7-80d1-75b5b28a4455",
@@ -3499,36 +3570,6 @@
       "avgLoad": 7,
       "avgReps": 17.73,
       "avgVolume": 138.73
-    },
-    {
-      "movementId": "d5555c40-95d3-4587-9fb7-f92c69ecc490",
-      "canonicalKey": "d5555c40-95d3-4587-9fb7-f92c69ecc490",
-      "sampleTitle": null,
-      "muscleGroup": "unmapped",
-      "pattern": "other",
-      "mapped": false,
-      "confidence": 0.18,
-      "setCount": 15,
-      "workoutCount": 2,
-      "lastSeenAt": "2026-04-14T10:08:05.615Z",
-      "avgLoad": 17.3,
-      "avgReps": 13.73,
-      "avgVolume": 473.29
-    },
-    {
-      "movementId": "eb067021-46de-433c-9262-deea70debde2",
-      "canonicalKey": "eb067021-46de-433c-9262-deea70debde2",
-      "sampleTitle": null,
-      "muscleGroup": "unmapped",
-      "pattern": "other",
-      "mapped": false,
-      "confidence": 0.18,
-      "setCount": 15,
-      "workoutCount": 2,
-      "lastSeenAt": "2026-04-14T09:54:23.287Z",
-      "avgLoad": 27.93,
-      "avgReps": 23.52,
-      "avgVolume": 661.39
     },
     {
       "movementId": "fed85293-b564-429c-b9be-9d52c2da5e75",
@@ -3589,36 +3630,6 @@
       "avgLoad": 42.83,
       "avgReps": 20,
       "avgVolume": 868.64
-    },
-    {
-      "movementId": "ea30d4b4-4b45-4dc6-a4ee-1b8a85eb88f9",
-      "canonicalKey": "ea30d4b4-4b45-4dc6-a4ee-1b8a85eb88f9",
-      "sampleTitle": null,
-      "muscleGroup": "unmapped",
-      "pattern": "other",
-      "mapped": false,
-      "confidence": 0.18,
-      "setCount": 14,
-      "workoutCount": 2,
-      "lastSeenAt": "2026-04-14T10:02:32.057Z",
-      "avgLoad": 27.08,
-      "avgReps": 11.97,
-      "avgVolume": 330.3
-    },
-    {
-      "movementId": "0e17b36b-37b4-4c6f-accb-979dfaaf30d2",
-      "canonicalKey": "0e17b36b-37b4-4c6f-accb-979dfaaf30d2",
-      "sampleTitle": null,
-      "muscleGroup": "unmapped",
-      "pattern": "other",
-      "mapped": false,
-      "confidence": 0.18,
-      "setCount": 12,
-      "workoutCount": 2,
-      "lastSeenAt": "2026-04-14T10:08:41.369Z",
-      "avgLoad": 19.59,
-      "avgReps": 13.62,
-      "avgVolume": 532.96
     },
     {
       "movementId": "2da40d18-5f1c-42a8-9a21-c2677a00d300",
@@ -4733,6 +4744,7 @@
   ],
   "qualityFlags": {
     "low_mapping_workouts": [
+      "71de8407-3c75-499e-8ca7-e178ebd1c815",
       "308d4a89-f051-4eb8-993f-2d66fe0efd0c",
       "e7f849e5-fb02-4966-94a6-a66b424a2baf",
       "9e0f467e-a8e2-419b-9b7f-6befbc29b03d",
@@ -4975,10 +4987,11 @@
   },
   "raw": {
     "profile": {
-      "total_workouts": 121,
+      "total_workouts": 122,
       "user_id": "709c25e4-e35f-39fe-a5c9-83f048f42498"
     },
     "top_program_ids": [
+      "7c75828b-cee7-433e-b488-ac0360bcfaef",
       "7c75828b-cee7-433e-b488-ac0360bcfaef",
       null,
       "7c75828b-cee7-433e-b488-ac0360bcfaef",
@@ -4987,10 +5000,10 @@
       "7c75828b-cee7-433e-b488-ac0360bcfaef",
       null,
       "30a6fa9d-5de0-4507-963d-809be7a8a70f",
-      null,
-      "30a6fa9d-5de0-4507-963d-809be7a8a70f"
+      null
     ],
     "top_workout_ids": [
+      "28abe326-89c1-496b-b163-b6a7d60b8e7f",
       "c65a556f-55cb-4094-9ffa-34524be48bbe",
       "00000000-0000-0000-0000-000000000001",
       "bf5d9d6d-c8cf-40c8-a29a-9da59eb6343e",
@@ -4999,8 +5012,7 @@
       "28abe326-89c1-496b-b163-b6a7d60b8e7f",
       "00000000-0000-0000-0000-000000000001",
       "1abc779c-77df-4425-b550-841c9ce8a0e6",
-      "a54e584e-661e-4076-acca-7ace7cc74a97",
-      "7b6e93e8-b3da-4390-aa3c-e7f75388e473"
+      "a54e584e-661e-4076-acca-7ace7cc74a97"
     ]
   }
 }

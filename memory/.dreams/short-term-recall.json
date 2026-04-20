@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-04-20T00:38:26.781Z",
+  "updatedAt": "2026-04-20T10:39:35.189Z",
   "entries": {
     "memory:memory/.dreams/session-corpus/2026-04-10.txt:1:1": {
       "key": "memory:memory/.dreams/session-corpus/2026-04-10.txt:1:1",
@@ -14889,23 +14889,26 @@
       "endLine": 67,
       "source": "memory",
       "snippet": "- status: staged - Candidate: Assistant: [[reply_to_current]] Quite a lot, Chief. I can: - read, edit, and create files in your `/Users/hd/Developer/cortana` workspace - run shell commands, inspect logs, and debug local services - use browser automation for web tasks - manage messages, reminders, cron jobs, a - confidence: 0.58 - evidence: memory/.dreams/session-corpus/2026-04-12.txt:100-100 - recalls: 0 - status: staged - Candidate: Assistant: ☀️ Brief - Morning Brief Schedule: - 11:00 AM - 🏁 FORMULA 1 GULF AIR BAHRAIN GRAND PRIX 2026 - Race Apple Reminders: - Return iPhone FedEx - Bedding laundry - Pick classes for last semester - Check workday - Email Sanjay Uncle about investm",
-      "recallCount": 5,
+      "recallCount": 7,
       "dailyCount": 0,
       "groundedCount": 0,
-      "totalScore": 1.4504280358552935,
-      "maxScore": 0.3544162184000015,
+      "totalScore": 2.153321272134781,
+      "maxScore": 0.3868418604135513,
       "firstRecalledAt": "2026-04-17T16:48:18.880Z",
-      "lastRecalledAt": "2026-04-19T23:35:59.708Z",
+      "lastRecalledAt": "2026-04-20T10:39:35.189Z",
       "queryHashes": [
         "489659511777",
         "1d4ad651fc3c",
         "8d9acb69d49c",
         "b223830b246e",
-        "538b8377e745"
+        "538b8377e745",
+        "8579c1a90669",
+        "a89cb8b7e9fa"
       ],
       "recallDays": [
         "2026-04-17",
-        "2026-04-19"
+        "2026-04-19",
+        "2026-04-20"
       ],
       "conceptTags": [
         "reply-to-current",
