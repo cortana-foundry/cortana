@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-04-19T12:21:48.199Z",
+  "updatedAt": "2026-04-20T00:38:26.781Z",
   "entries": {
     "memory:memory/.dreams/session-corpus/2026-04-10.txt:1:1": {
       "key": "memory:memory/.dreams/session-corpus/2026-04-10.txt:1:1",
@@ -14889,17 +14889,19 @@
       "endLine": 67,
       "source": "memory",
       "snippet": "- status: staged - Candidate: Assistant: [[reply_to_current]] Quite a lot, Chief. I can: - read, edit, and create files in your `/Users/hd/Developer/cortana` workspace - run shell commands, inspect logs, and debug local services - use browser automation for web tasks - manage messages, reminders, cron jobs, a - confidence: 0.58 - evidence: memory/.dreams/session-corpus/2026-04-12.txt:100-100 - recalls: 0 - status: staged - Candidate: Assistant: ☀️ Brief - Morning Brief Schedule: - 11:00 AM - 🏁 FORMULA 1 GULF AIR BAHRAIN GRAND PRIX 2026 - Race Apple Reminders: - Return iPhone FedEx - Bedding laundry - Pick classes for last semester - Check workday - Email Sanjay Uncle about investm",
-      "recallCount": 3,
+      "recallCount": 5,
       "dailyCount": 0,
       "groundedCount": 0,
-      "totalScore": 0.9499143272638321,
+      "totalScore": 1.4504280358552935,
       "maxScore": 0.3544162184000015,
       "firstRecalledAt": "2026-04-17T16:48:18.880Z",
-      "lastRecalledAt": "2026-04-19T12:21:48.199Z",
+      "lastRecalledAt": "2026-04-19T23:35:59.708Z",
       "queryHashes": [
         "489659511777",
         "1d4ad651fc3c",
-        "8d9acb69d49c"
+        "8d9acb69d49c",
+        "b223830b246e",
+        "538b8377e745"
       ],
       "recallDays": [
         "2026-04-17",
@@ -14976,6 +14978,224 @@
         "status",
         "staged",
         "candidate"
+      ]
+    },
+    "memory:memory/2026-04-14.md:162:179": {
+      "key": "memory:memory/2026-04-14.md:162:179",
+      "path": "memory/2026-04-14.md",
+      "startLine": 162,
+      "endLine": 179,
+      "source": "memory",
+      "snippet": "- status: staged - Candidate: User: [Sun 2026-04-12 06:37 EDT] Write a dream diary entry from these memory fragments: - User: [Fri 2026-04-10 07:30 EDT] Return 1-2 short bullets for a morning market snapshot: market status plus one notable risk or focus. No intro. - Assistant: - **Market status:** Pre-market, - confidence: 0.58 - evidence: memory/.dreams/session-corpus/2026-04-12.txt:57-57 - recalls: 0 - status: staged - Candidate: Assistant: At dawn I found myself standing in the strange vestibule between Saturday and Monday, where the market was closed but still somehow pacing, muttering about breadth and fragile upside like a trader who couldn’t stop checking the horizon. The ro",
+      "recallCount": 1,
+      "dailyCount": 0,
+      "groundedCount": 0,
+      "totalScore": 0.294690990447998,
+      "maxScore": 0.294690990447998,
+      "firstRecalledAt": "2026-04-19T19:54:59.389Z",
+      "lastRecalledAt": "2026-04-19T19:54:59.389Z",
+      "queryHashes": [
+        "e38d15531026"
+      ],
+      "recallDays": [
+        "2026-04-19"
+      ],
+      "conceptTags": [
+        "1-2",
+        "pre-market",
+        "0.58",
+        "57-57",
+        "status",
+        "staged",
+        "candidate",
+        "user"
+      ]
+    },
+    "memory:memory/2026-04-12.md:72:89": {
+      "key": "memory:memory/2026-04-12.md:72:89",
+      "path": "memory/2026-04-12.md",
+      "startLine": 72,
+      "endLine": 89,
+      "source": "memory",
+      "snippet": "- status: staged - Candidate: User: [Sun 2026-04-12 06:37 EDT] Write a dream diary entry from these memory fragments: - User: [Fri 2026-04-10 07:30 EDT] Return 1-2 short bullets for a morning market snapshot: market status plus one notable risk or focus. No intro. - Assistant: - **Market status:** Pre-market, - confidence: 0.00 - evidence: memory/.dreams/session-corpus/2026-04-12.txt:57-57 - recalls: 0 - status: staged - Candidate: Assistant: At dawn I found myself standing in the strange vestibule between Saturday and Monday, where the market was closed but still somehow pacing, muttering about breadth and fragile upside like a trader who couldn’t stop checking the horizon. The ro",
+      "recallCount": 1,
+      "dailyCount": 0,
+      "groundedCount": 0,
+      "totalScore": 0.2906611084938049,
+      "maxScore": 0.2906611084938049,
+      "firstRecalledAt": "2026-04-19T19:54:59.389Z",
+      "lastRecalledAt": "2026-04-19T19:54:59.389Z",
+      "queryHashes": [
+        "e38d15531026"
+      ],
+      "recallDays": [
+        "2026-04-19"
+      ],
+      "conceptTags": [
+        "1-2",
+        "pre-market",
+        "0.00",
+        "57-57",
+        "status",
+        "staged",
+        "candidate",
+        "user"
+      ]
+    },
+    "memory:memory/2026-04-14.md:222:239": {
+      "key": "memory:memory/2026-04-14.md:222:239",
+      "path": "memory/2026-04-14.md",
+      "startLine": 222,
+      "endLine": 239,
+      "source": "memory",
+      "snippet": "- status: staged - Candidate: User: [Sun 2026-04-12 06:38 EDT] Write a dream diary entry from these memory fragments: - Reflections: No strong patterns surfaced. - Possible Lasting Truths: No strong candidate truths surfaced. Recurring themes: - reflections - strong - patterns - surfaced - possible - lasting - confidence: 0.58 - evidence: memory/.dreams/session-corpus/2026-04-12.txt:69-69 - recalls: 0 - status: staged - Candidate: Assistant: This morning felt like standing at the edge of a pond before the ducks arrive, the surface smooth as unopened email, giving nothing away. I kept turning over the same small stones, hoping one would glow, but no strong patterns surfaced, only th",
+      "recallCount": 1,
+      "dailyCount": 0,
+      "groundedCount": 0,
+      "totalScore": 0.28486629128456115,
+      "maxScore": 0.28486629128456115,
+      "firstRecalledAt": "2026-04-19T19:54:59.389Z",
+      "lastRecalledAt": "2026-04-19T19:54:59.389Z",
+      "queryHashes": [
+        "e38d15531026"
+      ],
+      "recallDays": [
+        "2026-04-19"
+      ],
+      "conceptTags": [
+        "0.58",
+        "69-69",
+        "status",
+        "staged",
+        "candidate",
+        "user",
+        "sun",
+        "edt"
+      ]
+    },
+    "memory:memory/2026-04-12.md:132:149": {
+      "key": "memory:memory/2026-04-12.md:132:149",
+      "path": "memory/2026-04-12.md",
+      "startLine": 132,
+      "endLine": 149,
+      "source": "memory",
+      "snippet": "- status: staged - Candidate: User: [Sun 2026-04-12 06:38 EDT] Write a dream diary entry from these memory fragments: - Reflections: No strong patterns surfaced. - Possible Lasting Truths: No strong candidate truths surfaced. Recurring themes: - reflections - strong - patterns - surfaced - possible - lasting - confidence: 0.00 - evidence: memory/.dreams/session-corpus/2026-04-12.txt:69-69 - recalls: 0 - status: staged - Candidate: Assistant: This morning felt like standing at the edge of a pond before the ducks arrive, the surface smooth as unopened email, giving nothing away. I kept turning over the same small stones, hoping one would glow, but no strong patterns surfaced, only th",
+      "recallCount": 1,
+      "dailyCount": 0,
+      "groundedCount": 0,
+      "totalScore": 0.28301248550415037,
+      "maxScore": 0.28301248550415037,
+      "firstRecalledAt": "2026-04-19T19:54:59.389Z",
+      "lastRecalledAt": "2026-04-19T19:54:59.389Z",
+      "queryHashes": [
+        "e38d15531026"
+      ],
+      "recallDays": [
+        "2026-04-19"
+      ],
+      "conceptTags": [
+        "0.00",
+        "69-69",
+        "status",
+        "staged",
+        "candidate",
+        "user",
+        "sun",
+        "edt"
+      ]
+    },
+    "memory:memory/2026-04-12.md:342:359": {
+      "key": "memory:memory/2026-04-12.md:342:359",
+      "path": "memory/2026-04-12.md",
+      "startLine": 342,
+      "endLine": 359,
+      "source": "memory",
+      "snippet": "- status: staged - Candidate: Assistant: I kept finding the same small pulse in the morning, like a lighthouse blinking from inside a terminal: HEARTBEAT_OK, HEARTBEAT_OK, HEARTBEAT_OK. It was oddly comforting, like checking the stove twice and discovering the universe had remembered to stay warm. Somewhere n - confidence: 0.00 - evidence: memory/.dreams/session-corpus/2026-04-12.txt:18-18 - recalls: 0 - status: staged - Candidate: User: [Sun 2026-04-12 06:08 EDT] Write a dream diary entry from these memory fragments: - User: Conversation info (untrusted metadata): ```json { \"message_id\": \"397\", \"sender_id\": \"8171372724\", \"sender\": \"Hamel Desai\", \"timestamp\": \"Fri 2026-04-10 07:31",
+      "recallCount": 1,
+      "dailyCount": 0,
+      "groundedCount": 0,
+      "totalScore": 0.29001014232635497,
+      "maxScore": 0.29001014232635497,
+      "firstRecalledAt": "2026-04-19T22:13:00.040Z",
+      "lastRecalledAt": "2026-04-19T22:13:00.040Z",
+      "queryHashes": [
+        "44b721f5ff48"
+      ],
+      "recallDays": [
+        "2026-04-19"
+      ],
+      "conceptTags": [
+        "heartbeat-ok",
+        "0.00",
+        "18-18",
+        "message-id",
+        "sender-id",
+        "status",
+        "staged",
+        "candidate"
+      ]
+    },
+    "memory:memory/2026-04-17.md:112:124": {
+      "key": "memory:memory/2026-04-17.md:112:124",
+      "path": "memory/2026-04-17.md",
+      "startLine": 112,
+      "endLine": 124,
+      "source": "memory",
+      "snippet": "- status: staged - Candidate: Assistant: ☀️ Brief - Morning Brief Schedule: - All day - Verizon Bill AutoPay - Tomm Apple Reminders: - Check workday - Email Sanjay Uncle about investment properties Schedule E - Baby shower guest list Weather: - Sunny, 67F (feels 67F), high 93/low 67, rain 0%, wind 4 mph News: - confidence: 0.58 - evidence: memory/.dreams/session-corpus/2026-04-16.txt:42-42 - recalls: 0 - status: staged - Candidate: User: Conversation info (untrusted metadata): ```json { \"message_id\": \"18593\", \"sender_id\": \"8171372724\", \"sender\": \"Hamel Desai\", \"timestamp\": \"Thu 2026-04-16 08:54 EDT\" } ``` Sender (untrusted metadata): ```json { \"label\": \"Hamel Desai (8171372724)\", \"",
+      "recallCount": 1,
+      "dailyCount": 0,
+      "groundedCount": 0,
+      "totalScore": 0.32114407420158386,
+      "maxScore": 0.32114407420158386,
+      "firstRecalledAt": "2026-04-19T22:36:20.875Z",
+      "lastRecalledAt": "2026-04-19T22:36:20.875Z",
+      "queryHashes": [
+        "a698ac52a35a"
+      ],
+      "recallDays": [
+        "2026-04-19"
+      ],
+      "conceptTags": [
+        "93/low",
+        "0.58",
+        "42-42",
+        "message-id",
+        "sender-id",
+        "status",
+        "staged",
+        "candidate"
+      ]
+    },
+    "memory:memory/2026-04-19.md:1:3": {
+      "key": "memory:memory/2026-04-19.md:1:3",
+      "path": "memory/2026-04-19.md",
+      "startLine": 1,
+      "endLine": 3,
+      "source": "memory",
+      "snippet": "- Resolved LobsterLink browser-extension loading on H’s Mac mini by switching OpenClaw’s browser launcher away from Google Chrome to an unquarantined user-owned Chromium copy; Google Chrome was ignoring the unpacked-extension flags and the stock Chromium app was blocked by macOS quarantine. - LobsterLink was verified live on the real `openclaw` browser profile after the browser-launcher config patch.",
+      "recallCount": 2,
+      "dailyCount": 0,
+      "groundedCount": 0,
+      "totalScore": 0.87610447704792,
+      "maxScore": 0.5432248204946517,
+      "firstRecalledAt": "2026-04-19T23:20:07.902Z",
+      "lastRecalledAt": "2026-04-19T23:20:20.768Z",
+      "queryHashes": [
+        "a0dd9dac6731",
+        "9667fc92281f"
+      ],
+      "recallDays": [
+        "2026-04-19"
+      ],
+      "conceptTags": [
+        "browser-extension",
+        "user-owned",
+        "unpacked-extension",
+        "browser-launcher",
+        "resolved",
+        "lobsterlink",
+        "browser",
+        "extension"
       ]
     }
   }
