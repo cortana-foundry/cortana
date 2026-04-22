@@ -230,25 +230,21 @@ describe("repo-auto-sync worktree conflict automation", () => {
     const identityDream = path.join(repoDir, "identities", "oracle", "DREAMS.md");
     const dreamState = path.join(repoDir, "memory", ".dreams", "short-term-recall.json");
     const dreamingDiary = path.join(repoDir, "memory", "dreaming", "rem", "2026-04-22.md");
-    const heartbeatState = path.join(repoDir, "memory", "heartbeat-state.json");
     const { binDir, callsPath } = setupFakeGh(rootDir);
 
     fs.mkdirSync(path.dirname(rootDream), { recursive: true });
     fs.mkdirSync(path.dirname(identityDream), { recursive: true });
     fs.mkdirSync(path.dirname(dreamState), { recursive: true });
-    fs.mkdirSync(path.dirname(heartbeatState), { recursive: true });
     fs.writeFileSync(rootDream, "# Seed dream diary\n", "utf8");
     fs.writeFileSync(identityDream, "# Oracle seed dream diary\n", "utf8");
     fs.writeFileSync(dreamState, '{"summary":"seed"}\n', "utf8");
-    fs.writeFileSync(heartbeatState, '{"pulse":1}\n', "utf8");
-    run("git add DREAMS.md identities/oracle/DREAMS.md memory/.dreams/short-term-recall.json memory/heartbeat-state.json", repoDir);
+    run("git add DREAMS.md identities/oracle/DREAMS.md memory/.dreams/short-term-recall.json", repoDir);
     run("git commit -m 'track dream memory files for regression'", repoDir);
     run("git push origin main", repoDir);
 
     fs.writeFileSync(rootDream, "# Updated dream diary\n", "utf8");
     fs.writeFileSync(identityDream, "# Oracle updated dream diary\n", "utf8");
     fs.writeFileSync(dreamState, '{"summary":"updated"}\n', "utf8");
-    fs.writeFileSync(heartbeatState, '{"pulse":2}\n', "utf8");
     fs.mkdirSync(path.dirname(dreamingDiary), { recursive: true });
     fs.writeFileSync(dreamingDiary, "# REM dream\n", "utf8");
 
@@ -270,7 +266,6 @@ describe("repo-auto-sync worktree conflict automation", () => {
     expect(run(`git show ${shQuote(promotedBranch ?? "")}:DREAMS.md`, repoDir)).toContain("Updated dream diary");
     expect(run(`git show ${shQuote(promotedBranch ?? "")}:identities/oracle/DREAMS.md`, repoDir)).toContain("updated dream diary");
     expect(run(`git show ${shQuote(promotedBranch ?? "")}:memory/dreaming/rem/2026-04-22.md`, repoDir)).toContain("REM dream");
-    expect(run(`git show ${shQuote(promotedBranch ?? "")}:memory/heartbeat-state.json`, repoDir)).toContain('"pulse":2');
   });
 
   it("resumes an existing promotable-memory branch instead of treating it as ordinary feature dirt", () => {
