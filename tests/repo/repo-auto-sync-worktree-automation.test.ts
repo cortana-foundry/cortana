@@ -224,18 +224,33 @@ describe("repo-auto-sync worktree conflict automation", () => {
     expect(fs.readFileSync(runtimeState, "utf8")).toContain("seed");
   });
 
-  it("promotes tracked dream-memory dirt on main into a draft PR and returns to clean main", () => {
+  it("promotes tracked and untracked dream-memory dirt on main into a draft PR and returns to clean main", () => {
     const { repoDir, rootDir } = setupMergedBranchRepo("repo-auto-sync-promotable-memory");
+    const rootDream = path.join(repoDir, "DREAMS.md");
+    const identityDream = path.join(repoDir, "identities", "oracle", "DREAMS.md");
     const dreamState = path.join(repoDir, "memory", ".dreams", "short-term-recall.json");
+    const dreamingDiary = path.join(repoDir, "memory", "dreaming", "rem", "2026-04-22.md");
+    const heartbeatState = path.join(repoDir, "memory", "heartbeat-state.json");
     const { binDir, callsPath } = setupFakeGh(rootDir);
 
+    fs.mkdirSync(path.dirname(rootDream), { recursive: true });
+    fs.mkdirSync(path.dirname(identityDream), { recursive: true });
     fs.mkdirSync(path.dirname(dreamState), { recursive: true });
+    fs.mkdirSync(path.dirname(heartbeatState), { recursive: true });
+    fs.writeFileSync(rootDream, "# Seed dream diary\n", "utf8");
+    fs.writeFileSync(identityDream, "# Oracle seed dream diary\n", "utf8");
     fs.writeFileSync(dreamState, '{"summary":"seed"}\n', "utf8");
-    run("git add memory/.dreams/short-term-recall.json", repoDir);
-    run("git commit -m 'track dream memory file for regression'", repoDir);
+    fs.writeFileSync(heartbeatState, '{"pulse":1}\n', "utf8");
+    run("git add DREAMS.md identities/oracle/DREAMS.md memory/.dreams/short-term-recall.json memory/heartbeat-state.json", repoDir);
+    run("git commit -m 'track dream memory files for regression'", repoDir);
     run("git push origin main", repoDir);
 
+    fs.writeFileSync(rootDream, "# Updated dream diary\n", "utf8");
+    fs.writeFileSync(identityDream, "# Oracle updated dream diary\n", "utf8");
     fs.writeFileSync(dreamState, '{"summary":"updated"}\n', "utf8");
+    fs.writeFileSync(heartbeatState, '{"pulse":2}\n', "utf8");
+    fs.mkdirSync(path.dirname(dreamingDiary), { recursive: true });
+    fs.writeFileSync(dreamingDiary, "# REM dream\n", "utf8");
 
     const result = runRepoAutoSyncWithEnv(repoDir, {
       PATH: `${binDir}:${process.env.PATH ?? ""}`,
@@ -252,5 +267,39 @@ describe("repo-auto-sync worktree conflict automation", () => {
     const promotedBranch = result.stdout.match(/branch=(codex\/promote-[^ ]+)/)?.[1];
     expect(promotedBranch).toBeTruthy();
     expect(hasLocalBranch(repoDir, promotedBranch ?? "")).toBe(true);
+    expect(run(`git show ${shQuote(promotedBranch ?? "")}:DREAMS.md`, repoDir)).toContain("Updated dream diary");
+    expect(run(`git show ${shQuote(promotedBranch ?? "")}:identities/oracle/DREAMS.md`, repoDir)).toContain("updated dream diary");
+    expect(run(`git show ${shQuote(promotedBranch ?? "")}:memory/dreaming/rem/2026-04-22.md`, repoDir)).toContain("REM dream");
+    expect(run(`git show ${shQuote(promotedBranch ?? "")}:memory/heartbeat-state.json`, repoDir)).toContain('"pulse":2');
+  });
+
+  it("resumes an existing promotable-memory branch instead of treating it as ordinary feature dirt", () => {
+    const { repoDir, rootDir } = setupMergedBranchRepo("repo-auto-sync-promotable-memory-resume");
+    const dreamState = path.join(repoDir, "memory", ".dreams", "short-term-recall.json");
+    const { binDir, callsPath } = setupFakeGh(rootDir);
+    const promotedBranch = "codex/promote-dream-memory-20260422-000000";
+
+    fs.mkdirSync(path.dirname(dreamState), { recursive: true });
+    fs.writeFileSync(dreamState, '{"summary":"seed"}\n', "utf8");
+    run("git add memory/.dreams/short-term-recall.json", repoDir);
+    run("git commit -m 'track dream memory file for resume regression'", repoDir);
+    run("git push origin main", repoDir);
+
+    fs.writeFileSync(dreamState, '{"summary":"updated"}\n', "utf8");
+    run(`git checkout -b ${shQuote(promotedBranch)}`, repoDir);
+
+    const result = runRepoAutoSyncWithEnv(repoDir, {
+      PATH: `${binDir}:${process.env.PATH ?? ""}`,
+    });
+
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain(`branch=${promotedBranch}`);
+    expect(result.stderr).toContain("detail=promotable-memory-branch-resume");
+    expect(result.stderr).toContain("detail=promotable-memory-pr-opened");
+    expect(run("git branch --show-current", repoDir)).toBe("main");
+    expect(run("git status --short", repoDir)).toBe("");
+    expect(fs.readFileSync(callsPath, "utf8")).toContain("pr create --draft");
+    expect(hasLocalBranch(repoDir, promotedBranch)).toBe(true);
+    expect(run(`git show ${shQuote(promotedBranch)}:memory/.dreams/short-term-recall.json`, repoDir)).toContain('"summary":"updated"');
   });
 });
