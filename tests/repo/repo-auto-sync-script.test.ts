@@ -75,8 +75,15 @@ describe("repo-auto-sync.sh hygiene policy", () => {
     expect(script).toContain('memory/calendar-reminders-sent.json');
     expect(script).toContain('memory/newsletter-alerted.json');
     expect(script).toContain('detail=volatile-runtime-state-restored');
+    expect(script).toContain('PROMOTABLE_MEMORY_FILES=(');
+    expect(script).toContain('"DREAMS.md"');
+    expect(script).toContain('"memory/heartbeat-state.json"');
     expect(script).toContain('PROMOTABLE_MEMORY_PREFIXES=(');
     expect(script).toContain('memory/.dreams/');
+    expect(script).toContain('memory/dreaming/');
+    expect(script).toContain('PROMOTABLE_MEMORY_GLOBS=(');
+    expect(script).toContain('identities/*/DREAMS.md');
+    expect(script).toContain('promotable-memory-branch-resume');
     expect(script).toContain('promotable-memory-pr-opened');
     expect(script).toContain('gh pr create --draft --base main --head "$branch"');
     expect(script).toContain('ALERT_STATE_FILE="${REPO_AUTO_SYNC_ALERT_STATE_FILE:-$HOME/.openclaw/tmp/repo-auto-sync-state.txt}"');

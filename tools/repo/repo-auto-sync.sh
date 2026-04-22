@@ -18,10 +18,16 @@ VOLATILE_STATUS_PREFIXES=(
   "var/backtests/runs/"
 )
 PROMOTABLE_MEMORY_FILES=(
+  "DREAMS.md"
   "memory/fitness/programs/json/current-tonal-catalog.json"
+  "memory/heartbeat-state.json"
 )
 PROMOTABLE_MEMORY_PREFIXES=(
   "memory/.dreams/"
+  "memory/dreaming/"
+)
+PROMOTABLE_MEMORY_GLOBS=(
+  "identities/*/DREAMS.md"
 )
 
 DIRTY_MAIN_STALE_HOURS="${DIRTY_MAIN_STALE_HOURS:-6}"
@@ -200,6 +206,17 @@ status_tracked_lines() {
   done <<< "$status"
 }
 
+status_nonvolatile_lines() {
+  local status="$1"
+
+  while IFS= read -r line; do
+    [[ -z "$line" ]] && continue
+    if ! status_line_is_volatile "$line"; then
+      printf '%s\n' "$line"
+    fi
+  done <<< "$status"
+}
+
 tracked_status_paths() {
   local status="$1"
 
@@ -209,10 +226,20 @@ tracked_status_paths() {
   done < <(status_tracked_lines "$status")
 }
 
+status_nonvolatile_paths() {
+  local status="$1"
+
+  while IFS= read -r line; do
+    [[ -z "$line" ]] && continue
+    status_line_path "$line"
+  done < <(status_nonvolatile_lines "$status")
+}
+
 path_is_promotable_memory() {
   local path="$1"
   local rel
   local prefix
+  local glob
 
   for rel in "${PROMOTABLE_MEMORY_FILES[@]}"; do
     if [[ "$path" == "$rel" ]]; then
@@ -226,10 +253,26 @@ path_is_promotable_memory() {
     fi
   done
 
+  for glob in "${PROMOTABLE_MEMORY_GLOBS[@]}"; do
+    if [[ "$path" == $glob ]]; then
+      return 0
+    fi
+  done
+
   return 1
 }
 
-tracked_status_is_promotable_memory_only() {
+path_is_dream_memory() {
+  local path="$1"
+
+  if [[ "$path" == "DREAMS.md" || "$path" == memory/.dreams/* || "$path" == memory/dreaming/* || "$path" == identities/*/DREAMS.md ]]; then
+    return 0
+  fi
+
+  return 1
+}
+
+status_is_promotable_memory_only() {
   local status="$1"
   local saw_path=1
   local path=""
@@ -240,7 +283,7 @@ tracked_status_is_promotable_memory_only() {
     if ! path_is_promotable_memory "$path"; then
       return 1
     fi
-  done < <(tracked_status_paths "$status")
+  done < <(status_nonvolatile_paths "$status")
 
   return "$saw_path"
 }
@@ -251,11 +294,11 @@ promotable_memory_slug() {
 
   while IFS= read -r path; do
     [[ -n "$path" ]] || continue
-    if [[ "$path" != memory/.dreams/* ]]; then
+    if ! path_is_dream_memory "$path"; then
       printf 'memory-artifacts\n'
       return 0
     fi
-  done < <(tracked_status_paths "$status")
+  done < <(status_nonvolatile_paths "$status")
 
   printf 'dream-memory\n'
 }
@@ -369,30 +412,39 @@ if isinstance(payload, list) and payload:
   printf '%s\n' "$pr_url"
 }
 
-promote_promotable_memory_state() {
+branch_is_promotable_memory_branch() {
+  local branch="${1:-}"
+
+  case "$branch" in
+    codex/promote-dream-memory-*|codex/promote-memory-artifacts-*)
+      return 0
+      ;;
+  esac
+
+  return 1
+}
+
+finalize_promotable_memory_branch() {
   local repo="$1"
-  local tracked_status="$2"
-  local branch_slug branch_name ts commit_msg pr_title pr_body branch_files file_list repo_name
+  local status="$2"
+  local branch_name="$3"
+  local branch_slug commit_msg pr_title pr_body branch_files file_list
   local paths=()
   local path=""
   local pr_url=""
   local commit_sha=""
   local promotion_ok=1
-  local on_feature_branch=1
 
   while IFS= read -r path; do
     [[ -n "$path" ]] || continue
     paths+=("$path")
-  done < <(tracked_status_paths "$tracked_status")
+  done < <(status_nonvolatile_paths "$status")
 
   if (( ${#paths[@]} == 0 )); then
     return 1
   fi
 
-  branch_slug="$(promotable_memory_slug "$tracked_status")"
-  ts="$(date -u +%Y%m%d-%H%M%S)"
-  branch_name="codex/promote-${branch_slug}-${ts}"
-  repo_name="$(basename "$repo")"
+  branch_slug="$(promotable_memory_slug "$status")"
   branch_files="$(join_by_comma "${paths[@]}")"
 
   if [[ "$branch_slug" == "dream-memory" ]]; then
@@ -406,7 +458,7 @@ promote_promotable_memory_state() {
   file_list="$(for path in "${paths[@]}"; do printf -- '- `%s`\n' "$path"; done)"
   pr_body=$(cat <<EOF
 ## Summary
-- promote tracked memory artifacts detected on local main during repo auto-sync
+- promote dream and memory artifacts detected during repo auto-sync
 - preserve dreaming and runtime-derived memory state instead of treating it as disposable dirt
 - return local main to a clean state so sync/deploy automation can continue
 
@@ -415,20 +467,19 @@ $file_list
 EOF
 )
 
-  if ! git -C "$repo" checkout -b "$branch_name" >/dev/null 2>&1; then
-    queue_actionable_alert "$repo" "preflight-clean" "promotable-memory-branch-create-failed branch=$branch_name"
-    return 1
-  fi
-  on_feature_branch=0
-
   if ! git -C "$repo" add -- "${paths[@]}" >/dev/null 2>&1; then
     queue_actionable_alert "$repo" "preflight-clean" "promotable-memory-stage-failed branch=$branch_name files=$branch_files"
     return 1
   fi
 
-  if ! git -C "$repo" commit -m "$commit_msg" >/dev/null 2>&1; then
-    queue_actionable_alert "$repo" "preflight-clean" "promotable-memory-commit-failed branch=$branch_name files=$branch_files"
-    return 1
+  if ! git -C "$repo" diff --cached --quiet -- "${paths[@]}"; then
+    if ! git -C "$repo" commit -m "$commit_msg" >/dev/null 2>&1; then
+      queue_actionable_alert "$repo" "preflight-clean" "promotable-memory-commit-failed branch=$branch_name files=$branch_files"
+      return 1
+    fi
+  else
+    printf 'INFO repo=%s step=preflight-clean detail=promotable-memory-no-new-commit branch=%q\n' \
+      "$repo" "$branch_name" >&2
   fi
 
   commit_sha="$(git -C "$repo" rev-parse HEAD 2>/dev/null || true)"
@@ -452,13 +503,39 @@ EOF
     queue_actionable_alert "$repo" "preflight-clean" "promotable-memory-return-main-failed branch=$branch_name"
     return 1
   fi
-  on_feature_branch=1
 
   if [[ "$promotion_ok" -ne 0 ]]; then
     return 0
   fi
 
   return 1
+}
+
+promote_promotable_memory_state() {
+  local repo="$1"
+  local status="$2"
+  local branch_slug branch_name ts
+
+  branch_slug="$(promotable_memory_slug "$status")"
+  ts="$(date -u +%Y%m%d-%H%M%S)"
+  branch_name="codex/promote-${branch_slug}-${ts}"
+
+  if ! git -C "$repo" checkout -b "$branch_name" >/dev/null 2>&1; then
+    queue_actionable_alert "$repo" "preflight-clean" "promotable-memory-branch-create-failed branch=$branch_name"
+    return 1
+  fi
+
+  finalize_promotable_memory_branch "$repo" "$status" "$branch_name"
+}
+
+resume_promotable_memory_state() {
+  local repo="$1"
+  local status="$2"
+  local branch_name="$3"
+
+  printf 'INFO repo=%s step=preflight-clean detail=promotable-memory-branch-resume branch=%q\n' \
+    "$repo" "$branch_name" >&2
+  finalize_promotable_memory_branch "$repo" "$status" "$branch_name"
 }
 
 list_worktrees_for_branch() {
@@ -722,6 +799,25 @@ ensure_clean_preflight() {
     return 0
   fi
 
+  local current_branch
+  current_branch="$(git -C "$repo" branch --show-current 2>/dev/null || true)"
+
+  if status_is_promotable_memory_only "$status"; then
+    if [[ "$current_branch" == "main" ]]; then
+      if promote_promotable_memory_state "$repo" "$status"; then
+        return 0
+      fi
+      return 3
+    fi
+
+    if branch_is_promotable_memory_branch "$current_branch"; then
+      if resume_promotable_memory_state "$repo" "$status" "$current_branch"; then
+        return 0
+      fi
+      return 3
+    fi
+  fi
+
   local tracked_status=""
   tracked_status="$(status_tracked_lines "$status")"
 
@@ -730,9 +826,6 @@ ensure_clean_preflight() {
     return 0
   fi
 
-  local current_branch
-  current_branch="$(git -C "$repo" branch --show-current 2>/dev/null || true)"
-
   if [[ "$current_branch" != "main" ]]; then
     if [[ "$POST_MERGE_MODE" == true ]]; then
       queue_actionable_alert "$repo" "preflight-clean" "post-merge-blocked-dirty-non-main branch=${current_branch:-detached}"
@@ -740,13 +833,6 @@ ensure_clean_preflight() {
     fi
     printf 'WARN repo=%s step=preflight-clean detail=feature-branch-dirty-expected branch=%q\n' "$repo" "$current_branch" >&2
     return 2
-  fi
-
-  if tracked_status_is_promotable_memory_only "$tracked_status"; then
-    if promote_promotable_memory_state "$repo" "$tracked_status"; then
-      return 0
-    fi
-    return 3
   fi
 
   local newest_age_seconds threshold_seconds
