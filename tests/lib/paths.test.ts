@@ -1,6 +1,7 @@
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
-import { findRepoRoot, getScriptDir } from '../../tools/lib/paths';
+import { defaultHeartbeatStatePath, findRepoRoot, getScriptDir } from '../../tools/lib/paths';
 
 describe('tools/lib/paths', () => {
   it('findRepoRoot returns a valid repo path with AGENTS.md or .git', () => {
@@ -16,5 +17,9 @@ describe('tools/lib/paths', () => {
     const scriptDir = getScriptDir(import.meta.url);
     expect(typeof scriptDir).toBe('string');
     expect(scriptDir.length).toBeGreaterThan(0);
+  });
+
+  it('defaults heartbeat runtime state outside the repo worktree', () => {
+    expect(defaultHeartbeatStatePath()).toBe(path.join(os.homedir(), '.openclaw', 'memory', 'heartbeat-state.json'));
   });
 });
