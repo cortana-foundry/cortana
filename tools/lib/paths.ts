@@ -57,5 +57,5 @@ export function resolveRuntimeStatePath(...segments: string[]): string {
 }
 
 export function defaultHeartbeatStatePath(): string {
-  return process.env.HEARTBEAT_STATE_FILE ?? resolveRepoPath("memory", "heartbeat-state.json");
+  return process.env.HEARTBEAT_STATE_FILE ?? resolveRuntimeStatePath("memory", "heartbeat-state.json");
 }
