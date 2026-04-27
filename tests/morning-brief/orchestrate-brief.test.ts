@@ -1,5 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
-import { buildBrief, fetchWeatherWithRunCommand, parseCalendarEvents } from "../../tools/morning-brief/orchestrate-brief.ts";
+import {
+  buildBrief,
+  fetchWeatherWithRunCommand,
+  parseCalendarEvents,
+  sessionsSendWithRunCommand,
+} from "../../tools/morning-brief/orchestrate-brief.ts";
 
 describe("parseCalendarEvents", () => {
   it("sorts, deduplicates, and formats schedule lines", () => {
@@ -90,5 +95,37 @@ describe("fetchWeatherWithRunCommand", () => {
     expect(run.mock.calls[0]).toEqual(["curl", ["-fsSL", "https://wttr.in/Warren+NJ?format=j1"], 20_000]);
     expect(run.mock.calls[1]?.[0]).toBe("curl");
     expect(run.mock.calls[1]?.[1]?.[1]).toContain("api.open-meteo.com/v1/forecast");
+  });
+});
+
+describe("sessionsSendWithRunCommand", () => {
+  it("retries once on the transient active-memory CLI startup race", async () => {
+    const run = vi
+      .fn<(cmd: string, args: string[], timeoutMs?: number) => Promise<string>>()
+      .mockRejectedValueOnce(
+        new Error(
+          "Command failed: openclaw agent --agent oracle --message test --json --timeout 240\n[openclaw] Failed to start CLI: PluginLoadFailureError: plugin load failed: active-memory: failed to install bundled runtime deps: Error: ENOTEMPTY",
+        ),
+      )
+      .mockResolvedValueOnce(
+        JSON.stringify({
+          result: {
+            payloads: [{ text: "- Premarket\n- Watch energy." }],
+          },
+        }),
+      );
+
+    const result = await sessionsSendWithRunCommand(
+      {
+        sessionKey: "agent:oracle:main",
+        agentId: "oracle",
+        prompt: "test",
+      },
+      run,
+    );
+
+    expect(result.ok).toBe(true);
+    expect(result.text).toBe("- Premarket\n- Watch energy.");
+    expect(run).toHaveBeenCalledTimes(2);
   });
 });
