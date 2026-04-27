@@ -227,6 +227,14 @@ function extractAgentText(raw: string): string {
   return "No response text returned.";
 }
 
+function isRetryableSpecialistError(message: string): boolean {
+  return (
+    message.includes("Failed to start CLI") &&
+    message.includes("PluginLoadFailureError") &&
+    message.includes("active-memory")
+  );
+}
+
 function splitForTelegram(messageText: string): string[] {
   if (messageText.length <= TELEGRAM_MAX_MESSAGE_LEN) return [messageText];
 
@@ -264,32 +272,49 @@ function splitForTelegram(messageText: string): string[] {
   return chunks;
 }
 
-async function sessionsSend(task: SpecialistTask): Promise<SpecialistResult> {
-  try {
-    const raw = await runCommand("openclaw", [
-      "agent",
-      "--agent",
-      task.agentId,
-      "--message",
-      task.prompt,
-      "--json",
-      "--timeout",
-      "240",
-    ]);
+export async function sessionsSendWithRunCommand(
+  task: SpecialistTask,
+  run: (cmd: string, args: string[], timeoutMs?: number) => Promise<string>,
+): Promise<SpecialistResult> {
+  const args = [
+    "agent",
+    "--agent",
+    task.agentId,
+    "--message",
+    task.prompt,
+    "--json",
+    "--timeout",
+    "240",
+  ];
 
-    return {
-      sessionKey: task.sessionKey,
-      ok: true,
-      text: extractAgentText(raw),
-    };
-  } catch (error) {
-    const msg = error instanceof Error ? error.message : String(error);
-    return {
-      sessionKey: task.sessionKey,
-      ok: false,
-      text: `Unavailable (${msg})`,
-    };
+  let lastError: string | null = null;
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      const raw = await run("openclaw", args);
+      return {
+        sessionKey: task.sessionKey,
+        ok: true,
+        text: extractAgentText(raw),
+      };
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      lastError = msg;
+      if (attempt === 0 && isRetryableSpecialistError(msg)) {
+        continue;
+      }
+      break;
+    }
   }
+
+  return {
+    sessionKey: task.sessionKey,
+    ok: false,
+    text: `Unavailable (${lastError ?? "unknown error"})`,
+  };
+}
+
+async function sessionsSend(task: SpecialistTask): Promise<SpecialistResult> {
+  return sessionsSendWithRunCommand(task, runCommand);
 }
 
 function formatWttrWeather(parsed: WttrWeatherPayload | null): string | null {
